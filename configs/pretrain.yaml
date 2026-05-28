@@ -1,0 +1,38 @@
+# Hydra config for pretraining runs. Override on the command line, e.g.:
+#   python scripts/pretrain.py mask_ratio=0.25 model.n_layers=8
+defaults:
+  - _self_
+
+seed: 42
+device: auto          # auto -> mps on Mac, cuda on cluster
+
+data:
+  dataset: assistments2017     # one of: assistments2017 | ednet | junyi | combined
+  processed_dir: /work/algl/processed
+  max_seq_len: 200             # sequences longer than this are chunked
+  min_interactions: 10         # drop students with fewer interactions
+  num_time_bins: 5
+
+model:
+  n_layers: 6
+  n_heads: 8
+  hidden_dim: 256
+  ff_dim: 1024
+  dropout: 0.1
+  factored_embeddings: true    # separate skill + outcome + time embeddings (vs compound)
+
+pretrain:
+  objective: mlm               # masked-interaction modeling
+  mask_ratio: 0.15             # fraction of interactions masked per sequence
+  predict_correctness: true    # masked token must recover the outcome too
+  epochs: 50
+  batch_size: 64               # reduce to 16 on M1 for dev
+  lr: 1.0e-4
+  weight_decay: 0.01
+  warmup_steps: 1000
+
+logging:
+  wandb_project: StudentBERT
+  wandb_mode: online           # 'disabled' for quick local debugging
+  checkpoint_dir: /work/algl/checkpoints
+  log_every: 50

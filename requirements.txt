@@ -1,0 +1,28 @@
+# pip-only install (alternative to environment.yml)
+# Use with:  pip install -r requirements.txt
+numpy
+pandas
+pyarrow
+scipy
+scikit-learn
+tqdm
+torch
+torchvision
+torchaudio
+transformers
+datasets
+tokenizers
+pykt-toolkit
+pyBKT
+wandb
+hydra-core
+omegaconf
+matplotlib
+seaborn
+black
+ruff
+isort
+pytest
+pre-commit
+jupyterlab
+ipykernel

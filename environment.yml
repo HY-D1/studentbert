@@ -1,0 +1,44 @@
+# Conda environment for StudentBERT (Apple Silicon M1 + cluster compatible)
+# Create with:  conda env create -f environment.yml
+# Update with:  conda env update -f environment.yml --prune
+name: studentbert
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      # Core scientific stack
+      - numpy
+      - pandas
+      - pyarrow            # parquet I/O for processed sequences
+      - scipy
+      - scikit-learn       # AUC, metrics, splits
+      - tqdm
+      # Deep learning (MPS on M1; CUDA wheels auto-selected on cluster)
+      - torch
+      - torchvision
+      - torchaudio
+      # Transformer building blocks
+      - transformers
+      - datasets
+      - tokenizers
+      # KT-specific
+      - pykt-toolkit       # standardized KT baselines + preprocessing
+      - pyBKT              # classical Bayesian Knowledge Tracing baseline
+      # Experiment tracking + config
+      - wandb
+      - hydra-core
+      - omegaconf
+      # Plotting
+      - matplotlib
+      - seaborn
+      # Dev tooling
+      - black
+      - ruff
+      - isort
+      - pytest
+      - pre-commit
+      # Notebooks
+      - jupyterlab
+      - ipykernel

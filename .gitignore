@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtual envs
+.venv/
+venv/
+.conda/
+
+# Environment / secrets
+.env
+*.key
+
+# macOS
+.DS_Store
+
+# Data & artifacts (live on cluster, never commit)
+data/
+!data/sample/
+checkpoints/
+outputs/
+*.npz
+*.parquet
+*.csv
+
+# Experiment tracking
+wandb/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
