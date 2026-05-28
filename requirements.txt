@@ -25,3 +25,4 @@ pytest
 pre-commit
 jupyterlab
 ipykernel
+pyBKT==1.4.1

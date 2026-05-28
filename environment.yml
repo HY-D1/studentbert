@@ -25,7 +25,7 @@ dependencies:
       - tokenizers
       # KT-specific
       - pykt-toolkit       # standardized KT baselines + preprocessing
-      - pyBKT              # classical Bayesian Knowledge Tracing baseline
+      - pyBKT == 1.4.1              # classical Bayesian Knowledge Tracing baseline
       # Experiment tracking + config
       - wandb
       - hydra-core
