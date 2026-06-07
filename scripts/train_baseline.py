@@ -97,12 +97,21 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--max_seq_len", type=int, default=512)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--wandb", action="store_true", help="log to Weights & Biases")
     args = ap.parse_args()
 
     set_seed(args.seed)
     device = get_device()
     num_skills = infer_num_skills(args.processed_dir)
     print(f"device={device}  num_skills={num_skills}")
+    if args.wandb:
+        import wandb
+        wandb.init(project="StudentBERT", entity="dhy666666o-n",
+                   name=f"{args.model}_{Path(args.processed_dir).name}",
+                   config={"model": args.model, "dataset": Path(args.processed_dir).name,
+                           "epochs": args.epochs, "batch_size": args.batch_size,
+                           "lr": args.lr, "max_seq_len": args.max_seq_len,
+                           "num_skills": num_skills})
 
     def make_loader(split, shuffle):
         ds = InteractionDataset(args.processed_dir, split, args.max_seq_len)
@@ -123,12 +132,18 @@ def main() -> None:
     for ep in range(1, args.epochs + 1):
         tr_loss, *_ = run_epoch(model, train_loader, device, args.model, opt)
         _, yt, yp = run_epoch(model, val_loader, device, args.model)
-        print(f"epoch {ep:2d}  train_loss={tr_loss:.4f}  val_AUC={auc(yt,yp):.4f}")
+        val_auc = auc(yt, yp)
+        print(f"epoch {ep:2d}  train_loss={tr_loss:.4f}  val_AUC={val_auc:.4f}")
+        if args.wandb:
+            import wandb; wandb.log({"epoch": ep, "train/loss": tr_loss, "val/auc": val_auc})
 
     _, yt, yp = run_epoch(model, test_loader, device, args.model)
     print(f"\n=== {args.model.upper()} on {Path(args.processed_dir).name} ===")
     print(f"test AUC : {auc(yt, yp):.4f}")
-    print(f"test ECE : {ece(yt, yp):.4f}")
+    test_auc, test_ece = auc(yt, yp), ece(yt, yp)
+    print(f"test ECE : {test_ece:.4f}")
+    if args.wandb:
+        import wandb; wandb.log({"test/auc": test_auc, "test/ece": test_ece}); wandb.finish()
 
 
 if __name__ == "__main__":

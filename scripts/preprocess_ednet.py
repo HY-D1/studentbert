@@ -112,7 +112,12 @@ def main() -> None:
         except ValueError:
             uid = abs(hash(f.stem)) % (10**9)  # fallback stable-ish id
 
-        df = pd.read_csv(f, usecols=["timestamp", "question_id", "user_answer", "elapsed_time"])
+        if f.stat().st_size == 0:
+            continue
+        try:
+            df = pd.read_csv(f, usecols=["timestamp", "question_id", "user_answer", "elapsed_time"])
+        except pd.errors.EmptyDataError:
+            continue
         n_raw_rows += len(df)
         if df.empty:
             continue
