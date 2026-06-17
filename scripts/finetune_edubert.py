@@ -197,16 +197,28 @@ def main() -> None:
                          n_layers=args.n_layers, dropout=args.dropout,
                          max_len=args.max_seq_len).to(device)
 
-    # load pretrained encoder weights (everything except the KT head)
+    # load pretrained encoder weights (everything except the KT head).
+    # CROSS-DATASET SAFE: keep only tensors whose shape matches the target model.
+    # For in-domain transfer (same skill vocab) this loads everything incl. skill_emb.
+    # For cross-dataset transfer (disjoint vocab, different K) this automatically
+    # SKIPS skill_emb + skill_head (size mismatch) and transfers the shared parts:
+    # encoder layers, pos_emb, time_emb, outcome_emb, emb_norm. The skill table is
+    # then (re)learned fresh on the target dataset — the correct behavior, since a
+    # skill id means different things across datasets.
     if args.init == "pretrained":
         ck = torch.load(args.encoder_ckpt, map_location=device)
         state = ck["model_state"]
-        # load into backbone; MLM heads (skill_head/correct_head) are unused by KT,
-        # so strict=False lets the new kt_head stay randomly initialized
-        missing, unexpected = model.backbone.load_state_dict(state, strict=False)
-        print(f"loaded pretrained encoder from {args.encoder_ckpt} "
-              f"(epoch {ck.get('epoch')}, mlm {ck.get('mlm_loss'):.4f}); "
-              f"missing={len(missing)} unexpected={len(unexpected)}")
+        tgt = model.backbone.state_dict()
+        transferable = {k: v for k, v in state.items()
+                        if k in tgt and v.shape == tgt[k].shape}
+        skipped = sorted(k for k in state if k not in transferable)
+        missing, unexpected = model.backbone.load_state_dict(transferable, strict=False)
+        mlm = ck.get("mlm_loss")
+        mlm_s = f"{mlm:.4f}" if isinstance(mlm, (int, float)) else str(mlm)
+        print(f"loaded {len(transferable)}/{len(state)} tensors from {args.encoder_ckpt} "
+              f"(epoch {ck.get('epoch')}, mlm {mlm_s})")
+        if skipped:
+            print(f"  skipped {len(skipped)} vocab-specific tensors (cross-dataset): {skipped}")
 
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
     total_steps = args.epochs * max(1, len(train_loader))
