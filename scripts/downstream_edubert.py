@@ -72,7 +72,7 @@ class StudentSeqDataset(Dataset):
     """Loads one split; exposes per-student (skill, correct, time_bin) + a
     precomputed dropout label (for --task dropout)."""
 
-    def __init__(self, processed_dir, split, max_seq_len, dropout_labels=None):
+    def __init__(self, processed_dir, split, max_seq_len, dropout_labels=None, k_prefix=None):
         d = Path(processed_dir)
         data = np.load(d / "sequences.npz")
         self.skill = data["skill"]; self.correct = data["correct"]
@@ -84,12 +84,19 @@ class StudentSeqDataset(Dataset):
         id_to_row = {int(sid): i for i, sid in enumerate(self.student_ids)}
         self.rows = [id_to_row[s] for s in wanted if s in id_to_row]
         self.dropout_labels = dropout_labels  # dict row->0/1 or None
+        self.k_prefix = k_prefix  # if set: use FIRST k interactions (early-pred)
+        if dropout_labels is not None:
+            # keep only eligible students (those present in the label dict)
+            self.rows = [r for r in self.rows if r in dropout_labels]
 
     def seq(self, row):
         s, e = self.offsets[row], self.offsets[row + 1]
         sk = self.skill[s:e].astype(np.int64)
         co = self.correct[s:e].astype(np.int64)
         tb = self.time_bin[s:e].astype(np.int64)
+        if self.k_prefix is not None:
+            # early-prediction: return FIRST k tokens, prefix taken in __getitem__
+            return sk, co, tb
         if len(sk) > self.max_seq_len:
             sk, co, tb = sk[-self.max_seq_len:], co[-self.max_seq_len:], tb[-self.max_seq_len:]
         return sk, co, tb
@@ -99,6 +106,8 @@ class StudentSeqDataset(Dataset):
     def __getitem__(self, idx):
         row = self.rows[idx]
         sk, co, tb = self.seq(row)
+        if self.k_prefix is not None:
+            sk, co, tb = sk[:self.k_prefix], co[:self.k_prefix], tb[:self.k_prefix]
         item = {"skill": torch.from_numpy(sk), "correct": torch.from_numpy(co),
                 "time_bin": torch.from_numpy(tb), "length": len(sk)}
         if self.dropout_labels is not None:
@@ -128,32 +137,27 @@ def collate(batch):
 # Dropout label construction (proxy from npz; see module docstring caveat)
 # ---------------------------------------------------------------------------
 def build_dropout_labels(processed_dir, max_seq_len):
-    """Per-student dropout proxy reconstructable from the npz.
-    Rule (advisor-approved intent, proxy realization):
-      dropped = (total_interactions < dataset-mean total) AND
-                (trailing inactivity: last time_bin == 5, i.e. >300s gap before final step)
-    Returns {row_index: 0/1} for ALL students, plus the positive rate.
-    NOTE: exact "30-day" rule needs raw timestamps not in npz; this is the
-    activity-based proxy. Flagged at runtime."""
-    data = np.load(Path(processed_dir) / "sequences.npz")
-    offsets = data["offsets"]; time_bin = data["time_bin"]
-    n_students = len(data["student_ids"])
-    totals = np.diff(offsets)  # interactions per student
-    mean_total = totals.mean()
+    """Load the real dropout label file (built by build_dropout_labels.py)."""
+    import json
+    d = Path(processed_dir)
+    lf = d / "dropout_labels.json"
+    if not lf.exists():
+        raise SystemExit(f"missing {lf}; run scripts/build_dropout_labels.py first")
+    raw = json.loads(lf.read_text())
+    meta = raw.pop("_meta", {})
+    npz = np.load(d / "sequences.npz")
+    sid_to_row = {int(s): i for i, s in enumerate(npz["student_ids"])}
     labels = {}
-    for row in range(n_students):
-        s, e = offsets[row], offsets[row + 1]
-        tb = time_bin[s:e]
-        low_activity = totals[row] < mean_total
-        trailing_gap = len(tb) > 0 and int(tb[-1]) == 5  # >300s before last action
-        labels[row] = 1 if (low_activity and trailing_gap) else 0
-    pos_rate = np.mean([labels[r] for r in range(n_students)])
-    return labels, pos_rate, mean_total
+    for sid_str, lab in raw.items():
+        sid = int(sid_str)
+        if sid in sid_to_row:
+            labels[sid_to_row[sid]] = int(lab)
+    for sid, row in sid_to_row.items():
+        labels.setdefault(row, 0)
+    pos_rate = float(np.mean([labels[r] for r in range(len(sid_to_row))]))
+    return labels, pos_rate, meta.get("threshold_interactions", -1)
 
 
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
 class EduBERTForDropout(nn.Module):
     """Mean-pool encoder states (over real tokens) -> binary logit."""
     def __init__(self, num_skills, d_model=256, n_layers=6, dropout=0.1, max_len=512):
@@ -214,6 +218,27 @@ def f1_minority(y_true, y_prob, thresh=0.5):
     tp = int(((yp == 1) & (yt == 1)).sum())
     fp = int(((yp == 1) & (yt == 0)).sum())
     fn = int(((yp == 0) & (yt == 1)).sum())
+    prec = tp / (tp + fp) if (tp + fp) else 0.0
+    rec = tp / (tp + fn) if (tp + fn) else 0.0
+    return 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
+
+
+def f1_at_rate(y_true, y_prob):
+    """F1 for the positive class using a threshold that matches the true positive
+    rate (predict the top-r fraction as positive, r = mean(y_true)). Avoids the
+    default-0.5 artifact when probabilities are uncalibrated."""
+    import numpy as np
+    yt = np.asarray(y_true).astype(int)
+    yp = np.asarray(y_prob)
+    r = yt.mean()
+    if r == 0 or r == 1:
+        return 0.0
+    k = max(1, int(round(r * len(yp))))
+    thresh = np.sort(yp)[::-1][k - 1]      # k-th largest prob
+    pred = (yp >= thresh).astype(int)
+    tp = int(((pred == 1) & (yt == 1)).sum())
+    fp = int(((pred == 1) & (yt == 0)).sum())
+    fn = int(((pred == 0) & (yt == 1)).sum())
     prec = tp / (tp + fp) if (tp + fp) else 0.0
     rec = tp / (tp + fn) if (tp + fn) else 0.0
     return 2 * prec * rec / (prec + rec) if (prec + rec) else 0.0
@@ -319,6 +344,8 @@ def main():
     ap.add_argument("--warmup_frac", type=float, default=0.1)
     ap.add_argument("--dropout", type=float, default=0.1)
     ap.add_argument("--max_seq_len", type=int, default=512)
+    ap.add_argument("--k_prefix", type=int, default=20,
+                    help="dropout: use first K interactions (early prediction)")
     ap.add_argument("--d_model", type=int, default=256)
     ap.add_argument("--n_layers", type=int, default=6)
     ap.add_argument("--seed", type=int, default=42)
@@ -363,12 +390,11 @@ def main():
     # ---- build datasets ----
     if args.task == "dropout":
         labels, pos_rate, mean_total = build_dropout_labels(args.processed_dir, args.max_seq_len)
-        print(f"[dropout] proxy label (activity-based; not raw-30-day): "
-              f"positive rate={pos_rate:.4f}, dataset-mean interactions={mean_total:.1f}")
-        print("  NOTE: exact 30-day rule needs raw timestamps not in npz; using proxy.")
+        print(f"[dropout] label=bottom-quartile disengagement; positive rate={pos_rate:.4f}")
         if wb: wb.log({"data/pos_rate": pos_rate})
         def mk(split): return StudentSeqDataset(args.processed_dir, split,
-                                                args.max_seq_len, labels)
+                                                args.max_seq_len, labels,
+                                                k_prefix=args.k_prefix)
         Model = EduBERTForDropout
     else:
         def mk(split): return StudentSeqDataset(args.processed_dir, split, args.max_seq_len)
@@ -422,11 +448,13 @@ def main():
     if args.task == "dropout":
         _, yt, pt = run_dropout(model, test_loader, device)
         test_auc = auc(yt, pt); test_f1 = f1_minority(yt, pt)
+        test_f1_rate = f1_at_rate(yt, pt)
         test_pos = float(np.mean(yt))
         print(f"test AUC          : {test_auc:.4f}")
         print(f"test F1 (minority): {test_f1:.4f}")
+        print(f"test F1 (rate-matched): {test_f1_rate:.4f}")
         print(f"test pos-rate     : {test_pos:.4f}")
-        if wb: wb.log({"test/auc": test_auc, "test/f1": test_f1, "test/pos_rate": test_pos})
+        if wb: wb.log({"test/auc": test_auc, "test/f1": test_f1, "test/f1_rate": test_f1_rate, "test/pos_rate": test_pos})
     else:
         _, lg, tg, vd = run_next_skill(model, test_loader, device, collect=True)
         t1 = topk_acc(lg, tg, vd, 1); t5 = topk_acc(lg, tg, vd, 5)

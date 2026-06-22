@@ -39,3 +39,11 @@ wandb/
 
 # Logs
 *.log
+
+# run artifacts
+*.log
+wandb/
+*.pt
+*.npz
+__pycache__/
+*.pyc
