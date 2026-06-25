@@ -344,6 +344,8 @@ def main():
     ap.add_argument("--warmup_frac", type=float, default=0.1)
     ap.add_argument("--dropout", type=float, default=0.1)
     ap.add_argument("--max_seq_len", type=int, default=512)
+    ap.add_argument("--n_students", type=int, default=0,
+                    help="next_skill: subset train to N students (0=all)")
     ap.add_argument("--k_prefix", type=int, default=20,
                     help="dropout: use first K interactions (early prediction)")
     ap.add_argument("--d_model", type=int, default=256)
@@ -397,7 +399,13 @@ def main():
                                                 k_prefix=args.k_prefix)
         Model = EduBERTForDropout
     else:
-        def mk(split): return StudentSeqDataset(args.processed_dir, split, args.max_seq_len)
+        def mk(split):
+            ds = StudentSeqDataset(args.processed_dir, split, args.max_seq_len)
+            if split == "train" and args.n_students and args.n_students < len(ds.rows):
+                import random as _r
+                rng = _r.Random(args.seed)
+                ds.rows = rng.sample(ds.rows, args.n_students)
+            return ds
         Model = EduBERTForNextSkill
 
     def loader(split, sh):
