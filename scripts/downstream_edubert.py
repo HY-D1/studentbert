@@ -255,25 +255,33 @@ def topk_acc(logits, target, valid, k):
 
 
 def macro_ovr_auc(probs, target, valid, present_classes):
-    """One-vs-rest AUC averaged over classes that appear in y_true."""
+    """One-vs-rest AUC per present class. Returns:
+       macro_auc  = unweighted mean over classes (every class equal)
+       weighted_auc = mean weighted by class support (n positives) in y_true
+       n_used     = number of classes with a computable AUC
+    Macro is sensitive to the rare tail; weighted reflects the common skills."""
     from src.eval.metrics import auc as _auc
     p = probs[valid].cpu().numpy()               # (n, K+1)
     t = target[valid].cpu().numpy()              # (n,)
-    aucs = []
+    aucs, weights = [], []
     for c in present_classes:
         yt = (t == c).astype(int)
-        if yt.sum() == 0 or yt.sum() == len(yt):
-            continue                              # skip degenerate classes
+        n_pos = int(yt.sum())
+        if n_pos == 0 or n_pos == len(yt):
+            continue                              # degenerate, skip
         try:
-            aucs.append(_auc(yt, p[:, c]))
+            a = _auc(yt, p[:, c])
         except Exception:
             continue
-    return float(np.mean(aucs)) if aucs else float("nan"), len(aucs)
+        aucs.append(a); weights.append(n_pos)     # weight by support
+    if not aucs:
+        return float("nan"), float("nan"), 0
+    aucs = np.asarray(aucs); weights = np.asarray(weights, dtype=float)
+    macro = float(aucs.mean())
+    weighted = float((aucs * weights).sum() / weights.sum())
+    return macro, weighted, len(aucs)
 
 
-# ---------------------------------------------------------------------------
-# Train / eval loops
-# ---------------------------------------------------------------------------
 def run_dropout(model, loader, device, opt=None, sched=None, wb=None):
     train = opt is not None
     model.train() if train else model.eval()
@@ -469,11 +477,12 @@ def main():
         probs = torch.softmax(lg, dim=-1)
         present = np.unique(tg[vd].numpy())
         present = present[present > 0]
-        m_auc, n_cls = macro_ovr_auc(probs, tg, vd, present.tolist())
+        m_auc, w_auc, n_cls = macro_ovr_auc(probs, tg, vd, present.tolist())
         print(f"test top-1 acc    : {t1:.4f}")
         print(f"test top-5 acc    : {t5:.4f}")
         print(f"test macro-OVR AUC: {m_auc:.4f}  (over {n_cls} classes)")
-        if wb: wb.log({"test/top1": t1, "test/top5": t5, "test/macro_auc": m_auc})
+        print(f"test weighted-OVR AUC: {w_auc:.4f}  (over {n_cls} classes)")
+        if wb: wb.log({"test/top1": t1, "test/top5": t5, "test/macro_auc": m_auc, "test/weighted_auc": w_auc})
 
     if wb: wb.finish()
 
