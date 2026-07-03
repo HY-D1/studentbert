@@ -40,6 +40,7 @@ from src.data.dataset import InteractionDataset, collate_fn
 from src.eval.metrics import auc, ece
 from src.models.dkt import DKT
 from src.models.saint_plus import SAINTPlus
+from src.models.akt import AKT
 from src.utils import get_device, set_seed
 
 
@@ -119,7 +120,7 @@ def run_epoch(model, loader, device, model_name, optimizer=None,
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--model", choices=["dkt", "saint"], required=True)
+    ap.add_argument("--model", choices=["dkt", "saint", "akt"], required=True)
     ap.add_argument("--processed_dir", required=True)
     ap.add_argument("--epochs", type=int, default=10)
     ap.add_argument("--batch_size", type=int, default=64)
@@ -130,6 +131,8 @@ def main() -> None:
                     help="model dropout; defaults to model's own default if unset")
     ap.add_argument("--max_seq_len", type=int, default=512)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--n_students", type=int, default=None,
+                    help="subsample TRAIN to first N students (seeded); None=all")
     ap.add_argument("--run_type", default="baseline",
                     help="run-name suffix, e.g. baseline / pretrain / scratch")
     ap.add_argument("--ckpt_dir", default="../checkpoints")
@@ -167,12 +170,22 @@ def main() -> None:
         ds = InteractionDataset(args.processed_dir, split, args.max_seq_len)
         return DataLoader(ds, batch_size=args.batch_size, shuffle=shuffle, collate_fn=collate_fn)
 
-    train_loader = make_loader("train", True)
+    train_ds = InteractionDataset(args.processed_dir, "train", args.max_seq_len)
+    if args.n_students is not None and args.n_students < len(train_ds.rows):
+        import numpy as _np
+        _rng = _np.random.default_rng(args.seed)
+        _order = _rng.permutation(len(train_ds.rows))[:args.n_students]
+        train_ds.rows = [train_ds.rows[i] for i in _order]
+        print(f"subsampled train to {len(train_ds.rows)} students (seed {args.seed})")
+    train_loader = DataLoader(train_ds, batch_size=args.batch_size, shuffle=True, collate_fn=collate_fn)
     val_loader = make_loader("val", False)
     test_loader = make_loader("test", False)
 
     if args.model == "dkt":
         model = DKT(num_skills=num_skills, hidden_size=128, dropout=dropout).to(device)
+    elif args.model == "akt":
+        model = AKT(num_skills=num_skills, d_model=256, n_heads=8,
+                    n_blocks=2, d_ff=1024, dropout=dropout, max_len=args.max_seq_len).to(device)
     else:
         model = SAINTPlus(num_skills=num_skills, d_model=256, n_heads=8,
                           n_layers=2, dropout=dropout, max_len=args.max_seq_len).to(device)
