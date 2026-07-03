@@ -1,3 +1,5 @@
+import re
+import os
 """Train a KT baseline (DKT or SAINT+) on a processed dataset; report test AUC.
 
 Usage:
@@ -118,6 +120,19 @@ def run_epoch(model, loader, device, model_name, optimizer=None,
     return total_loss / max(n, 1), y_true, y_prob
 
 
+def _wandb_fields(args, dataset):
+    # derive source/target/condition for clean W&B grouping
+    src = 'none'
+    ck = getattr(args, 'encoder_ckpt', None)
+    if ck:
+        b = os.path.basename(ck)
+        m = re.match(r'edubert_([a-zA-Z0-9]+)_pretrain', b)
+        if m: src = m.group(1)
+    init = getattr(args, 'init', 'scratch')
+    cond = 'scratch' if init == 'scratch' else ('indomain' if src == dataset else src)
+    return {'source': src, 'target': dataset, 'condition': cond}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", choices=["dkt", "saint", "akt"], required=True)
@@ -163,6 +178,7 @@ def main() -> None:
                 "warmup_frac": args.warmup_frac, "dropout": dropout,
                 "max_seq_len": args.max_seq_len, "num_skills": num_skills,
                 "seed": args.seed,
+                **_wandb_fields(args, dataset),
             },
         )
 

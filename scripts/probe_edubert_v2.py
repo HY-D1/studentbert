@@ -1,3 +1,5 @@
+import re
+import os
 # Linear probing of a (frozen) EduBERT encoder for skill-relational structure.
 # FIX vs v1: v1 was circular. The encoder input includes skill_emb(skill) at each
 # position, so a linear probe trivially inverted it (scratch reached ~99.9%),
@@ -87,6 +89,19 @@ def load_encoder(backbone, ckpt_path, device):
         print(f"  skipped (vocab-specific): {skipped}")
 
 
+def _wandb_fields(args, dataset):
+    # derive source/target/condition for clean W&B grouping
+    src = 'none'
+    ck = getattr(args, 'encoder_ckpt', None)
+    if ck:
+        b = os.path.basename(ck)
+        m = re.match(r'edubert_([a-zA-Z0-9]+)_pretrain', b)
+        if m: src = m.group(1)
+    init = getattr(args, 'init', 'scratch')
+    cond = 'scratch' if init == 'scratch' else ('indomain' if src == dataset else src)
+    return {'source': src, 'target': dataset, 'condition': cond}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--processed_dir", required=True)
@@ -132,7 +147,7 @@ def main():
             wb_mod.init(project="StudentBERT", name=run_name,
                         config={"task": "probe_masked_skill", "init": args.init,
                                 "dataset": dataset, "seed": args.seed,
-                                "encoder_ckpt": args.encoder_ckpt or "none"})
+                                "encoder_ckpt": args.encoder_ckpt or "none", **_wandb_fields(args, dataset)})
             wb = wb_mod
         except Exception as ex:
             print(f"wandb disabled: {ex}")

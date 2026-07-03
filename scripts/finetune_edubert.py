@@ -1,3 +1,5 @@
+import re
+import os
 """Fine-tune EduBERT for knowledge tracing (next-step correctness).
 
 Two modes:
@@ -148,6 +150,19 @@ def run_epoch(model, loader, device, optimizer=None, scheduler=None, wandb_mod=N
     return total_loss / max(n, 1), np.concatenate(all_true), np.concatenate(all_prob)
 
 
+def _wandb_fields(args, dataset):
+    # derive source/target/condition for clean W&B grouping
+    src = 'none'
+    ck = getattr(args, 'encoder_ckpt', None)
+    if ck:
+        b = os.path.basename(ck)
+        m = re.match(r'edubert_([a-zA-Z0-9]+)_pretrain', b)
+        if m: src = m.group(1)
+    init = getattr(args, 'init', 'scratch')
+    cond = 'scratch' if init == 'scratch' else ('indomain' if src == dataset else src)
+    return {'source': src, 'target': dataset, 'condition': cond}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--processed_dir", required=True)
@@ -239,7 +254,7 @@ def main() -> None:
                            "d_model": args.d_model, "n_layers": args.n_layers,
                            "n_students": n_train_students, "num_skills": num_skills,
                            "seed": args.seed,
-                           "encoder_ckpt": args.encoder_ckpt or "none"})
+                           "encoder_ckpt": args.encoder_ckpt or "none", **_wandb_fields(args, dataset)})
 
     ckpt_dir = Path(args.ckpt_dir); ckpt_dir.mkdir(parents=True, exist_ok=True)
     best_path = ckpt_dir / f"{run_name}_best.pt"

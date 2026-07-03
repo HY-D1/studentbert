@@ -1,3 +1,5 @@
+import re
+import os
 """Two downstream tasks on ASSISTments using a (pretrained or scratch) EduBERT encoder.
 
   --task dropout      : student-level early-dropout prediction (binary).
@@ -340,6 +342,19 @@ def run_next_skill(model, loader, device, opt=None, sched=None, wb=None,
     return tot / max(nb, 1), None, None, None
 
 
+def _wandb_fields(args, dataset):
+    # derive source/target/condition for clean W&B grouping
+    src = 'none'
+    ck = getattr(args, 'encoder_ckpt', None)
+    if ck:
+        b = os.path.basename(ck)
+        m = re.match(r'edubert_([a-zA-Z0-9]+)_pretrain', b)
+        if m: src = m.group(1)
+    init = getattr(args, 'init', 'scratch')
+    cond = 'scratch' if init == 'scratch' else ('indomain' if src == dataset else src)
+    return {'source': src, 'target': dataset, 'condition': cond}
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--task", choices=["dropout", "next_skill"], required=True)
@@ -395,7 +410,7 @@ def main():
                            "batch_size": args.batch_size, "lr": args.lr,
                            "dropout": args.dropout, "seed": args.seed,
                            "num_skills": num_skills,
-                           "encoder_ckpt": args.encoder_ckpt or "none"})
+                           "encoder_ckpt": args.encoder_ckpt or "none", **_wandb_fields(args, dataset)})
 
     # ---- build datasets ----
     if args.task == "dropout":
