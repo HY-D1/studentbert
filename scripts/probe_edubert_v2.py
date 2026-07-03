@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import os
 # Linear probing of a (frozen) EduBERT encoder for skill-relational structure.
@@ -19,7 +20,6 @@ import os
 #       --init scratch --seed 42 --run_type probe2_scratch --wandb
 #   python scripts/probe_edubert_v2.py --processed_dir ../processed/assist2017 \
 #       --init pretrained --encoder_ckpt <enc.pt> --seed 42 --run_type probe2_ednet --wandb
-from __future__ import annotations
 import argparse, json
 from pathlib import Path
 import numpy as np
