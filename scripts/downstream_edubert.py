@@ -74,7 +74,7 @@ class StudentSeqDataset(Dataset):
     """Loads one split; exposes per-student (skill, correct, time_bin) + a
     precomputed dropout label (for --task dropout)."""
 
-    def __init__(self, processed_dir, split, max_seq_len, dropout_labels=None, k_prefix=None):
+    def __init__(self, processed_dir, split, max_seq_len, dropout_labels=None, k_prefix=None, window_censor=False):
         d = Path(processed_dir)
         data = np.load(d / "sequences.npz")
         self.skill = data["skill"]; self.correct = data["correct"]
@@ -87,9 +87,18 @@ class StudentSeqDataset(Dataset):
         self.rows = [id_to_row[s] for s in wanted if s in id_to_row]
         self.dropout_labels = dropout_labels  # dict row->0/1 or None
         self.k_prefix = k_prefix  # if set: use FIRST k interactions (early-pred)
+        self.window_censor = window_censor
         if dropout_labels is not None:
             # keep only eligible students (those present in the label dict)
             self.rows = [r for r in self.rows if r in dropout_labels]
+            if window_censor and k_prefix is not None:
+                # censor students whose whole trajectory fits in the prefix
+                # (total_len <= K means the label leaks into the input window)
+                def _tot(r):
+                    return int(self.offsets[r + 1] - self.offsets[r])
+                before = len(self.rows)
+                self.rows = [r for r in self.rows if _tot(r) > k_prefix]
+                print(f'window_censor: kept {len(self.rows)}/{before} students with total_len > {k_prefix}')
 
     def seq(self, row):
         s, e = self.offsets[row], self.offsets[row + 1]
@@ -256,6 +265,26 @@ def topk_acc(logits, target, valid, k):
     return hit.mean().item()
 
 
+def macro_top1(logits, target, valid, present_classes):
+    # frequency-normalized top-1: mean over classes of per-class top-1 recall.
+    lt = logits[valid]
+    tt = target[valid]
+    if len(tt) == 0:
+        return 0.0, 0
+    pred = lt.argmax(dim=-1).cpu().numpy()
+    tt_np = tt.cpu().numpy()
+    recalls = []
+    for c in present_classes:
+        idx = (tt_np == c)
+        n = int(idx.sum())
+        if n == 0:
+            continue
+        recalls.append(float((pred[idx] == c).sum()) / n)
+    if not recalls:
+        return 0.0, 0
+    return float(sum(recalls) / len(recalls)), len(recalls)
+
+
 def macro_ovr_auc(probs, target, valid, present_classes):
     """One-vs-rest AUC per present class. Returns:
        macro_auc  = unweighted mean over classes (every class equal)
@@ -369,6 +398,8 @@ def main():
     ap.add_argument("--max_seq_len", type=int, default=512)
     ap.add_argument("--n_students", type=int, default=0,
                     help="next_skill: subset train to N students (0=all)")
+    ap.add_argument("--window_censor", action="store_true",
+                    help="exclude students whose total_len <= k_prefix (recovers leaky high-K)")
     ap.add_argument("--k_prefix", type=int, default=20,
                     help="dropout: use first K interactions (early prediction)")
     ap.add_argument("--d_model", type=int, default=256)
@@ -419,7 +450,7 @@ def main():
         if wb: wb.log({"data/pos_rate": pos_rate})
         def mk(split): return StudentSeqDataset(args.processed_dir, split,
                                                 args.max_seq_len, labels,
-                                                k_prefix=args.k_prefix)
+                                                k_prefix=args.k_prefix, window_censor=args.window_censor)
         Model = EduBERTForDropout
     else:
         def mk(split):
@@ -493,11 +524,13 @@ def main():
         present = np.unique(tg[vd].numpy())
         present = present[present > 0]
         m_auc, w_auc, n_cls = macro_ovr_auc(probs, tg, vd, present.tolist())
+        mt1, n_mt1 = macro_top1(lg, tg, vd, present.tolist())
         print(f"test top-1 acc    : {t1:.4f}")
         print(f"test top-5 acc    : {t5:.4f}")
         print(f"test macro-OVR AUC: {m_auc:.4f}  (over {n_cls} classes)")
+        print(f"test macro-top1   : {mt1:.4f}  (over {n_mt1} classes)")
         print(f"test weighted-OVR AUC: {w_auc:.4f}  (over {n_cls} classes)")
-        if wb: wb.log({"test/top1": t1, "test/top5": t5, "test/macro_auc": m_auc, "test/weighted_auc": w_auc})
+        if wb: wb.log({"test/top1": t1, "test/top5": t5, "test/macro_auc": m_auc, "test/weighted_auc": w_auc, "test/macro_top1": mt1})
 
     if wb: wb.finish()
 
