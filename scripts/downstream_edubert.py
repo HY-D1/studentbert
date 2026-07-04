@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import os
 """Two downstream tasks on ASSISTments using a (pretrained or scratch) EduBERT encoder.
@@ -36,7 +37,6 @@ from the npz (short total activity + trailing large time-gaps). If you want the 
 preprocessing and store a dropout label in the npz. This is flagged clearly at runtime.
 """
 
-from __future__ import annotations
 
 import argparse
 import json
