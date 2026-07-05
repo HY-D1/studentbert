@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import os
 """Fine-tune EduBERT for knowledge tracing (next-step correctness).
@@ -32,7 +33,6 @@ W&B run name: edubert_{dataset}_{run_type}; tags [edubert, finetune, {init}].
 Best checkpoint by val AUC; seed + dropout + config + train/lr logged.
 """
 
-from __future__ import annotations
 
 import argparse
 import json
