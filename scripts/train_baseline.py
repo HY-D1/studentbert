@@ -1,3 +1,4 @@
+from __future__ import annotations
 import re
 import os
 """Train a KT baseline (DKT or SAINT+) on a processed dataset; report test AUC.
@@ -27,7 +28,6 @@ LR schedule: linear warmup over warmup_frac of total steps, then linear decay
 to 0. Logged per optimizer step so decay is verifiable in W&B.
 """
 
-from __future__ import annotations
 
 import argparse
 import json
