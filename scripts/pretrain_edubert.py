@@ -89,6 +89,9 @@ def main() -> None:
     ap.add_argument("--d_model", type=int, default=256)
     ap.add_argument("--n_layers", type=int, default=6)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--objective", choices=["full", "correct_only", "skill_only"],
+                    default="full",
+                    help="ablation: which masked targets to predict during pretraining")
     ap.add_argument("--run_type", default="pretrain_full")
     ap.add_argument("--ckpt_dir", default="../checkpoints")
     ap.add_argument("--wandb", action="store_true")
@@ -159,7 +162,12 @@ def main() -> None:
             out = model(s_in, c_in, t_in, key_padding_mask=~pad_mask)
             loss_s = ce(out["skill_logits"].reshape(-1, K), s_lab.reshape(-1))
             loss_c = ce(out["correct_logits"].reshape(-1, 2), c_lab.reshape(-1))
-            loss = loss_s + loss_c
+            if args.objective == 'full':
+                loss = loss_s + loss_c
+            elif args.objective == 'correct_only':
+                loss = loss_c
+            elif args.objective == 'skill_only':
+                loss = loss_s
 
             opt.zero_grad()
             loss.backward()
