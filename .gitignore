@@ -46,4 +46,5 @@ wandb/
 *.pt
 *.npz
 __pycache__/
-*.pyc
+*.pycw*.sbatch
+audit_output.txt
