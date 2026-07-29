@@ -32,7 +32,7 @@ done
 echo ""
 echo "===== C. CODE: all scripts parse (from __future__ bug check) ====="
 bad=0
-for f in $(ls scripts/*.py *.py 2>/dev/null); do
+for f in $(ls scripts/*.py analysis/*.py tools/patches/*.py 2>/dev/null); do
   [ -f "$f" ] || continue
   if python -c "import ast; ast.parse(open('$f').read())" 2>/dev/null; then :; else echo "  BROKEN: $f"; bad=1; fi
 done
