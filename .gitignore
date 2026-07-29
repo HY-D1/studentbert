@@ -49,3 +49,5 @@ __pycache__/
 *.pycw*.sbatch
 audit_output.txt
 w*.sbatch
+embedding_analysis/
+embedding_analysis_matched/
