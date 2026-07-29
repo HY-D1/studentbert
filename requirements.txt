@@ -1,28 +1,14 @@
-# pip-only install (alternative to environment.yml)
-# Use with:  pip install -r requirements.txt
+# Runtime dependencies (verified against actual imports in scripts/ and src/)
+# GPU note: install torch as 2.5.1+cu121 on the cluster; cu130 wheels fall back to CPU.
 numpy
 pandas
-pyarrow
 scipy
 scikit-learn
-tqdm
 torch
-torchvision
-torchaudio
-transformers
-datasets
-tokenizers
-pykt-toolkit
 wandb
-hydra-core
-omegaconf
 matplotlib
-seaborn
-black
+
+# Dev tooling (pre-commit hooks, tests)
 ruff
-isort
 pytest
 pre-commit
-jupyterlab
-ipykernel
-pyBKT==1.4.1
