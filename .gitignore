@@ -52,3 +52,10 @@ w*.sbatch
 embedding_analysis/
 embedding_analysis_matched/
 results.json
+log_formats.txt
+
+# analysis outputs: regenerate via parse_nextskill_full.py / make_lak_figure.py
+nextskill_results.json
+nextskill_results_*.csv
+break_even_*.pdf
+break_even_*.png
