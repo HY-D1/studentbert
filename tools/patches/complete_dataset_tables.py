@@ -37,13 +37,22 @@ PATTERNS = {
  "skills":   [r"skills \([^)]*\):\s*([\d,]+)", r"\bn_skills\b\s*[:=]\s*([\d,]+)",
               r"\bnum_skills\b\s*[:=]\s*([\d,]+)", r"vocab size\s*[:=]\s*([\d,]+)",
               r"skills(?:[^:\n]*)[:=]\s*([\d,]+)"],
- "interactions": [r"total interactions\s*[:=]\s*([\d,]+)", r"\bn_interactions\b\s*[:=]\s*([\d,]+)",
-                  r"interactions(?:[^:\n]*)[:=]\s*([\d,]+)"],
+ # NOTE: no loose "interactions" fallback here. "Min interactions filter : 10"
+ # matched it and put 10 in the table for three datasets.
+ "interactions": [r"total interactions\s*[:=]\s*([\d,]+)",
+                  r"Rows after all filters\s*[:=]\s*([\d,]+)",
+                  r"Rows kept \(after meta join\)\s*[:=]\s*([\d,]+)",
+                  r"\bn_interactions\b\s*[:=]\s*([\d,]+)"],
  "median_len": [r"median seq len\s*[:=]\s*([\d.]+)",
-                r"median (?:sequence )?len(?:gth)?\s*[:=]\s*([\d.]+)"],
+                r"median (?:sequence )?len(?:gth)?\s*[:=]\s*([\d.]+)",
+                r"^\s*median\s*[:=]\s*([\d.]+)",
+                r"\bmedian\s+([\d.]+)"],
  "mean_len":   [r"mean seq len\s*[:=]\s*([\d.]+)",
-                r"mean (?:sequence )?len(?:gth)?\s*[:=]\s*([\d.]+)"],
+                r"mean (?:sequence )?len(?:gth)?\s*[:=]\s*([\d.]+)",
+                r"^\s*mean\s*[:=]\s*([\d.]+)",
+                r"\bmean\s+([\d.]+)"],
  "base_rate":  [r"PROCESSED correct base rate\s*[:=]\s*([\d.]+)",
+                r"Fraction correct\s*[:=]\s*([\d.]+)",
                 r"correct(?: base)? rate\s*[:=]\s*([\d.]+)",
                 r"\bfrac_correct\b\s*[:=]\s*([\d.]+)", r"base rate\s*[:=]\s*([\d.]+)"],
 }
@@ -69,6 +78,13 @@ def parse(ds):
             if m:
                 rec[field] = num(m.group(1))
                 break
+    # structural guard: the min-interaction filter is 10, so a dataset cannot have
+    # fewer than 10*students interactions. This catches a stray match such as
+    # "Min interactions filter : 10".
+    if rec["interactions"] is not None and rec["students"]:
+        if rec["interactions"] < 10 * rec["students"]:
+            rec["_bad_interactions"] = rec["interactions"]
+            rec["interactions"] = None
     return rec, txt
 
 
@@ -83,6 +99,7 @@ def cell(v, kind="int"):
 
 
 def main():
+    refresh = "--refresh" in sys.argv
     for f in (RESULTS, README):
         if not os.path.exists(f):
             sys.exit(f"ERROR: {f} not found. Run from the repo root.")
@@ -95,8 +112,13 @@ def main():
     if absent:
         print(f"WARNING: no vocab_stats.md for {absent} under {PROC}/<ds>/")
 
-    gaps = {d: [f for f, v in stats[d].items() if v is None] for d in ORDER if stats[d]}
+    gaps = {d: [f for f, v in stats[d].items() if v is None and not f.startswith("_")]
+            for d in ORDER if stats[d]}
     gaps = {d: g for d, g in gaps.items() if g}
+    for d in ORDER:
+        if stats[d] and "_bad_interactions" in stats[d]:
+            print(f"REJECTED for {d}: interactions={stats[d]['_bad_interactions']:,} is below "
+                  f"10 x {int(stats[d]['students']):,} students; a filter line was matched by mistake")
     if gaps:
         print("\nFIELDS NOT PARSED:")
         for d, g in gaps.items():
@@ -109,8 +131,12 @@ def main():
         print()
 
     res = open(RESULTS).read()
+    if "### 0.1 Dataset characterization" in res and refresh:
+        res = re.sub(r"\n### 0\.1 Dataset characterization.*?(?=\n---\n## 1\. )", "", res, flags=re.S)
+        open(RESULTS, "w").write(res)
+        print("RESULTS.md 0.1: removed old block (--refresh)")
     if "### 0.1 Dataset characterization" in res:
-        print("RESULTS.md 0.1: already present, skipped")
+        print("RESULTS.md 0.1: already present, skipped (use --refresh to rebuild)")
     else:
         rows = []
         for ds in ORDER:
@@ -203,7 +229,7 @@ def main():
         want = float(sec5.get(alias[ds], "nan"))
         flag = "" if abs(got - want) < 0.011 else "   <-- MISMATCH, check rounding or a stale table"
         bad += bool(flag)
-        print(f"  {alias[ds]:12s} {got:7.3f} vs {want:7.3f}{flag}")
+        print(f"  {alias[ds]:12s} {got:7.3f} vs {want:7.3f}   delta {got-want:+.4f}{flag}")
     if bad:
         print(f"  {bad} mismatch(es). The 0.1 table comes from vocab_stats.md and is the primary "
               "source; reconcile section 5 by hand if the difference is real.")
