@@ -60,7 +60,7 @@ def cell(t, c):
     return f"{mean(v):.4f} ±{pstdev(v):.4f}{g}"
 
 block21 = """
-### 2.1 Verified source table at N=3000 (KT test AUC, parsed from logs) [EDM; poster R2]
+### 2.1 Source comparison at N=3000, all 3 targets (KT test AUC, parsed from logs)
 
 Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_n3000_seed{1,2,42}`, 3 seeds, mean ±pstdev, gain vs scratch in parentheses. Log-verified July 30 2026 (poster_gaps_evidence.txt).
 
@@ -72,14 +72,14 @@ Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_
 
 Per-seed paired gains vs scratch, assist2017 target: fromednet +0.0263/+0.0253/+0.0290 (3/3 positive), indomain +0.0239/+0.0210/+0.0248, fromjunyi +0.0200/+0.0183/+0.0183.
 
-_Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale>granularity claim and the poster R2 card._
+_Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale-over-granularity claim in section 2._
 """ % (cell("assist2017","scratch"), cell("assist2017","indomain"), cell("assist2017","fromednet"), cell("assist2017","fromjunyi"),
        cell("ednet","scratch"), cell("ednet","indomain"), cell("ednet","fromjunyi"), cell("ednet","fromassist"),
        cell("junyi","scratch"), cell("junyi","indomain"), cell("junyi","fromednet"), cell("junyi","fromassist"))
 
 lg = lambda t, c: f"{LOGME[t][c]:.6f}" if c in LOGME[t] else "-"
 block61 = f"""
-### 6.1 LogME vs the domain probe (w7_logme_8263344.log, scripts/compute_logme.py) [placement: ICLR or NeurIPS, advisor decision pending]
+### 6.1 LogME vs the domain probe (w7_logme_8263344.log, scripts/compute_logme.py)
 
 LogME on frozen encoders (full-objective + scratch), 3 targets, higher = better:
 

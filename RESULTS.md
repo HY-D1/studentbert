@@ -46,7 +46,7 @@ _Read: DKT is the strongest simple baseline and wins on the 4 newer datasets; th
 - **Moderator:** sequence density (practice-per-skill) - see section 5.
 
 ---
-### 2.1 Verified source table at N=3000 (KT test AUC, parsed from logs) [EDM; poster R2]
+### 2.1 Source comparison at N=3000, all 3 targets (KT test AUC, parsed from logs)
 
 Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_n3000_seed{1,2,42}`, 3 seeds, mean ±pstdev, gain vs scratch in parentheses. Log-verified July 30 2026 (poster_gaps_evidence.txt).
 
@@ -58,7 +58,7 @@ Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_
 
 Per-seed paired gains vs scratch, assist2017 target: fromednet +0.0263/+0.0253/+0.0290 (3/3 positive), indomain +0.0239/+0.0210/+0.0248, fromjunyi +0.0200/+0.0183/+0.0183.
 
-_Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale>granularity claim and the poster R2 card._
+_Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale-over-granularity claim in section 2._
 
 ## 3. Low-resource advantage & scale boundary  
 
@@ -207,7 +207,7 @@ _Per-target probe ordering tracks transfer ordering: Spearman rho ASSIST +0.5, E
 _Parsing caveat: restrict probe greps to `w6_probe2*.log` and `w8_probe7*.log`. `w6_probe_*.log` (header `=== probe (skill-identity)`) holds the DEPRECATED v1 probe, which was circular (skill visible at the probed position, accuracies 0.96 to 0.9996; confirmed present in w6_probe_7988582.log and w6_probe_7988933.log); those values must never be reported._
 
 ---
-### 6.1 LogME vs the domain probe (w7_logme_8263344.log, scripts/compute_logme.py) [placement: ICLR or NeurIPS, advisor decision pending]
+### 6.1 LogME vs the domain probe (w7_logme_8263344.log, scripts/compute_logme.py)
 
 LogME on frozen encoders (full-objective + scratch), 3 targets, higher = better:
 
@@ -252,7 +252,7 @@ K<=50 = clean eval points. K=100/200 UNCENSORED = LEAKED (14% / 74% per the leak
 _Read: pretraining does NOT beat scratch on ASSIST dropout at any clean K (scratch best at K=5/10/20; tied at K=50). This is the quantitative version of the qualitative claim in section 8. W7 censored recovery (recorded): K=100 scratch 0.768 > ednet 0.765 > junyi 0.763 > indomain 0.759 (cohort 1315/1366); K=200 scratch 0.732, indomain 0.762, ednet 0.692, junyi 0.731 (cohort 1118, high variance, report with N caveat)._
 
 ---
-### 8.2 EdNet dropout at n3000: corrected full 8-seed grid [LAK]
+### 8.2 EdNet dropout at n3000: corrected full 8-seed grid
 
 Runs `edubert_ednet_drop_ednet_{scratch|indomain|fromassist|fromjunyi}_k{5,10}_n3000_seed{1..7,42}`, test AUC. Extraction MUST be comma-anchored (`grep -A4 -F "=== dropout (NAME,"`): a bare-name grep collides seed4 with seed42 (prefix) and silently duplicates values; 7 seed4 cells below were corrected this way on July 30 2026. indomain k10 seed42 = 0.7261 recovered from the W&B run output.log (run completed and synced; the local log lost its tail) - W&B and local logs agree exactly on the junyi indomain k10 seed2/seed42 cross-checks (0.6240 / 0.6259). indomain k10 seed2 died before eval (no banner locally, not on W&B): cell is n=7; a resubmit is optional and changes no claim.
 

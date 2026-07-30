@@ -42,7 +42,7 @@ for (c, k), v in GRID.items():
     rows.append(f"| {c} | {k} | {cells} | {mean(vv):.4f} ±{pstdev(vv):.4f} (n={len(vv)}) |")
 
 BLOCK = f"""
-### 8.2 EdNet dropout at n3000: corrected full 8-seed grid [LAK]
+### 8.2 EdNet dropout at n3000: corrected full 8-seed grid
 
 Runs `edubert_ednet_drop_ednet_{{scratch|indomain|fromassist|fromjunyi}}_k{{5,10}}_n3000_seed{{1..7,42}}`, test AUC. Extraction MUST be comma-anchored (`grep -A4 -F "=== dropout (NAME,"`): a bare-name grep collides seed4 with seed42 (prefix) and silently duplicates values; 7 seed4 cells below were corrected this way on July 30 2026. indomain k10 seed42 = 0.7261 recovered from the W&B run output.log (run completed and synced; the local log lost its tail) - W&B and local logs agree exactly on the junyi indomain k10 seed2/seed42 cross-checks (0.6240 / 0.6259). indomain k10 seed2 died before eval (no banner locally, not on W&B): cell is n=7; a resubmit is optional and changes no claim.
 
