@@ -13,8 +13,8 @@ A transformer is pretrained on student interaction sequences, `(skill, correctne
 | ASSISTments 2017 | 1,708 | 102 | US math tutoring |
 | EdNet KT1 | 441,997 | 142 | Korean TOEIC English prep |
 | Junyi Academy | 61,442 | 1,326 | Taiwanese K-12 math |
-| Algebra 2005 (KDD Cup) | — | — | Cognitive Tutor algebra |
-| Bridge to Algebra 2006 (KDD Cup) | — | — | Cognitive Tutor algebra |
+| Algebra 2005 (KDD Cup) | 567 | 109 | Cognitive Tutor algebra |
+| Bridge to Algebra 2006 (KDD Cup) | 1,130 | 492 | Cognitive Tutor algebra |
 | ASSISTments 2009 | 3,119 | 123 | US math tutoring |
 | Algebra 2006-2007 (KDD Cup) | 1,310 | 484 | Cognitive Tutor algebra |
 

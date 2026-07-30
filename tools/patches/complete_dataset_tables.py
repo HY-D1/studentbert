@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Complete the dataset characterization from the processed vocab_stats.md files.
 
-Does four things, all from real files, nothing hardcoded:
-  1. inserts RESULTS.md section 0.1, a full 7-dataset characterization table
+The seven datasets were written by different preprocessing scripts, so the
+vocab_stats.md field wording is not uniform. This version tries several phrasings
+per field, never crashes on a field it cannot find, and prints the contents of any
+file it could not fully parse so the missing pattern can be added.
+
+Does four things, all from real files:
+  1. RESULTS.md section 0.1, a 7-dataset characterization table
   2. fills the two empty README rows (Algebra 2005, Bridge to Algebra 2006)
-  3. fixes the hardcoded "# Algebra2005 vocab stats" title in
-     scripts/preprocess_algebra2005.py, which is reused for the other KDD sets
-  4. repairs the wrong title already written into bridge2006/vocab_stats.md and
-     algebra2006/vocab_stats.md, without touching their numbers
+  3. fixes the hardcoded title in scripts/preprocess_algebra2005.py
+  4. repairs wrong titles already written into processed/<ds>/vocab_stats.md
+
+Each step runs independently: one failing does not block the others.
 
 Run from the repo root:  python3 tools/patches/complete_dataset_tables.py
-Idempotent. Needs ../processed/<ds>/vocab_stats.md to exist (cluster only).
+Idempotent.
 """
 import os
 import re
@@ -25,24 +30,56 @@ ORDER = ["assist2017", "ednet", "junyi", "algebra2005", "bridge2006", "assist200
 PRETTY = {"assist2017": "ASSISTments 2017", "ednet": "EdNet KT1", "junyi": "Junyi Academy",
           "algebra2005": "Algebra 2005 (KDD Cup)", "bridge2006": "Bridge to Algebra 2006 (KDD Cup)",
           "assist2009": "ASSISTments 2009", "algebra2006": "Algebra 2006-2007 (KDD Cup)"}
-FIELDS = [("students", r"students \(>= \d+ interactions\): ([\d.]+)"),
-          ("skills", r"skills \([^)]*\): ([\d.]+)"),
-          ("interactions", r"total interactions: ([\d.]+)"),
-          ("median_len", r"median seq len: ([\d.]+)"),
-          ("mean_len", r"mean seq len: ([\d.]+)"),
-          ("base_rate", r"PROCESSED correct base rate: ([\d.]+)")]
+
+PATTERNS = {
+ "students": [r"students \(>=[^)]*\):\s*([\d,]+)", r"\bn_students\b\s*[:=]\s*([\d,]+)",
+              r"\bnum_students\b\s*[:=]\s*([\d,]+)", r"students(?:[^:\n]*)[:=]\s*([\d,]+)"],
+ "skills":   [r"skills \([^)]*\):\s*([\d,]+)", r"\bn_skills\b\s*[:=]\s*([\d,]+)",
+              r"\bnum_skills\b\s*[:=]\s*([\d,]+)", r"vocab size\s*[:=]\s*([\d,]+)",
+              r"skills(?:[^:\n]*)[:=]\s*([\d,]+)"],
+ "interactions": [r"total interactions\s*[:=]\s*([\d,]+)", r"\bn_interactions\b\s*[:=]\s*([\d,]+)",
+                  r"interactions(?:[^:\n]*)[:=]\s*([\d,]+)"],
+ "median_len": [r"median seq len\s*[:=]\s*([\d.]+)",
+                r"median (?:sequence )?len(?:gth)?\s*[:=]\s*([\d.]+)"],
+ "mean_len":   [r"mean seq len\s*[:=]\s*([\d.]+)",
+                r"mean (?:sequence )?len(?:gth)?\s*[:=]\s*([\d.]+)"],
+ "base_rate":  [r"PROCESSED correct base rate\s*[:=]\s*([\d.]+)",
+                r"correct(?: base)? rate\s*[:=]\s*([\d.]+)",
+                r"\bfrac_correct\b\s*[:=]\s*([\d.]+)", r"base rate\s*[:=]\s*([\d.]+)"],
+}
+
+
+def num(x):
+    try:
+        return float(x.replace(",", ""))
+    except (AttributeError, ValueError):
+        return None
 
 
 def parse(ds):
     p = os.path.join(PROC, ds, "vocab_stats.md")
     if not os.path.exists(p):
-        return None
+        return None, None
     txt = open(p, errors="ignore").read()
     rec = {}
-    for name, pat in FIELDS:
-        m = re.search(pat, txt)
-        rec[name] = float(m.group(1)) if m else None
-    return rec
+    for field, pats in PATTERNS.items():
+        rec[field] = None
+        for pat in pats:
+            m = re.search(pat, txt, re.I | re.M)
+            if m:
+                rec[field] = num(m.group(1))
+                break
+    return rec, txt
+
+
+def cell(v, kind="int"):
+    if v is None:
+        return "-"
+    if kind == "int":
+        return f"{int(v):,}"
+    if kind == "len":
+        return f"{v:.0f}"
+    return f"{v:.4f}"
 
 
 def main():
@@ -50,13 +87,27 @@ def main():
         if not os.path.exists(f):
             sys.exit(f"ERROR: {f} not found. Run from the repo root.")
 
-    stats = {ds: parse(ds) for ds in ORDER}
-    missing = [d for d, v in stats.items() if v is None]
-    if missing:
-        sys.exit(f"ERROR: no vocab_stats.md for {missing}. Expected under {PROC}/<ds>/. "
-                 "This patch must run on the cluster.")
+    stats, raw = {}, {}
+    for ds in ORDER:
+        stats[ds], raw[ds] = parse(ds)
 
-    # ---- 1. RESULTS.md section 0.1 -------------------------------------------
+    absent = [d for d in ORDER if stats[d] is None]
+    if absent:
+        print(f"WARNING: no vocab_stats.md for {absent} under {PROC}/<ds>/")
+
+    gaps = {d: [f for f, v in stats[d].items() if v is None] for d in ORDER if stats[d]}
+    gaps = {d: g for d, g in gaps.items() if g}
+    if gaps:
+        print("\nFIELDS NOT PARSED:")
+        for d, g in gaps.items():
+            print(f"  {d}: {', '.join(g)}")
+        print("\nContents of the files with gaps, so the patterns can be extended:")
+        for d in gaps:
+            print(f"--- {PROC}/{d}/vocab_stats.md")
+            for line in raw[d].strip().split("\n")[:16]:
+                print(f"    {line}")
+        print()
+
     res = open(RESULTS).read()
     if "### 0.1 Dataset characterization" in res:
         print("RESULTS.md 0.1: already present, skipped")
@@ -64,33 +115,43 @@ def main():
         rows = []
         for ds in ORDER:
             s = stats[ds]
-            pps = s["median_len"] / s["skills"] if s["skills"] else float("nan")
-            rows.append(f"| {PRETTY[ds]} | {int(s['students']):,} | {int(s['skills']):,} | "
-                        f"{int(s['interactions']):,} | {s['median_len']:.0f} | {s['mean_len']:.0f} | "
-                        f"{s['base_rate']:.4f} | {pps:.3f} |")
+            if s is None:
+                rows.append(f"| {PRETTY[ds]} | - | - | - | - | - | - | - |")
+                continue
+            pps = (s["median_len"] / s["skills"]
+                   if s["median_len"] is not None and s["skills"] else None)
+            rows.append(
+                f"| {PRETTY[ds]} | {cell(s['students'])} | {cell(s['skills'])} | "
+                f"{cell(s['interactions'])} | {cell(s['median_len'], 'len')} | "
+                f"{cell(s['mean_len'], 'len')} | {cell(s['base_rate'], 'rate')} | "
+                + ("-" if pps is None else f"{pps:.3f}") + " |")
         block = ("\n### 0.1 Dataset characterization (parsed from processed/<ds>/vocab_stats.md)\n\n"
                  "| Dataset | Students | Skills | Interactions | Median len | Mean len | Correct rate | pps |\n"
                  "|---|---|---|---|---|---|---|---|\n" + "\n".join(rows) + "\n\n"
                  "_Read: pps here is recomputed as median length / skills and reproduces the section 5 "
-                 "ordering. Correct rate is the PROCESSED base rate, i.e. after the min-interaction "
-                 "filter, so it can differ from a raw-file rate quoted elsewhere._\n")
+                 "ordering. Correct rate is the PROCESSED base rate, after the min-interaction filter, "
+                 "so it can differ from a raw-file rate quoted elsewhere. A dash means the field is not "
+                 "recorded in that dataset's vocab_stats.md._\n")
         anchor = "\n---\n## 1. "
         if res.count(anchor) != 1:
-            sys.exit(f"ERROR: anchor {anchor!r} not unique in {RESULTS}")
-        open(RESULTS, "w").write(res.replace(anchor, block + "\n---\n## 1. "))
-        print("RESULTS.md: inserted 0.1")
+            print(f"ERROR: anchor {anchor!r} not unique in {RESULTS}; 0.1 NOT inserted")
+        else:
+            open(RESULTS, "w").write(res.replace(anchor, block + "\n---\n## 1. "))
+            print("RESULTS.md: inserted 0.1")
 
-    # ---- 2. README rows -------------------------------------------------------
     rd = open(README).read()
     filled = 0
     for ds in ("algebra2005", "bridge2006"):
-        s = stats[ds]
+        s = stats.get(ds)
+        if not s or s["students"] is None or s["skills"] is None:
+            print(f"README: {ds} students/skills unparsed, row left alone")
+            continue
         pat = re.compile(r"(\| " + re.escape(PRETTY[ds]) + r" \| )[^|]*(\| )[^|]*(\|)")
         m = pat.search(rd)
         if not m:
             print(f"README: row for {PRETTY[ds]!r} not found, skipped")
             continue
-        if m.group(0).count("—") == 0:
+        if not re.search(r"\|\s*[—-]\s*\|", m.group(0)):
             print(f"README: {ds} row already filled, skipped")
             continue
         rd = pat.sub(lambda mm, s=s: f"{mm.group(1)}{int(s['students']):,} {mm.group(2)}"
@@ -100,7 +161,6 @@ def main():
         open(README, "w").write(rd)
     print(f"README: filled {filled} row(s)")
 
-    # ---- 3. preprocessing script title ---------------------------------------
     if os.path.exists(PREP):
         src = open(PREP).read()
         old = 'f"# Algebra2005 vocab stats\\n\\n"'
@@ -109,24 +169,23 @@ def main():
             print(f"{PREP}: already fixed, skipped")
         elif old in src:
             if "from pathlib import Path" not in src and "import pathlib" not in src:
-                print(f"WARNING: {PREP} has no pathlib import; using os.path instead")
                 new = 'f"# {os.path.basename(str(args.out_dir).rstrip(chr(47)))} vocab stats\\n\\n"'
             open(PREP, "w").write(src.replace(old, new, 1))
             print(f"{PREP}: title now derives from --out_dir")
         else:
             print(f"{PREP}: title line not found verbatim, skipped")
 
-    # ---- 4. repair titles already written to disk -----------------------------
     for ds in ORDER:
         p = os.path.join(PROC, ds, "vocab_stats.md")
+        if not os.path.exists(p):
+            continue
         txt = open(p, errors="ignore").read()
         first = txt.split("\n", 1)[0]
         want = f"# {ds} vocab stats"
-        if first.startswith("# ") and first != want and "vocab stats" in first:
+        if first.startswith("# ") and first != want and "vocab stats" in first.lower():
             open(p, "w").write(want + txt[len(first):])
             print(f"{p}: title {first!r} -> {want!r} (numbers untouched)")
 
-    # ---- 5. self-check: recomputed pps must agree with the section 5 table ----
     res2 = open(RESULTS).read()
     sec5 = dict(re.findall(r"\| (Junyi|EdNet|ASSIST2009|Algebra2006|Bridge2006|ASSIST2017|Algebra2005)"
                            r" \| ([\d.]+) \|", res2))
@@ -137,16 +196,19 @@ def main():
     bad = 0
     for ds in ORDER:
         s = stats[ds]
-        got = s["median_len"] / s["skills"] if s["skills"] else float("nan")
+        if not s or s["median_len"] is None or not s["skills"]:
+            print(f"  {alias[ds]:12s} not computable (missing median_len or skills)")
+            continue
+        got = s["median_len"] / s["skills"]
         want = float(sec5.get(alias[ds], "nan"))
         flag = "" if abs(got - want) < 0.011 else "   <-- MISMATCH, check rounding or a stale table"
         bad += bool(flag)
         print(f"  {alias[ds]:12s} {got:7.3f} vs {want:7.3f}{flag}")
     if bad:
-        print(f"  {bad} mismatch(es). The 0.1 table is computed from vocab_stats.md and is the "
-              "primary source; reconcile section 5 by hand if the difference is real.")
+        print(f"  {bad} mismatch(es). The 0.1 table comes from vocab_stats.md and is the primary "
+              "source; reconcile section 5 by hand if the difference is real.")
 
-    print("\nVerify: grep -n '### 0.1' RESULTS.md ; sed -n '10,22p' README.md")
+    print("\nVerify: grep -n '### 0.1' RESULTS.md ; sed -n '11,20p' README.md")
 
 
 if __name__ == "__main__":

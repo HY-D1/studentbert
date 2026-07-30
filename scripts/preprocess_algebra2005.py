@@ -131,7 +131,7 @@ def main() -> None:
     sl = np.array(seq_lengths)
     frac_correct = float(np.mean(correct_arr)) if correct_arr else 0.0
     stats = (
-        f"# Algebra2005 vocab stats\n\n"
+        f"# {Path(args.out_dir).name} vocab stats\n\n"
         f"- raw rows: {n_raw}\n"
         f"- after cleaning (KC+correct present): {n_clean}\n"
         f"- students (>= {args.min_interactions} interactions): {n_students}\n"
