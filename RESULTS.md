@@ -120,6 +120,50 @@ Source: `parse_nextskill_full.py` over `w5_nextskill_sweep_*.log` + `w5_nsauc_s*
 Note: ednet at N=25 is high variance (top-1 std 0.0455). Full per-seed values: `nextskill_results_long.csv` / `nextskill_results_agg.csv` (gitignored, regenerable).
 
 ---
+### 3.2 Paired-by-seed next-skill gaps, assist2017 target (top-1, recomputed from nextskill_results_long.csv)
+
+Same runs as 3.1, but each pretrained condition is differenced against scratch at the
+same N *within* a seed, since a seed fixes the target subsample (`first_n_students`
+draws per seed). Regenerate with `python3 analysis/paired_bootstrap_lak.py`.
+
+| N | condition | seeds | per-seed gaps | mean gap | 95% CI (paired boot) | +/n | sign-test p |
+|---|---|---|---|---|---|---|---|
+| 25 | ednet | 3 | -0.0058 +0.0225 +0.0852 | +0.0340 | [-0.0058, +0.0852] includes 0 | 2/3 | 0.500 |
+| 25 | indomain | 3 | +0.0765 +0.1195 +0.0804 | +0.0922 | [+0.0765, +0.1195] excludes 0 | 3/3 | 0.125 |
+| 25 | junyi | 3 | +0.0694 +0.1092 +0.0789 | +0.0858 | [+0.0694, +0.1092] excludes 0 | 3/3 | 0.125 |
+| 50 | ednet | 3 | -0.0091 -0.0170 +0.0122 | -0.0046 | [-0.0170, +0.0122] includes 0 | 1/3 | 0.875 |
+| 50 | indomain | 3 | +0.0102 +0.0178 +0.0139 | +0.0140 | [+0.0102, +0.0178] excludes 0 | 3/3 | 0.125 |
+| 50 | junyi | 3 | +0.0077 +0.0134 +0.0138 | +0.0116 | [+0.0077, +0.0138] excludes 0 | 3/3 | 0.125 |
+| 100 | ednet | 3 | -0.0046 -0.0064 +0.0064 | -0.0015 | [-0.0064, +0.0064] includes 0 | 1/3 | 0.875 |
+| 100 | indomain | 3 | +0.0067 +0.0058 +0.0064 | +0.0063 | [+0.0058, +0.0067] excludes 0 | 3/3 | 0.125 |
+| 100 | junyi | 3 | +0.0074 +0.0046 +0.0077 | +0.0066 | [+0.0046, +0.0077] excludes 0 | 3/3 | 0.125 |
+| 200 | ednet | 3 | +0.0003 +0.0013 +0.0063 | +0.0027 | [+0.0003, +0.0063] excludes 0 | 3/3 | 0.125 |
+| 200 | indomain | 3 | +0.0058 +0.0068 +0.0076 | +0.0067 | [+0.0058, +0.0076] excludes 0 | 3/3 | 0.125 |
+| 200 | junyi | 3 | +0.0079 +0.0072 +0.0081 | +0.0077 | [+0.0072, +0.0081] excludes 0 | 3/3 | 0.125 |
+| 500 | ednet | 3 | +0.0074 +0.0090 +0.0104 | +0.0089 | [+0.0074, +0.0104] excludes 0 | 3/3 | 0.125 |
+| 500 | indomain | 3 | +0.0104 +0.0140 +0.0100 | +0.0115 | [+0.0100, +0.0140] excludes 0 | 3/3 | 0.125 |
+| 500 | junyi | 3 | +0.0126 +0.0144 +0.0142 | +0.0137 | [+0.0126, +0.0144] excludes 0 | 3/3 | 0.125 |
+| 1000 | ednet | 3 | +0.0117 +0.0104 +0.0140 | +0.0120 | [+0.0104, +0.0140] excludes 0 | 3/3 | 0.125 |
+| 1000 | indomain | 3 | +0.0129 +0.0109 +0.0122 | +0.0120 | [+0.0109, +0.0129] excludes 0 | 3/3 | 0.125 |
+| 1000 | junyi | 3 | +0.0148 +0.0134 +0.0152 | +0.0145 | [+0.0134, +0.0152] excludes 0 | 3/3 | 0.125 |
+
+_Read: gaps are pretrained minus scratch at the same N, paired by seed. The bootstrap resamples the paired per-seed gaps._
+
+> CAVEAT, n=3 seeds per cell. Two consequences, both real:
+> 1. The exact one-sided sign test cannot go below 0.125 even when every seed agrees, so no cell here can reach p<0.05 by that test. Reaching p<0.05 needs at least 5 seeds.
+> 2. A bootstrap over 3 values resamples from only 10 distinct multisets, so the CI is coarse and anti-conservative. Treat it as indicative, not as a significance test.
+> The defensible claim at this seed count is the per-seed evidence itself: the gap direction and how many seeds agree. That is what the poster reports.
+
+_Read: in-domain and Junyi sources are positive on 3/3 seeds at every budget. The
+EdNet source is not: 2/3 seeds at N=25 with a per-seed spread of -0.0058 to +0.0852,
+and 1/3 seeds at both N=50 and N=100 where its mean gap is negative (-0.0046 and
+-0.0015). It only becomes consistently positive from N=200. So the largest source is
+not merely noisy at small N, it is the wrong default there; low-N guidance should name
+in-domain first, then Junyi. The gap is also not monotone in N: it collapses from
++0.092 at N=25 to +0.006 at N=100, then recovers to +0.012 to +0.015 by N=1000, with
+tight per-seed spread at the high end, so the recovery is not seed noise. At n=3 seeds
+these are per-seed evidence, not significance tests; see the caveat above._
+
 ## 4. Objective reversal (headline)  
 
 Best pretraining objective is target-dependent. Per-dataset objective ablation (EdNet-source encoders: full / skill_only / correct_only -> target), from logs:
