@@ -60,3 +60,10 @@ nextskill_results_*.csv
 break_even_*.pdf
 break_even_*.png
 skill_freq_*.md
+poster/*.pdf
+poster/*.png
+poster/*.svg
+poster/*.pptx
+poster/poster_layout.json
+poster/chart_*.png
+poster_gaps_evidence.txt

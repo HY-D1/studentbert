@@ -46,6 +46,20 @@ _Read: DKT is the strongest simple baseline and wins on the 4 newer datasets; th
 - **Moderator:** sequence density (practice-per-skill) - see section 5.
 
 ---
+### 2.1 Verified source table at N=3000 (KT test AUC, parsed from logs) [EDM; poster R2]
+
+Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_n3000_seed{1,2,42}`, 3 seeds, mean ±pstdev, gain vs scratch in parentheses. Log-verified July 30 2026 (poster_gaps_evidence.txt).
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 | 0.6702 ±0.0008 | 0.6934 ±0.0018 (+0.0232) | 0.6970 ±0.0021 (+0.0269) | 0.6890 ±0.0002 (+0.0189) | (=indomain) |
+| ednet | 0.6652 ±0.0007 | 0.6728 ±0.0008 (+0.0076) | (=indomain) | 0.6693 ±0.0003 (+0.0041) | 0.6647 ±0.0012 (-0.0005) |
+| junyi | 0.7352 ±0.0010 | 0.7388 ±0.0002 (+0.0036) | 0.7414 ±0.0002 (+0.0062) | (=indomain) | 0.7342 ±0.0004 (-0.0010) |
+
+Per-seed paired gains vs scratch, assist2017 target: fromednet +0.0263/+0.0253/+0.0290 (3/3 positive), indomain +0.0239/+0.0210/+0.0248, fromjunyi +0.0200/+0.0183/+0.0183.
+
+_Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale>granularity claim and the poster R2 card._
+
 ## 3. Low-resource advantage & scale boundary  
 
 - **Scale boundary (recorded):** cross-dataset transfer gains are largest when the target is data-poor; at full target scale they fade toward ~0.
@@ -193,6 +207,21 @@ _Per-target probe ordering tracks transfer ordering: Spearman rho ASSIST +0.5, E
 _Parsing caveat: restrict probe greps to `w6_probe2*.log` and `w8_probe7*.log`. `w6_probe_*.log` (header `=== probe (skill-identity)`) holds the DEPRECATED v1 probe, which was circular (skill visible at the probed position, accuracies 0.96 to 0.9996; confirmed present in w6_probe_7988582.log and w6_probe_7988933.log); those values must never be reported._
 
 ---
+### 6.1 LogME vs the domain probe (w7_logme_8263344.log, scripts/compute_logme.py) [placement: ICLR or NeurIPS, advisor decision pending]
+
+LogME on frozen encoders (full-objective + scratch), 3 targets, higher = better:
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 | -0.669368 | -0.563884 | -0.565629 | -0.624513 | (=indomain) |
+| ednet | -0.650869 | -0.548155 | (=indomain) | -0.611066 | -0.569707 |
+| junyi | -0.574950 | -0.551480 | -0.439082 | (=indomain) | -0.506391 |
+
+Per-target Spearman rho against the same N=3000 KT gains (section 2.1), 3 pretrained sources per target:
+LogME [0.5, 0.5, 0.5] mean 0.50; probe [0.5, 1.0, 1.0] mean 0.83.
+
+_Read: identical 9 source-target pairs, identical gains. LogME does rank scratch last on all 3 targets (the coarse pretrain-vs-not signal is right) but mis-orders the pretrained sources on every target; the domain-specific masked-skill probe (section 6) tracks the source ordering better (0.83 vs 0.50)._
+
 ## 7. Embedding geometry (honest negative) 
 
 - vocab-invariant coherence separated regimes raw, but matched-skill (top-100) control: confound persisted r=+0.87 AND separation broke (Algebra2006 skill rose above EdNet corr). REPORT AS NEGATIVE.
@@ -223,6 +252,27 @@ K<=50 = clean eval points. K=100/200 UNCENSORED = LEAKED (14% / 74% per the leak
 _Read: pretraining does NOT beat scratch on ASSIST dropout at any clean K (scratch best at K=5/10/20; tied at K=50). This is the quantitative version of the qualitative claim in section 8. W7 censored recovery (recorded): K=100 scratch 0.768 > ednet 0.765 > junyi 0.763 > indomain 0.759 (cohort 1315/1366); K=200 scratch 0.732, indomain 0.762, ednet 0.692, junyi 0.731 (cohort 1118, high variance, report with N caveat)._
 
 ---
+### 8.2 EdNet dropout at n3000: corrected full 8-seed grid [LAK]
+
+Runs `edubert_ednet_drop_ednet_{scratch|indomain|fromassist|fromjunyi}_k{5,10}_n3000_seed{1..7,42}`, test AUC. Extraction MUST be comma-anchored (`grep -A4 -F "=== dropout (NAME,"`): a bare-name grep collides seed4 with seed42 (prefix) and silently duplicates values; 7 seed4 cells below were corrected this way on July 30 2026. indomain k10 seed42 = 0.7261 recovered from the W&B run output.log (run completed and synced; the local log lost its tail) - W&B and local logs agree exactly on the junyi indomain k10 seed2/seed42 cross-checks (0.6240 / 0.6259). indomain k10 seed2 died before eval (no banner locally, not on W&B): cell is n=7; a resubmit is optional and changes no claim.
+
+| cond | K | s1 | s2 | s3 | s4 | s5 | s6 | s7 | s42 | mean ±pstdev |
+|---|---|---|---|---|---|---|---|---|---|---|
+| scratch | 5 | 0.6623 | 0.5238 | 0.6342 | 0.4995 | 0.5000 | 0.5185 | 0.5196 | 0.7029 | 0.5701 ±0.0771 (n=8) |
+| scratch | 10 | 0.5124 | 0.7183 | 0.5180 | 0.5977 | 0.5264 | 0.6752 | 0.6348 | 0.5378 | 0.5901 ±0.0740 (n=8) |
+| indomain | 5 | 0.6949 | 0.6970 | 0.6118 | 0.5172 | 0.7156 | 0.7110 | 0.7047 | 0.6834 | 0.6669 ±0.0644 (n=8) |
+| indomain | 10 | 0.5802 | died | 0.6817 | 0.6852 | 0.7273 | 0.5861 | 0.5405 | 0.7261 | 0.6467 ±0.0706 (n=7) |
+| fromassist | 5 | 0.5164 | 0.6053 | 0.5000 | 0.5218 | 0.6753 | 0.5364 | 0.5130 | 0.5122 | 0.5475 ±0.0571 (n=8) |
+| fromassist | 10 | 0.5229 | 0.6912 | 0.5043 | 0.7367 | 0.6113 | 0.6456 | 0.6081 | 0.5463 | 0.6083 ±0.0764 (n=8) |
+| fromjunyi | 5 | 0.5077 | 0.7025 | 0.5128 | 0.6132 | 0.5371 | 0.5230 | 0.6797 | 0.6666 | 0.5928 ±0.0767 (n=8) |
+| fromjunyi | 10 | 0.6459 | 0.7214 | 0.6846 | 0.7311 | 0.5719 | 0.7302 | 0.7106 | 0.6867 | 0.6853 ±0.0506 (n=8) |
+
+Paired-by-seed effects vs scratch on this corrected grid, matching the recorded 8-seed paired-bootstrap results exactly (so the original analysis used correct extraction):
+- indomain k5: mean +0.0968 (6/8 seeds positive) - recorded +0.097, CI [+0.029, +0.164].
+- fromjunyi k10: mean +0.0952 (8/8 positive) - recorded +0.095, CI [+0.057, +0.132].
+- indomain k10 (n=7 paired): mean +0.0750, per-seed range -0.094 to +0.201 - high variance, NO claim.
+- All other cells: high variance, no claims beyond the two effects above. EdNet dropout remains mostly inconclusive; report it that way.
+
 ## 9. Honest negatives & caveats 
 
 - Embedding coherence does not separate regimes under a vocab control (section 7).
