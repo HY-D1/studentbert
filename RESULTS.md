@@ -60,6 +60,18 @@ Per-seed paired gains vs scratch, assist2017 target: fromednet +0.0263/+0.0253/+
 
 _Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale-over-granularity claim in section 2._
 
+### 2.2 Source comparison at N=3000, next-skill macro-OVR AUC (parsed from logs)
+
+Runs `edubert_<target>_ns_<t>_<cond>_n3000_seed{1,2,42}`, mean ±pstdev, gain vs scratch in parentheses. Same budget and same sources as 2.1, second task.
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 (92 classes) | 0.9796 ±0.0001 (n=3) | 0.9819 ±0.0000 (+0.0023) | 0.9815 ±0.0002 (+0.0019) | 0.9821 ±0.0002 (+0.0025) | - |
+| ednet (142 classes) | 0.8701 ±0.0007 (n=3) | 0.8847 ±0.0008 (+0.0146) | - | 0.8749 ±0.0005 (+0.0048) | 0.8727 ±0.0004 (+0.0026) |
+| junyi (1326 classes) | 0.9888 ±0.0005 (n=3) | 0.9911 ±0.0006 (+0.0023) | 0.9896 ±0.0002 (+0.0009) | - | 0.9896 ±0.0003 (+0.0009) |
+
+_Read: assist2017: best is fromjunyi at +0.0025; ednet: best is indomain at +0.0146; junyi: best is indomain at +0.0023. Next-skill macro-OVR sits far above chance on all three targets, so the absolute values are compressed and the gaps are correspondingly small; read the ordering, not the magnitude, and compare against the knowledge-tracing gaps in 2.1 before making any source claim._
+
 ## 3. Low-resource advantage & scale boundary  
 
 - **Scale boundary (recorded):** cross-dataset transfer gains are largest when the target is data-poor; at full target scale they fade toward ~0.
