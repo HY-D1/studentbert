@@ -173,7 +173,7 @@ _practice-per-skill orders all 7: skill-driven >=0.325, correctness-driven <=0.2
 | 320 | 0.6614 | 0.6589 | 0.6599 | 0.6597 |
 | 512 | 0.6941 | 0.6920 | 0.6655 | - |
 
-**Honest limit:** precise threshold fuzzy (empty gap 0.33-2.79). LODO does not generalize at n=6 (leave-one-dataset-out: multivariate 5/6 but overparameterized at n=6, not trustworthy; single features n_students 5/6, pps 3/6. No combo generalizes. NEGATIVE.).
+**Honest limit:** precise threshold fuzzy (empty gap 0.33-2.41; Algebra2006-07 at pps 2.410 sits inside the originally stated 0.33-2.79 span and closed its upper part). LODO does not generalize at n=6 (leave-one-dataset-out: multivariate 5/6 but overparameterized at n=6, not trustworthy; single features n_students 5/6, pps 3/6. No combo generalizes. NEGATIVE.).
 
 ---
 ## 6. Probe mechanism (7 datasets)
@@ -254,7 +254,7 @@ _Read: pretraining does NOT beat scratch on ASSIST dropout at any clean K (scrat
 ---
 ### 8.2 EdNet dropout at n3000: corrected full 8-seed grid
 
-Runs `edubert_ednet_drop_ednet_{scratch|indomain|fromassist|fromjunyi}_k{5,10}_n3000_seed{1..7,42}`, test AUC. Extraction MUST be comma-anchored (`grep -A4 -F "=== dropout (NAME,"`): a bare-name grep collides seed4 with seed42 (prefix) and silently duplicates values; 7 seed4 cells below were corrected this way on July 30 2026. indomain k10 seed42 = 0.7261 recovered from the W&B run output.log (run completed and synced; the local log lost its tail) - W&B and local logs agree exactly on the junyi indomain k10 seed2/seed42 cross-checks (0.6240 / 0.6259). indomain k10 seed2 died before eval (no banner locally, not on W&B): cell is n=7; a resubmit is optional and changes no claim.
+Runs `edubert_ednet_drop_ednet_{scratch|indomain|fromassist|fromjunyi}_k{5,10}_n3000_seed{1..7,42}`, test AUC. Extraction MUST be comma-anchored (`grep -A4 -F "=== dropout (NAME,"`): a bare-name grep collides seed4 with seed42 (prefix) and silently duplicates values; 7 seed4 cells below were corrected this way on July 30 2026. indomain k10 seed42 = 0.7261 recovered from the W&B run output.log (run completed and synced; the local log lost its tail) - W&B and local logs agree exactly on the junyi indomain k10 seed2/seed42 cross-checks (0.6240 / 0.6259). indomain k10 seed2 has no value and the cell stands at n=7. Every completed run of this condition logs exactly 165766 optimizer steps. Throughput is node-dependent by an order of magnitude: 59-92 steps/s on the fast nodes (d4052, h200, cascadelake; wall-clock 0.50-0.78 h) against 6.3 steps/s on a V100 node (c2207, v100-pcie, zen; 1 CPU allocated, GPU utilisation 2%, so the loader and not the GPU is the bottleneck), which needs 7.3 h. Against the 6 h walltime in the sbatch, a slow-node draw cannot finish: the original attempt reached 137073 steps (82.7%) at 5.98 h and died at the wall, and the July 30 2026 rerun (job 8839160) was on the same trajectory, 40.0% at 2.93 h projecting to 81.9% at the wall, and was cancelled. An earlier rerun that day (job 8838715) failed in 19 s at wandb.init after /home/dai.hany/.bashrc was lost, taking the WANDB_API_KEY with it. Completing this cell needs --time=08:00:00 and more than one CPU, not a plain resubmit; the seed42 value in this table came from a slow-node run that took 7.29 h. No claim depends on it either way.
 
 | cond | K | s1 | s2 | s3 | s4 | s5 | s6 | s7 | s42 | mean ±pstdev |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -278,7 +278,7 @@ Paired-by-seed effects vs scratch on this corrected grid, matching the recorded 
 - Embedding coherence does not separate regimes under a vocab control (section 7).
 - Coherence-vs-probe tie-in is a vocab-size artifact - dropped (section 7).
 - LODO cross-dataset prediction does not generalize at n=6 (overparameterized).
-- Regime threshold is fuzzy (empty pps gap 0.33-2.79); pps ordering holds, exact boundary not localized.
+- Regime threshold is fuzzy (empty pps gap 0.33-2.41, no dataset between assist2009 at 0.325 and algebra2006 at 2.410); pps ordering holds, exact boundary not localized.
 - Scale/pps observationally confounded at n=7; the causal claim rests on the single ASSIST2017 truncation manipulation.
 - EdNet dropout high-variance; ASSIST dropout pretraining doesn't help.
 - ednet-source next-skill at N=25 is high variance (top-1 std 0.0455); low-N claims anchor on indomain/junyi (section 3.1).
