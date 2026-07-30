@@ -24,7 +24,9 @@ Design:
     clearly marked as "recorded from prior analysis".
 """
 from __future__ import annotations
-import argparse, json, re, glob, os
+import argparse
+import os
+import sys, json, re, glob, os
 from collections import defaultdict
 import statistics as st
 
@@ -380,7 +382,22 @@ def main():
     ap.add_argument("--logdir", default=".")
     ap.add_argument("--out_md", default="RESULTS.md")
     ap.add_argument("--out_json", default="results.json")
+    ap.add_argument("--force", action="store_true",
+                    help="overwrite --out_md even if it contains hand-added sections")
     args = ap.parse_args()
+
+    # Sections this script does NOT regenerate. Overwriting RESULTS.md while any
+    # of them are present silently destroys them.
+    MANUAL = ["### 2.1", "### 3.1", "### 3.2", "### 6.1", "### 8.1", "### 8.2", "## 10."]
+    if os.path.exists(args.out_md) and not args.force:
+        existing = open(args.out_md, errors="ignore").read()
+        present = [m for m in MANUAL if m in existing]
+        if present:
+            sys.exit(
+                f"REFUSING to overwrite {args.out_md}: it contains hand-added sections "
+                f"that this script does not regenerate ({', '.join(present)}).\n"
+                f"  Write elsewhere and diff:  --out_md RESULTS_generated.md\n"
+                f"  Or overwrite deliberately: --force  (the sections above will be lost)")
 
     coll = {}
     print("collecting objective ablation ...")
