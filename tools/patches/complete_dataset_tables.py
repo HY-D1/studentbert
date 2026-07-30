@@ -94,12 +94,61 @@ def cell(v, kind="int"):
     if kind == "int":
         return f"{int(v):,}"
     if kind == "len":
-        return f"{v:.0f}"
+        return f"{v:.1f}"
     return f"{v:.4f}"
+
+
+def fix_section5(text, stats, alias):
+    """Rewrite the section 5 pps column from the processed files.
+
+    Scoped to the pps table only. An unscoped regex matched the section 1
+    baseline table first and rewrote an AUC as a pps value, so the block is
+    located by its header and edits are confined to it.
+    """
+    changed = []
+    hdr = "| Dataset | pps | regime |"
+    i = text.find(hdr)
+    if i < 0:
+        return text, changed, "section 5 pps table header not found; nothing changed"
+    j = text.find("\n\n", i)
+    if j < 0:
+        return text, changed, "could not find the end of the pps table; nothing changed"
+    block = text[i:j]
+
+    for ds, key in alias.items():
+        s = stats.get(ds)
+        if not s or s["median_len"] is None or not s["skills"]:
+            continue
+        val = s["median_len"] / s["skills"]
+        pat = re.compile(r"(\| " + re.escape(key) + r" \| )([\d.]+)( \|)")
+        m = pat.search(block)
+        if m and abs(float(m.group(2)) - val) >= 0.0015:
+            changed.append((key, m.group(2), f"{val:.3f}"))
+            block = pat.sub(lambda mm: f"{mm.group(1)}{val:.3f}{mm.group(3)}", block, count=1)
+    text = text[:i] + block + text[j:]
+
+    # prose, only on lines that already talk about pps
+    lines = text.split("\n")
+    for n, line in enumerate(lines):
+        if "pps" not in line.lower():
+            continue
+        for ds, key in alias.items():
+            s = stats.get(ds)
+            if not s or s["median_len"] is None or not s["skills"]:
+                continue
+            val = s["median_len"] / s["skills"]
+            pat = re.compile(r"(" + re.escape(key.lower()) + r"(?:-07)? at (?:pps )?)([\d.]+)", re.I)
+            m = pat.search(line)
+            if m and abs(float(m.group(2)) - val) >= 0.0015:
+                changed.append((key + " (prose)", m.group(2), f"{val:.3f}"))
+                lines[n] = pat.sub(lambda x: f"{x.group(1)}{val:.3f}", line, count=1)
+                line = lines[n]
+    return "\n".join(lines), changed, None
 
 
 def main():
     refresh = "--refresh" in sys.argv
+    fix5 = "--fix-section5" in sys.argv
     for f in (RESULTS, README):
         if not os.path.exists(f):
             sys.exit(f"ERROR: {f} not found. Run from the repo root.")
@@ -233,6 +282,21 @@ def main():
     if bad:
         print(f"  {bad} mismatch(es). The 0.1 table comes from vocab_stats.md and is the primary "
               "source; reconcile section 5 by hand if the difference is real.")
+
+    if fix5:
+        res3 = open(RESULTS).read()
+        res3, changed, err = fix_section5(res3, stats, alias)
+        if err:
+            print(f"\nsection 5: {err}")
+        elif changed:
+            open(RESULTS, "w").write(res3)
+            print("\nsection 5 corrected from the processed files:")
+            for k, was, now in changed:
+                print(f"  {k}: {was} -> {now}")
+        else:
+            print("\nsection 5: nothing to correct")
+    elif bad:
+        print("  rerun with --fix-section5 to correct these in place")
 
     print("\nVerify: grep -n '### 0.1' RESULTS.md ; sed -n '11,20p' README.md")
 
