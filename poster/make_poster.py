@@ -500,7 +500,7 @@ lim = [
     "Practice per skill orders all 7 datasets, but leave-one-dataset-out prediction holds for only 3 of 6 held-out sets: associated, not established.",
     "PPS is a proxy: skills are defined differently per dataset, and it is measured before the model's 512-step cap, which lowers Bridge 2006 to 1.04 and Algebra 2006-07 to 1.06, so the unsampled interval is 0.33 to 1.04.",
     "The truncation test keeps each learner's most recent K interactions, changing amount, horizon, skill mix and density together; the crossover is not localized. Size, compute and density stay confounded at n = 7.",
-    "Scarce-data effect; embedding geometry failed a vocabulary control; disengagement results mixed; 10.1% of ASSISTments next-skill labels are an unlabeled placeholder.",
+    "Scarce-data effect; embedding geometry failed a vocabulary control; disengagement results mixed. 10.1% of next-skill labels are an unlabeled placeholder, but averaging per skill roughly doubles the N=25 gain (+0.18 macro top-1), so it is not a frequent-skill artifact.",
 ]
 nxt = [
     "Prospectively test practice-per-skill on new mid-density datasets.",
