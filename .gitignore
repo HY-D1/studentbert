@@ -46,7 +46,6 @@ wandb/
 *.pt
 *.npz
 __pycache__/
-*.pycw*.sbatch
 audit_output.txt
 w*.sbatch
 embedding_analysis/
@@ -67,3 +66,6 @@ poster/*.pptx
 poster/poster_layout.json
 poster/chart_*.png
 poster_gaps_evidence.txt
+audit_report.txt
+paired_bootstrap_lak_out.md
+probe_rerun_info.txt
