@@ -229,7 +229,7 @@ _practice-per-skill orders all 7: skill-driven >=0.325, correctness-driven <=0.2
 **Causal truncation flip (recorded):** truncating ASSIST2017 sequence length while holding skill count (102) and #students (1708) FIXED flips the regime:
 - K=512 (pps~5.0): correct-skill -0.0265 CI [-0.0280,-0.0253] (0/6) -> ASSIST2017 truncated K=512/pps5.0: skill-driven (correct-skill negative) (recorded)
 - K=10 (pps~0.10): correct-skill +0.0121 CI [+0.0033,+0.0212] (6/6) -> ASSIST2017 truncated K=10/pps0.10: correctness-driven (correct-skill positive); regime FLIPPED holding skills+students fixed (recorded)
-- Scratch control rises smoothly with K (rules out pure data-quantity). Crossover ~pps 1.5.
+- A from-scratch control was run to K=320 (0.6347, 0.6476, 0.6423, 0.6523, 0.6586, 0.6597 at K=10..320). It is not monotone, it does not reproduce the endpoint reversal, and there is no scratch run at K=512, so the longest endpoint is uncontrolled. The skill_only minus correct_only gap is negative at every tested K through 320 (pps 3.14) and positive only at K=512 (pps 5.02): the sign change is bracketed between pps 3.14 and 5.02, NOT near 1.5 (at K=160, pps 1.57, the gap is still -0.0046). Truncation retains each learner's most recent K interactions, so it lowers total interactions, time horizon and skill composition together; density is not isolated.
 
 **Truncation sweep (from logs, KT AUC means):**
 
