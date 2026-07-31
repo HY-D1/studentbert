@@ -316,6 +316,50 @@ for m in nxt:
  '    (2.414,  0.0186, "Algebra 06-07","s", -1.35,  0.0042),'),
 ("if olap(ab, tb, tol=0.0020):",
  "if olap(ab, tb, tol=0.0008):"),
+("""# QR placeholder (replace with a real QR code before printing)
+qx, qy, qw, qh = 0.892, 0.9040, 0.0430, 0.0645
+box(qx, qy, qw, qh, fc="#FBFAF8", ec=FAINT, lw=1.8, r=0.004)
+T(qx + qw / 2, qy + qh * 0.62, "QR CODE", 15, color=FAINT, weight="bold", ha="center", va="center")
+T(qx + qw / 2, qy + qh * 0.36, "(add before print)", 11.5, color=FAINT, ha="center", va="center")""",
+ """# QR code area: image axes created near the end so fig.axes[:6] stays the charts
+qx, qy, qw, qh = 0.892, 0.9040, 0.0430, 0.0645
+box(qx, qy, qw, qh, fc="white", ec=FAINT, lw=1.8, r=0.004)
+import os as _os
+HAVE_QR = _os.path.exists("qr_code.png")
+if not HAVE_QR:
+    T(qx + qw / 2, qy + qh * 0.62, "QR CODE", 15, color=FAINT, weight="bold", ha="center", va="center")
+    T(qx + qw / 2, qy + qh * 0.36, "(add before print)", 11.5, color=FAINT, ha="center", va="center")
+    print("WARNING: poster/qr_code.png missing, rendering placeholder")"""),
+("""# ---------------------------------------------------------------- QA pass
+# Catch text or chart artists that spill outside the card they belong to.""",
+ """# ---------------------------------------------------------------- QR image
+# Created after all chart axes so name-to-axes pairings stay intact.
+QR_AX = None
+if HAVE_QR:
+    _qr_w = 0.037
+    _qr_h = _qr_w * FW / FH
+    QR_AX = fig.add_axes([qx + (qw - _qr_w) / 2, qy + (qh - _qr_h) / 2, _qr_w, _qr_h], zorder=6)
+    QR_AX.imshow(plt.imread("qr_code.png"), cmap="gray", interpolation="nearest", aspect="auto")
+    QR_AX.axis("off")
+
+# ---------------------------------------------------------------- QA pass
+# Catch text or chart artists that spill outside the card they belong to."""),
+("""for a in fig.axes:
+    b = fbox(a, tight=True)
+    if not any(inside(b, r, pad=0.003) for r in CARDS):""",
+ """for a in fig.axes:
+    b = fbox(a, tight=True)
+    if b[1] > 0.802:
+        continue
+    if not any(inside(b, r, pad=0.003) for r in CARDS):"""),
+("""    json.dump(dict(fig=[FW, FH], paper=hx(PAPER), shapes=shapes, texts=texts,
+                   charts=charts), open("poster_layout.json", "w"), indent=1)""",
+ """    if QR_AX is not None:
+        qp = QR_AX.get_position()
+        charts.append(dict(name="qr_code", x=qp.x0, y=qp.y1, w=qp.x1 - qp.x0, h=qp.y1 - qp.y0))
+
+    json.dump(dict(fig=[FW, FH], paper=hx(PAPER), shapes=shapes, texts=texts,
+                   charts=charts), open("poster_layout.json", "w"), indent=1)"""),
 ]
 
 OPTIONAL_PAIRS = [
