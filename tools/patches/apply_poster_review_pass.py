@@ -360,6 +360,47 @@ if HAVE_QR:
 
     json.dump(dict(fig=[FW, FH], paper=hx(PAPER), shapes=shapes, texts=texts,
                    charts=charts), open("poster_layout.json", "w"), indent=1)"""),
+# ---------------------------------------------------------------- mirror of the
+# manual Keynote edits, so a rebuild from source reproduces the printed file.
+("""T(0.0475, 0.9445, "Northeastern University", 20.5, weight="bold", va="center")
+T(0.0475, 0.9165, "Khoury College of Computer Sciences", 16.5, color=SLATE, va="center")""",
+ """T(0.0475, 0.9300, "Northeastern University", 20.5, weight="bold", va="center")"""),
+("""T(0.500, 0.9030, "Hanyu Dai   \u00b7   Supervised by Prof. Hazra Imran", 21, ha="center")
+T(0.500, 0.8830, "CS7980 Research Capstone   \u00b7   Khoury College of Computer Sciences, Northeastern University Vancouver   \u00b7   Summer 2026",
+  17.5, color=SLATE, ha="center")""",
+ """# Byline and affiliation share one row. AUTHOR_IN_HEADER=False reproduces the
+# printed Keynote header exactly; True is the default, the presenter's name
+# belongs near the title.
+AUTHOR_IN_HEADER = True
+HDRY, HDRGAP = 0.8992, 0.0155
+_byline = ("Hanyu Dai   \u00b7   Supervised by Prof. Hazra Imran" if AUTHOR_IN_HEADER
+           else "Supervised by Prof. Hazra Imran")
+_affil = "Khoury College of Computer Sciences, Northeastern University Vancouver   \u00b7   Summer 2026"
+_t1 = fig.text(0.500 - HDRGAP, HDRY, _byline, fontsize=21, color=INK,
+               ha="right", va="baseline", zorder=5)
+_t2 = fig.text(0.500 + HDRGAP, HDRY, _affil, fontsize=17.5, color=SLATE,
+               ha="left", va="baseline", zorder=5)
+# centre the pair as a unit so the row aligns with the title above it
+_r0 = fig.canvas.get_renderer()
+_i0 = fig.transFigure.inverted()
+_bb1, _bb2 = _t1.get_window_extent(_r0), _t2.get_window_extent(_r0)
+_sh = 0.500 - (_i0.transform([[_bb1.x0, 0]])[0][0]
+               + _i0.transform([[_bb2.x1, 0]])[0][0]) / 2
+_t1.set_x(0.500 - HDRGAP + _sh)
+_t2.set_x(0.500 + HDRGAP + _sh)"""),
+('T(qx + qw / 2, qy - 0.0215, "github.com/HY-D1/studentbert", 13, color=SLATE, ha="center")',
+ '# printed link under the QR removed: the code itself carries the URL'),
+("""box(MARG, 0.010, 1 - 2 * MARG, 0.033, fc="#EFEDE8", ec=EDGE, r=0.005)
+T(MARG + 0.006, 0.0265, "Hanyu Dai  \u00b7  dai.hany@northeastern.edu  \u00b7  github.com/HY-D1/studentbert",
+  15, va="center", weight="bold")
+T(0.5, 0.0265, "Khoury College of Computer Sciences, Northeastern University Vancouver  \u00b7  August 2026 Showcase",
+  14.5, va="center", ha="center", color=SLATE)
+T(1 - MARG - 0.006, 0.0265, "Computations: Northeastern Explorer HPC  \u00b7  Tracking: Weights & Biases",
+  14, va="center", ha="right", color=SLATE)""",
+ """# Footer band and the centre/right credits removed; the contact line sits
+# directly above the bottom accent rule.
+T(MARG + 0.006, 0.0265, "Hanyu Dai  \u00b7  dai.hany@northeastern.edu  \u00b7  github.com/HY-D1/studentbert",
+  15, va="center", weight="bold")"""),
 ]
 
 OPTIONAL_PAIRS = [
@@ -393,9 +434,35 @@ REQUIRED_AFTER = [
     "scratch control run to K=320", "0.693 vs 0.670",
     "A 2015 DKT still wins the 4 datasets added later",
     "Size, compute and density stay confounded at n = 7",
+    "Supervised by Prof. Hazra Imran",
+    "Northeastern University Vancouver   \u00b7   Summer 2026",
+    "dai.hany@northeastern.edu",
 ]
 FORBIDDEN_AFTER = ["\u2014", "Shown causally", "full length", "Four papers",
-                   "crossover sits near", "40,000"]
+                   "crossover sits near", "40,000",
+                   "CS7980 Research Capstone", "August 2026 Showcase",
+                   "Computations: Northeastern Explorer HPC"]
+
+
+def decide(src, old, new):
+    """'apply', 'skip', or a conflict string.
+
+    Insertion pairs keep the anchor, so old is a substring of new and a naive
+    'old in src' test fires again after the edit and duplicates the block.
+    When both strings are present, the containment direction settles it.
+    """
+    has_old, has_new = old in src, new in src
+    if has_old and has_new:
+        if old in new:
+            return "skip"          # anchor kept: new present means already done
+        if new in old:
+            return "apply"         # deletion: old present means still pending
+        return f"AMBIGUOUS (old and new both present): {old[:60]!r}"
+    if has_new:
+        return "skip"
+    if not has_old:
+        return f"NOT FOUND (local edit here?): {old[:70]!r}"
+    return "apply"
 
 
 def main():
@@ -403,22 +470,23 @@ def main():
     applied = skipped = optional = 0
     conflicts = []
     for old, new in OPTIONAL_PAIRS:
-        if old in src and src.count(old) == 1 and new not in src:
-            src = src.replace(old, new)
+        if decide(src, old, new) == "apply" and src.count(old) == 1:
+            src = src.replace(old, new, 1)
             optional += 1
     for old, new in PAIRS:
         if new.startswith("PLACEHOLDER"):
             continue
-        if old in src:
+        verdict = decide(src, old, new)
+        if verdict == "skip":
+            skipped += 1
+        elif verdict == "apply":
             if src.count(old) != 1:
                 conflicts.append(f"NON-UNIQUE ({src.count(old)}x): {old[:70]!r}")
                 continue
-            src = src.replace(old, new)
+            src = src.replace(old, new, 1)
             applied += 1
-        elif new in src:
-            skipped += 1
         else:
-            conflicts.append(f"NOT FOUND (local edit here?): {old[:70]!r}")
+            conflicts.append(verdict)
     open(PATH, "w", encoding="utf-8").write(src)
     ast.parse(src)
     missing = [r for r in REQUIRED_AFTER if r not in src]

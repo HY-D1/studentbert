@@ -98,8 +98,7 @@ fig.patches.append(Rectangle((0, 0), 1, 0.0045, transform=fig.transFigure, fc=RE
 # logo block (placeholder wordmark; swap in the official Khoury logo before print)
 box(0.013, 0.9075, 0.0300, 0.0450, fc=RED, ec=RED, r=0.004)
 T(0.0280, 0.9300, "N", 44, color="white", weight="bold", ha="center", va="center")
-T(0.0475, 0.9445, "Northeastern University", 20.5, weight="bold", va="center")
-T(0.0475, 0.9165, "Khoury College of Computer Sciences", 16.5, color=SLATE, va="center")
+T(0.0475, 0.9300, "Northeastern University", 20.5, weight="bold", va="center")
 
 # title block
 T(0.500, 0.9895, "S T U D E N T B E R T   ·   A  P R E T R A I N E D  M O D E L  F O R  S T U D E N T  I N T E R A C T I O N  D A T A",
@@ -109,9 +108,26 @@ T(0.500, 0.9700, "When Does Pretraining Help Model Student Learning?",
 T(0.500, 0.9265, "Whose past learning data to train on, when it actually helps, and a dataset property that goes with it. "
                  "7 datasets · 511,273 retained learner sequences · 115M interactions · 3 tasks.",
   22.5, color=SLATE, ha="center")
-T(0.500, 0.9030, "Hanyu Dai   ·   Supervised by Prof. Hazra Imran", 21, ha="center")
-T(0.500, 0.8830, "CS7980 Research Capstone   ·   Khoury College of Computer Sciences, Northeastern University Vancouver   ·   Summer 2026",
-  17.5, color=SLATE, ha="center")
+# Byline and affiliation share one row. AUTHOR_IN_HEADER=False reproduces the
+# printed Keynote header exactly; True is the default, the presenter's name
+# belongs near the title.
+AUTHOR_IN_HEADER = True
+HDRY, HDRGAP = 0.8992, 0.0155
+_byline = ("Hanyu Dai   ·   Supervised by Prof. Hazra Imran" if AUTHOR_IN_HEADER
+           else "Supervised by Prof. Hazra Imran")
+_affil = "Khoury College of Computer Sciences, Northeastern University Vancouver   ·   Summer 2026"
+_t1 = fig.text(0.500 - HDRGAP, HDRY, _byline, fontsize=21, color=INK,
+               ha="right", va="baseline", zorder=5)
+_t2 = fig.text(0.500 + HDRGAP, HDRY, _affil, fontsize=17.5, color=SLATE,
+               ha="left", va="baseline", zorder=5)
+# centre the pair as a unit so the row aligns with the title above it
+_r0 = fig.canvas.get_renderer()
+_i0 = fig.transFigure.inverted()
+_bb1, _bb2 = _t1.get_window_extent(_r0), _t2.get_window_extent(_r0)
+_sh = 0.500 - (_i0.transform([[_bb1.x0, 0]])[0][0]
+               + _i0.transform([[_bb2.x1, 0]])[0][0]) / 2
+_t1.set_x(0.500 - HDRGAP + _sh)
+_t2.set_x(0.500 + HDRGAP + _sh)
 
 # QR code area: image axes created near the end so fig.axes[:6] stays the charts
 qx, qy, qw, qh = 0.892, 0.9040, 0.0430, 0.0645
@@ -123,7 +139,7 @@ if not HAVE_QR:
     T(qx + qw / 2, qy + qh * 0.36, "(add before print)", 11.5, color=FAINT, ha="center", va="center")
     print("WARNING: poster/qr_code.png missing, rendering placeholder")
 T(qx + qw / 2, qy - 0.0075, "Code + results", 14, color=INK, weight="bold", ha="center")
-T(qx + qw / 2, qy - 0.0215, "github.com/HY-D1/studentbert", 13, color=SLATE, ha="center")
+# printed link under the QR removed: the code itself carries the URL
 
 # ---------------------------------------------------------------- takeaway banner
 by, bh = 0.806, 0.062
@@ -524,13 +540,10 @@ for m in nxt:
     yy -= 0.0096 * len(textwrap.wrap(m, 70)) + 0.0034
 
 # ---------------------------------------------------------------- footer
-box(MARG, 0.010, 1 - 2 * MARG, 0.033, fc="#EFEDE8", ec=EDGE, r=0.005)
+# Footer band and the centre/right credits removed; the contact line sits
+# directly above the bottom accent rule.
 T(MARG + 0.006, 0.0265, "Hanyu Dai  ·  dai.hany@northeastern.edu  ·  github.com/HY-D1/studentbert",
   15, va="center", weight="bold")
-T(0.5, 0.0265, "Khoury College of Computer Sciences, Northeastern University Vancouver  ·  August 2026 Showcase",
-  14.5, va="center", ha="center", color=SLATE)
-T(1 - MARG - 0.006, 0.0265, "Computations: Northeastern Explorer HPC  ·  Tracking: Weights & Biases",
-  14, va="center", ha="right", color=SLATE)
 
 # ---------------------------------------------------------------- QR image
 # Created after all chart axes so name-to-axes pairings stay intact.
