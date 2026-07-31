@@ -131,7 +131,7 @@ fig.patches.append(Rectangle((MARG + LBLW - 0.004, by + 0.010), 0.0012, bh - 0.0
                              transform=fig.transFigure, fc="white", alpha=0.45, ec="none"))
 msgs = [
     "On ASSISTments next-skill prediction, gains were largest at N=25:\n+9.2 points top-1 there, at most +1.5 by 1,000.",
-    "The largest source was best or tied in the 3 knowledge-tracing\nsource comparisons: the 442K-student source beat the in-domain one.",
+    "Source size mattered for knowledge tracing:\nthe 442K-student EdNet source was best in all 3 source tests.",
     "For knowledge tracing, skill-only versus correct-only preference varied\nby target, and tracked practice per skill. Reversed by a within-dataset test.",
 ]
 for i, m in enumerate(msgs):
@@ -174,7 +174,10 @@ for tag, q in rqs:
 
 # ---- 3 Model & pipeline (diagram)
 cx, cy, cw, ct = card(*c1c, "3", "Prototype and methodology")
-ax = mkax([cx, cy + 0.010, cw, ct - cy - 0.014])
+T(cx, ct, W("StudentBERT is a BERT-style model for student learning histories: every step is a "
+            "skill practiced, whether the answer was right, and a response-time bin.", 68),
+  14.5, ls=1.24, color=SLATE)
+ax = mkax([cx, cy + 0.010, cw, ct - cy - 0.042])
 ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
 
 def dbox(x, y, w, h, lines, fc="#FBFAF8", ec=INK, lw=1.6, sizes=None, colors=None, weights=None):
@@ -316,9 +319,9 @@ refs = [
 ]
 yy = ct - 0.001
 for i, r in enumerate(refs):
-    lines = textwrap.wrap(f"[{i+1}] {r}", 104)
-    T(cx, yy, "\n".join(lines), 11, color=SLATE, ls=1.14)
-    yy -= 0.0071 * len(lines) + 0.0012
+    lines = textwrap.wrap(f"[{i+1}] {r}", 94)
+    T(cx, yy, "\n".join(lines), 12.5, color=SLATE, ls=1.16)
+    yy -= 0.0080 * len(lines) + 0.0014
 
 # ================================================================ COLUMN 3
 (c3a, c3b) = stack(2, [0.428, 0.304])
@@ -346,7 +349,7 @@ ax1.set_xscale("log")
 ax1.minorticks_off()
 ax1.set_xticks(N); ax1.set_xticklabels([str(n) for n in N], fontsize=14)
 ax1.tick_params(axis="y", labelsize=14)
-ax1.set_ylabel("top-1 accuracy (%)", fontsize=15)
+ax1.set_ylabel("top-1 accuracy (%), axis truncated", fontsize=14)
 ax1.set_xlabel("number of target students (log scale)", fontsize=15)
 ax1.set_ylim(63, 82)
 for s in ("top", "right"):
@@ -395,7 +398,7 @@ ax2.set_xlabel("AUC gain vs scratch", fontsize=14)
 for s in ("top", "right"):
     ax2.spines[s].set_visible(False)
 notes = [
-    "The biggest source beat the in-domain one for knowledge tracing. The pattern holds on all 3 original targets; on the EdNet target the closest match in skill-vocabulary size (ASSISTments) transfers worst.",
+    "The EdNet source was best on all 3 targets, including where a smaller in-domain source was available. On the EdNet target the closest match in skill-vocabulary size (ASSISTments) transfers worst, below scratch.",
     "Cross-dataset loading drops the skill embeddings, so this compares corpus scale and granularity, not semantic similarity. Source size and pretraining compute were not independently controlled.",
     "On the large EdNet and Junyi targets gains shrink toward 0 as target data grows; only in-domain EdNet survives (+0.0069 AUC, 6/6 seeds). ASSISTments 2017 is small enough that even its full split is low-resource.",
 ]
@@ -427,6 +430,8 @@ pts = [  # (pps, skill_only - correct_only AUC, label, regime, dx, dy)
     (5.330,  0.0228, "Algebra 2005","s",  1.10,  -0.0018),
 ]
 axs.axhline(0, color="#B9B6AF", lw=1.6)
+axs.text(8.9, 0.0022, "above 0: skill-only better", fontsize=10.5, color=SLATE, ha="right")
+axs.text(8.9, -0.0060, "below 0: correct-only better", fontsize=10.5, color=SLATE, ha="right")
 axs.axvspan(0.211, 0.325, color="#DEDBD4", alpha=0.7, zorder=0, gid="band")
 for p, g, lab, reg, dx, dy in pts:
     c = RED if reg == "s" else BLUE
@@ -504,19 +509,18 @@ lim = [
 ]
 nxt = [
     "Prospectively test practice-per-skill on new mid-density datasets.",
-    "Four papers in preparation: mechanism, source selection, a practitioner guide for low-data deployments, representation analysis.",
 ]
 yy = ct
 for m in lim:
-    T(cx + 0.0085, yy, W(m, 80), 12.5, ls=1.20)
-    fig.patches.append(Rectangle((cx + 0.0012, yy - 0.0044), 0.003, 0.003,
+    T(cx + 0.0085, yy, W(m, 74), 13.5, ls=1.20)
+    fig.patches.append(Rectangle((cx + 0.0012, yy - 0.0048), 0.003, 0.003,
                                  transform=fig.transFigure, fc=SLATE, ec="none"))
-    yy -= 0.0086 * len(textwrap.wrap(m, 80)) + 0.0030
+    yy -= 0.0093 * len(textwrap.wrap(m, 74)) + 0.0032
 for m in nxt:
-    T(cx + 0.0085, yy, W(m, 82), 12, ls=1.20)
-    fig.patches.append(Rectangle((cx + 0.0012, yy - 0.0044), 0.003, 0.003,
+    T(cx + 0.0085, yy, W(m, 74), 13.5, ls=1.20)
+    fig.patches.append(Rectangle((cx + 0.0012, yy - 0.0048), 0.003, 0.003,
                                  transform=fig.transFigure, fc=RED, ec="none"))
-    yy -= 0.0084 * len(textwrap.wrap(m, 82)) + 0.0030
+    yy -= 0.0093 * len(textwrap.wrap(m, 74)) + 0.0032
 
 # ---------------------------------------------------------------- footer
 box(MARG, 0.010, 1 - 2 * MARG, 0.033, fc="#EFEDE8", ec=EDGE, r=0.005)
