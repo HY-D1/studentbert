@@ -419,7 +419,7 @@ T(cx, ct, W("EdNet is the fixed pretraining source; three objectives fine-tuned 
             "highest mean on 5 of 7.", 60),
   16, ls=1.26, color=SLATE)
 
-axs = mkax([cx + 0.036, cy + 0.148, cw - 0.052, 0.146])
+axs = mkax([cx + 0.036, cy + 0.154, cw - 0.052, 0.140])
 pts = [  # (pps, skill_only - correct_only AUC, label, regime, dx, dy)
     (0.066, -0.0122, "Junyi",       "c", -0.012,  0.0028),
     (0.211, -0.0068, "EdNet",       "c", -0.045, -0.0037),
@@ -568,7 +568,7 @@ for i in range(len(body_txt)):
 for a in fig.axes:
     ab = fbox(a, tight=True)
     for t, tb in body_txt:
-        if olap(ab, tb, tol=0.0020):
+        if olap(ab, tb, tol=0.0008):
             violations.append(("text/chart", repr(t.get_text()[:34]),
                                tuple(round(v, 4) for v in ab)))
 

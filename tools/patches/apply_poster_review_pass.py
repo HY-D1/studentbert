@@ -202,7 +202,7 @@ for m in notes:
             "highest mean on 5 of 7.", 60),
   16, ls=1.26, color=SLATE)"""),
 ('axs = mkax([cx + 0.036, cy + 0.162, cw - 0.052, 0.170])',
- 'axs = mkax([cx + 0.036, cy + 0.148, cw - 0.052, 0.146])'),
+ 'axs = mkax([cx + 0.036, cy + 0.154, cw - 0.052, 0.140])'),
 ('axs.text(8.9, 0.0022, "above 0: skill-only better", fontsize=10.5, color=SLATE, ha="right")',
  'axs.text(8.9, 0.0022, "above 0: skill-only better", fontsize=11.5, color=SLATE, ha="right")'),
 ('axs.text(8.9, -0.0060, "below 0: correct-only better", fontsize=10.5, color=SLATE, ha="right")',
@@ -314,9 +314,13 @@ for m in nxt:
  '    (5.330,  0.0228, "Algebra 2005","s",  0.40,  -0.0052),'),
 ('    (2.414,  0.0186, "Algebra 06-07","s", -0.90,  0.0038),',
  '    (2.414,  0.0186, "Algebra 06-07","s", -1.35,  0.0042),'),
+("if olap(ab, tb, tol=0.0020):",
+ "if olap(ab, tb, tol=0.0008):"),
 ]
 
 OPTIONAL_PAIRS = [
+("axs = mkax([cx + 0.036, cy + 0.148, cw - 0.052, 0.146])",
+ "axs = mkax([cx + 0.036, cy + 0.154, cw - 0.052, 0.140])"),
 ("""    "Those models are data-hungry, yet every new course or tool starts with only dozens of students.",
     "In NLP and vision, pretrain-then-fine-tune is the standard fix. For student data there is no recipe.",""",
  """    "Those models are data-hungry, yet every new course or tool starts with only dozens of students.",
