@@ -408,6 +408,12 @@ def main():
     ap.add_argument("--run_type", required=True)
     ap.add_argument("--ckpt_dir", default="../checkpoints")
     ap.add_argument("--wandb", action="store_true")
+    ap.add_argument("--exclude_label", default=None,
+                    help="skill_vocab.json key to exclude from next-skill metrics "
+                         "(evaluation only; training is unchanged)")
+    ap.add_argument("--save_preds", action="store_true",
+                    help="write test-set predictions to --preds_dir as npz")
+    ap.add_argument("--preds_dir", default="../preds")
     args = ap.parse_args()
     if args.init == "pretrained" and not args.encoder_ckpt:
         raise SystemExit("--init pretrained requires --encoder_ckpt")
@@ -531,6 +537,52 @@ def main():
         print(f"test macro-top1   : {mt1:.4f}  (over {n_mt1} classes)")
         print(f"test weighted-OVR AUC: {w_auc:.4f}  (over {n_cls} classes)")
         if wb: wb.log({"test/top1": t1, "test/top5": t5, "test/macro_auc": m_auc, "test/weighted_auc": w_auc, "test/macro_top1": mt1})
+
+        excl_idx = None
+        if args.exclude_label:
+            _vocab = json.loads((Path(args.processed_dir) / "skill_vocab.json").read_text())
+            excl_idx = _vocab.get(args.exclude_label)
+            if excl_idx is None:
+                raise SystemExit(f"--exclude_label {args.exclude_label!r} not found in skill_vocab.json")
+
+        if excl_idx is not None:
+            keep = vd & (tg != excl_idx)
+            pres_x = present[present != excl_idx]
+            n_drop = int((vd & (tg == excl_idx)).sum())
+            t1_x = topk_acc(lg, tg, keep, 1)
+            t5_x = topk_acc(lg, tg, keep, 5)
+            mt1_x, n_mt1_x = macro_top1(lg, tg, keep, pres_x.tolist())
+            m_auc_x, w_auc_x, n_cls_x = macro_ovr_auc(probs, tg, keep, pres_x.tolist())
+            lg_m = lg.clone()
+            lg_m[:, excl_idx] = float("-inf")
+            t1_xm = topk_acc(lg_m, tg, keep, 1)
+            mt1_xm, n_mt1_xm = macro_top1(lg_m, tg, keep, pres_x.tolist())
+            print(f"--- excluding {args.exclude_label!r} (class {excl_idx}); dropped {n_drop} of {int(vd.sum())} scored interactions ---")
+            print(f"test top-1 acc  (excl): {t1_x:.4f}")
+            print(f"test top-5 acc  (excl): {t5_x:.4f}")
+            print(f"test macro-top1 (excl): {mt1_x:.4f}  (over {n_mt1_x} classes)")
+            print(f"test macro-OVR AUC (excl): {m_auc_x:.4f}  (over {n_cls_x} classes)")
+            print(f"test weighted-OVR AUC (excl): {w_auc_x:.4f}  (over {n_cls_x} classes)")
+            print(f"test top-1 acc  (excl, class masked): {t1_xm:.4f}")
+            print(f"test macro-top1 (excl, class masked): {mt1_xm:.4f}  (over {n_mt1_xm} classes)")
+            if wb: wb.log({"test/top1_excl": t1_x, "test/top5_excl": t5_x,
+                           "test/macro_top1_excl": mt1_x, "test/macro_auc_excl": m_auc_x,
+                           "test/weighted_auc_excl": w_auc_x,
+                           "test/top1_excl_masked": t1_xm, "test/macro_top1_excl_masked": mt1_xm,
+                           "test/n_excluded": n_drop, "test/excluded_class": excl_idx})
+
+        if args.save_preds:
+            _pdir = Path(args.preds_dir)
+            _pdir.mkdir(parents=True, exist_ok=True)
+            _out = _pdir / f"{run_name}_testpreds.npz"
+            np.savez_compressed(
+                _out,
+                target=tg.cpu().numpy().astype(np.int16),
+                valid=vd.cpu().numpy(),
+                pred=lg.argmax(dim=-1).cpu().numpy().astype(np.int16),
+                top5=lg.topk(5, dim=-1).indices.cpu().numpy().astype(np.int16),
+            )
+            print(f"saved test predictions to {_out}")
 
     if wb: wb.finish()
 
