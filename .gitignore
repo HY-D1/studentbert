@@ -41,11 +41,7 @@ wandb/
 *.log
 
 # run artifacts
-*.log
-wandb/
 *.pt
-*.npz
-__pycache__/
 audit_output.txt
 w*.sbatch
 embedding_analysis/
@@ -72,7 +68,6 @@ probe_rerun_info.txt
 !poster/qr_code.png
 performance_by_data_regime.pdf
 *.bak_*
-performance_by_data_regime.pdf
 queue_noskill/
 preds/
 *.bak_noskill
