@@ -72,3 +72,7 @@ probe_rerun_info.txt
 !poster/qr_code.png
 performance_by_data_regime.pdf
 *.bak_*
+performance_by_data_regime.pdf
+queue_noskill/
+preds/
+*.bak_noskill
