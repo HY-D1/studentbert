@@ -71,3 +71,6 @@ performance_by_data_regime.pdf
 queue_noskill/
 preds/
 *.bak_noskill
+lodo_report.md
+vocab_stats_all.txt
+objabl_perseed.csv
