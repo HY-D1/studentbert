@@ -245,11 +245,13 @@ def main():
             ", ".join(f"K={k}:{g:+.4f}" for k, g in gaps))
         if neg and pos:
             lo, hi = max(neg), min(pos)
-            say(INFO, f"sign change lies between K={lo} (pps {lo/102:.2f}) and K={hi} (pps {hi/102:.2f})")
+            def epps(k, med=441.0, ns=102.0):
+                return min(k, med) / ns
+            say(INFO, f"sign change lies between K={lo} (pps {epps(lo):.2f}) and K={hi} (pps {epps(hi):.2f})")
             if re.search(r"[Cc]rossover\s*~?\s*pps\s*1\.5", md):
                 say(FAIL, f"RESULTS.md claims 'crossover ~pps 1.5' but the gap is still "
                           f"{dict(gaps).get(160, float('nan')):+.4f} at K=160 (pps 1.57); "
-                          f"the change is between pps {lo/102:.2f} and {hi/102:.2f}")
+                          f"the change is between pps {epps(lo):.2f} and {epps(hi):.2f}")
             else:
                 say(PASS, "no unsupported 'crossover ~pps 1.5' claim in RESULTS.md")
         if not any(r[4] not in ("-", "") for r in trunc if r[0] == "512"):
