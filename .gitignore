@@ -75,3 +75,7 @@ lodo_report.md
 vocab_stats_all.txt
 objabl_perseed.csv
 objective_ci.md
+RESULTS_generated.md
+results_generated.json
+audit_after.txt
+*.bak

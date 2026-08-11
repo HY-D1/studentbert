@@ -133,7 +133,7 @@ def main():
     W("")
     W(f"Test AUC differences paired by seed, 6 seeds (42, 1, 2, 3, 4, 5). "
       f"Percentile bootstrap over seeds, {args.boot:,} resamples, rng seed "
-      f"{args.seed}. Sign test is exact and one-sided.")
+      f"{args.seed}. Sign test is exact, one-sided in the observed direction.")
     W("")
     W("| Target | Contrast | Mean | 95% CI | Positive | Sign p (1-sided, "
       "observed dir) | Min | Max |")
