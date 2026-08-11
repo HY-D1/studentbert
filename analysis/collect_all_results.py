@@ -229,7 +229,7 @@ def render_md(coll):
       "audit_all_claims.py (standing audit).\n")
 
     # 0. Methods / provenance
-    W("\n---\n## 0. Methods & provenance  `[all]`\n")
+    W("\n---\n## 0. Methods & provenance\n")
     W(f"- **Datasets (7):** {', '.join(DATASETS)}. Uniform npz schema (student_ids, skill, correct, "
       "time_bin, CSR offsets); 80/10/10 split by student, seed 42; min 10 interactions.")
     W(f"- **Seeds:** up to {len(SEEDS)} ({', '.join(SEEDS)}). Means/std reported; paired-bootstrap CIs "
@@ -375,7 +375,7 @@ def render_md(coll):
       "in-domain +0.007 (best all seeds) and top-5 in-domain +0.055.")
 
     # 9. Negatives
-    W("\n---\n## 9. Honest negatives & caveats  `[all]`\n")
+    W("\n---\n## 9. Honest negatives & caveats\n")
     W("- Embedding coherence does not separate regimes under a vocab control (section 7).")
     W("- Coherence-vs-probe tie-in is a vocab-size artifact - dropped (section 7).")
     W("- LODO cross-dataset prediction does not generalize at n=6 (overparameterized).")
