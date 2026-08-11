@@ -79,3 +79,6 @@ RESULTS_generated.md
 results_generated.json
 audit_after.txt
 *.bak
+figures/
+baseline_perseed.csv
+probe_perseed.csv
