@@ -234,7 +234,7 @@ Best pretraining objective is target-dependent. Per-dataset objective ablation (
 **Recorded reversals (paired bootstrap):**
 - EdNet->ASSIST: skill 0.686 ~ full 0.690 >> correct 0.662; gap skill-correct large; 6/6 seeds, CI excludes 0 (recorded)
 - EdNet->Junyi: correct 0.728 > full 0.723 > skill 0.715; 6/6 seeds, CI excludes 0 (recorded)
-- Algebra2006 (seventh and last dataset added): skill-correct +0.0186 CI [+0.0148,+0.0228] 6/6 (analysis/paired_bootstrap_objective.py). NOT a preregistered prediction: git shows the written prediction entered the repo at ca13880 on 2026-07-25 18:39:09, while the skill_only logs finished 18:22-18:25 the same evening, so no timestamped record separates specification from outcome. Report as an out-of-sample test: the dataset was prepared and evaluated after the ordering was fixed on the other six. Do NOT use the words prospective, predict-before-test or preregistration.
+- Algebra2006 (seventh and last dataset added): skill-correct +0.0186 CI [+0.0148,+0.0228] 6/6 (analysis/paired_bootstrap_objective.py). NOT an advance-record claim: git shows the written prediction entered the repo at ca13880 on 2026-07-25 18:39:09, while the skill_only logs finished 18:22-18:25 the same evening, so no timestamped record separates specification from outcome. Report as an out-of-sample test: the dataset was prepared and evaluated after the ordering was fixed on the other six. Do NOT use the words prospective, predict-before-test or preregistration.
 
 ---
 ## 5. What governs the regime: practice-per-skill 
