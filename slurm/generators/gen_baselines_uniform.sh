@@ -37,8 +37,15 @@ cd "$CODE" || exit 1
 mkdir -p "$QDIR"
 rm -f "$QDIR"/*.sbatch
 
-SEEDS="42 1 2 3 4 5"
+SEEDS="${SEEDS:-42 1 2 3 4 5}"
 EPOCHS=30
+GPUTYPE="${GPUTYPE:-v100-sxm2}"
+
+if ! sinfo -p gpu -h -o "%G" | grep -q "gpu:${GPUTYPE}:"; then
+  echo "GPUTYPE '$GPUTYPE' does not appear in any gpu GRES on this cluster."
+  sinfo -p gpu -h -o "%G" | sort -u
+  exit 1
+fi
 
 count=0
 for DS in assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006; do
@@ -59,7 +66,7 @@ for DS in assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006; 
       {
         echo '#!/bin/bash'
         echo '#SBATCH --partition=gpu'
-        echo '#SBATCH --gres=gpu:1'
+        echo "#SBATCH --gres=gpu:${GPUTYPE}:1"
         echo '#SBATCH --cpus-per-task=8'
         echo '#SBATCH --time=08:00:00'
         echo '#SBATCH --mem=48G'
@@ -74,4 +81,5 @@ done
 
 echo "wrote $count sbatch files to $QDIR"
 echo "budgets: assist2017 full, ednet 20000, junyi 40000, other four 100000"
+echo "gpu type: $GPUTYPE"
 echo "submit with: bash tools/drip_submit.sh queue_base2"
