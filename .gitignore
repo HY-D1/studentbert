@@ -85,3 +85,7 @@ probe_perseed.csv
 trunc_perseed.csv
 audit_aug21.txt
 appendix_tables.tex
+queue_n3000/
+queue_base2/
+source_scale_gain.pdf
+drip_*.log

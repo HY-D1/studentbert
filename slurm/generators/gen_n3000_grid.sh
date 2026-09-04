@@ -88,14 +88,24 @@ for TARGET in assist2017 ednet junyi; do
           SCRIPT="scripts/downstream_edubert.py"
           EXTRA="--task next_skill"
         fi
+        if [ "$TARGET" = "assist2017" ]; then
+          WALL=00:30:00
+          MEM=24G
+        elif [ "$TASK" = "ns" ]; then
+          WALL=02:00:00
+          MEM=72G
+        else
+          WALL=02:00:00
+          MEM=24G
+        fi
         NAME="${TASK}_${TOK}_${COND}_n${N}_seed${SEED}"
         {
           echo '#!/bin/bash'
           echo '#SBATCH --partition=gpu'
           echo "#SBATCH --gres=gpu:${GPUTYPE}:1"
           echo '#SBATCH --cpus-per-task=8'
-          echo '#SBATCH --time=08:00:00'
-          echo '#SBATCH --mem=48G'
+          echo "#SBATCH --time=${WALL}"
+          echo "#SBATCH --mem=${MEM}"
           echo "#SBATCH --output=${NAME}_%j.log"
           echo "cd $CODE"
           echo "PYTHONPATH=. $PY $SCRIPT $EXTRA --processed_dir ../processed/$TARGET $INIT --n_students $N --seed $SEED --epochs 20 --run_type $NAME --wandb"

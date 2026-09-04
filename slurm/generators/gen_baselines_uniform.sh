@@ -60,6 +60,11 @@ for DS in assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006; 
     exit 1
   fi
   for MODEL in dkt akt; do
+    case "$DS" in
+      assist2017)  WALL=01:00:00 ;;
+      ednet|junyi) WALL=04:00:00 ;;
+      *)           WALL=02:00:00 ;;
+    esac
     for SEED in $SEEDS; do
       NAME="base2_${MODEL}_${DS}_seed${SEED}"
       F="$QDIR/${NAME}.sbatch"
@@ -68,8 +73,8 @@ for DS in assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006; 
         echo '#SBATCH --partition=gpu'
         echo "#SBATCH --gres=gpu:${GPUTYPE}:1"
         echo '#SBATCH --cpus-per-task=8'
-        echo '#SBATCH --time=08:00:00'
-        echo '#SBATCH --mem=48G'
+        echo "#SBATCH --time=${WALL}"
+        echo '#SBATCH --mem=24G'
         echo "#SBATCH --output=${NAME}_%j.log"
         echo "cd $CODE"
         echo "PYTHONPATH=. $PY scripts/train_baseline.py --model $MODEL --processed_dir ../processed/$DS $BUDGET --seed $SEED --epochs $EPOCHS --run_type $NAME --wandb"
