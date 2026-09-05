@@ -11,8 +11,8 @@
 # alongside the interval so the sign-test claim and the CI claim agree.
 #
 # Usage, from the repo root on the cluster:
-#   python3 analysis/inventory_kt_auc.py --logdir . --logdir ../logs --out kt_inventory.tsv
-#   python3 analysis/paired_bootstrap_pair.py --tsv kt_inventory.tsv \
+#   python3 analysis/inventory_runs.py --logdir . --logdir ../logs --out run_inventory.tsv
+#   python3 analysis/paired_bootstrap_pair.py --tsv run_inventory.tsv --metric test_auc \
 #       --a edubert_ednet_ktfull_ednet_indomain_n20000 \
 #       --b edubert_ednet_ktfull_ednet_scratch_n20000
 #
@@ -31,23 +31,28 @@ from collections import defaultdict
 SEED_SUFFIX = re.compile(r"_seed[0-9]+$")
 
 
-def load(tsv):
+def load(tsv, metric):
     rows = []
+    seen_metrics = set()
     with open(tsv, encoding="utf-8", errors="replace") as fh:
         header = fh.readline().rstrip("\n").split("\t")
         idx = {name: i for i, name in enumerate(header)}
-        for name in ("run", "seed", "auc"):
+        for name in ("run", "seed", "metric", "value"):
             if name not in idx:
-                sys.exit("column %r missing from %s" % (name, tsv))
+                sys.exit("column %r missing from %s; regenerate with inventory_runs.py"
+                         % (name, tsv))
         for line in fh:
             parts = line.rstrip("\n").split("\t")
             if len(parts) < len(header):
                 continue
-            run = parts[idx["run"]]
-            seed = parts[idx["seed"]]
-            if not run or not seed:
+            run, seed, met = parts[idx["run"]], parts[idx["seed"]], parts[idx["metric"]]
+            seen_metrics.add(met)
+            if not run or not seed or met != metric:
                 continue
-            rows.append((SEED_SUFFIX.sub("", run), int(seed), float(parts[idx["auc"]])))
+            rows.append((SEED_SUFFIX.sub("", run), int(seed), float(parts[idx["value"]])))
+    if not rows:
+        sys.exit("metric %r matched nothing. present in this file: %s"
+                 % (metric, ", ".join(sorted(seen_metrics))))
     return rows
 
 
@@ -65,14 +70,16 @@ def by_seed(rows, stem):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--tsv", default="kt_inventory.tsv")
+    ap.add_argument("--tsv", default="run_inventory.tsv")
+    ap.add_argument("--metric", default="test_auc",
+                    help="metric column value, e.g. test_auc or test_macro_ovr_auc")
     ap.add_argument("--a", required=True, help="run stem, without _seed<N>")
     ap.add_argument("--b", required=True, help="baseline run stem, without _seed<N>")
     ap.add_argument("--resamples", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    rows = load(args.tsv)
+    rows = load(args.tsv, args.metric)
     A, B = by_seed(rows, args.a), by_seed(rows, args.b)
     if not A:
         sys.exit("no rows for stem %s" % args.a)
@@ -101,6 +108,7 @@ def main():
     lo = means[int(0.025 * args.resamples)]
     hi = means[int(0.975 * args.resamples) - 1]
 
+    print("metric      : %s" % args.metric)
     print("a           : %s" % args.a)
     print("b           : %s" % args.b)
     print("paired seeds: %s  (n=%d)" % (shared, n))
