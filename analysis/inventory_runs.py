@@ -38,7 +38,18 @@ from collections import defaultdict
 
 BASELINE_BANNER = re.compile(r"^===\s+([A-Z][A-Za-z+]*)\s+on\s+(\S+)\s+===")
 KT_BANNER = re.compile(r"^===\s+EduBERT-KT\s+\(([^,]+),\s*init=([A-Za-z]+)\)\s*===")
-TASK_BANNER = re.compile(r"^===\s+([a-z][a-z_]*)\s+\(([^,]+),\s*init=([A-Za-z]+)\)\s*===")
+# A task banner may carry a parenthesised qualifier before the run name, as the
+# deprecated v1 probe does: "=== probe (skill-identity) (<run>, init=...) ===".
+# The v1 pattern swallowed the qualifier into the run name, producing rows whose
+# run began "skill-identity)". The qualifier is now captured separately and the
+# run group forbids parentheses so it cannot absorb one.
+TASK_BANNER = re.compile(
+    r"^===\s+([a-z][a-z_]*)(?:\s+\(([^()]*)\))?\s+\(([^(),]+),\s*init=([A-Za-z]+)\)\s*===")
+# Families whose values must never enter a paper. Matched against `kind`.
+QUARANTINE = {
+    "probe(skill-identity)":
+        "deprecated v1 circular probe, the target is recoverable from the input",
+}
 METRIC = re.compile(r"^test\s+(.+?)\s*:\s*([0-9]*\.?[0-9]+)")
 RUN_LINE = re.compile(r"\brun=(\S+)\s+seed=([0-9]+)")
 SEED_IN_NAME = re.compile(r"_seed([0-9]+)(?:_|$)")
@@ -82,9 +93,12 @@ def scan_file(path):
                 continue
             mt = TASK_BANNER.match(line)
             if mt:
-                run = mt.group(2).strip()
-                cur = {"kind": mt.group(1), "model": "EduBERT", "dataset": "",
-                       "run": run, "init": mt.group(3),
+                run = mt.group(3).strip()
+                kind = mt.group(1)
+                if mt.group(2):
+                    kind = "%s(%s)" % (kind, mt.group(2).strip())
+                cur = {"kind": kind, "model": "EduBERT", "dataset": "",
+                       "run": run, "init": mt.group(4),
                        "seed": seed_from(run, last_seed),
                        "file": os.path.basename(path), "line": lineno}
                 continue
@@ -120,6 +134,21 @@ def main():
         rows.extend(scan_file(f))
     print("found %d metric rows" % len(rows))
 
+    quarantined = [r for r in rows if r["kind"] in QUARANTINE]
+    rows = [r for r in rows if r["kind"] not in QUARANTINE]
+    if quarantined:
+        qpath = args.out.replace(".tsv", "_quarantined.tsv")
+        with open(qpath, "w") as fh:
+            fh.write("kind\trun\tseed\tmetric\tvalue\tfile\treason\n")
+            for r in quarantined:
+                fh.write("%s\t%s\t%s\t%s\t%.6f\t%s\t%s\n" % (
+                    r["kind"], r["run"], r["seed"], r["metric"], r["value"],
+                    r["file"], QUARANTINE[r["kind"]]))
+        print("\n!! QUARANTINED %d rows, written to %s and EXCLUDED from the main file"
+              % (len(quarantined), qpath))
+        for k in sorted(set(r["kind"] for r in quarantined)):
+            print("!!   %s : %s" % (k, QUARANTINE[k]))
+
     uniq, seen = [], set()
     dupes = defaultdict(list)
     for r in rows:
@@ -151,13 +180,23 @@ def main():
     g = defaultdict(list)
     for r in uniq:
         if r["kind"] == "baseline" and r["metric"] == "test_auc":
-            g[(r["model"], r["dataset"])].append(r)
+            g[(r["model"], r["dataset"], SEED_IN_NAME.sub("_seed*", r["run"]))].append(r)
+    fams = defaultdict(set)
+    for k in g:
+        fams[(k[0], k[1])].add(k[2])
     for k in sorted(g):
         v = [x["value"] for x in g[k]]
         sd = st.pstdev(v) if len(v) > 1 else 0.0
-        print("%-6s %-14s mean %.4f  pstdev %.4f  n=%d  seeds=%s"
-              % (k[0], k[1], st.mean(v), sd, len(v),
-                 ",".join(sorted(str(x["seed"]) for x in g[k]))))
+        warn = "  <-- MULTIPLE CAMPAIGNS ON THIS CELL" if len(fams[(k[0], k[1])]) > 1 else ""
+        print("%-6s %-14s %-46s mean %.4f  pstdev %.4f  n=%d  seeds=%s%s"
+              % (k[0], k[1], k[2] or "(no run name)", st.mean(v), sd, len(v),
+                 ",".join(sorted(str(x["seed"]) for x in g[k])), warn))
+    noseed = [r for r in uniq if r["kind"] == "baseline" and r["seed"] is None]
+    if noseed:
+        print("\n%d baseline rows have no recoverable seed and cannot be paired:"
+              % len(noseed))
+        for r in noseed:
+            print("   %s %s %s in %s" % (r["model"], r["dataset"], r["metric"], r["file"]))
 
     for metric in SUMMARY_METRICS[:1] + SUMMARY_METRICS[1:]:
         eg = defaultdict(list)
