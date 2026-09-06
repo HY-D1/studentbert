@@ -59,7 +59,7 @@ for DS in assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006; 
     echo "MISSING DATASET DIR: ../processed/$DS"
     exit 1
   fi
-  for MODEL in dkt akt; do
+  for MODEL in ${MODELS:-dkt akt}; do
     case "$DS" in
       assist2017)  WALL=01:00:00 ;;
       ednet|junyi) WALL=04:00:00 ;;
