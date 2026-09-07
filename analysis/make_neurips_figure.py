@@ -33,7 +33,10 @@ COL_SOURCE = {"indomain": None, "fromednet": "ednet",
 PRETTY = {"assist2017": "ASSISTments 2017", "ednet": "EdNet KT1",
           "junyi": "Junyi Academy"}
 MEAN = re.compile(r"^\s*([0-9]*\.[0-9]+)")
-GAIN = re.compile(r"\(([+-][0-9]*\.[0-9]+)\)")
+# The gain sits at the start of a parenthesis that may also carry a CI and
+# a seed count, e.g. "(+0.0231 [+0.0220,+0.0239] 6/6)", so do not require
+# the closing paren immediately after the number.
+GAIN = re.compile(r"\(([+-][0-9]*\.[0-9]+)")
 TOTAL = re.compile(r"\|\s*([A-Za-z0-9 ]+?)\s*\|\s*([0-9,]+)\s*\|")
 
 

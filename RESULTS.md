@@ -57,36 +57,36 @@ _Read: bold is the highest AUC in the row. SAINT+ is highest on 5 of 7, DKT on 2
 - **Moderator:** sequence density (practice-per-skill) - see section 5.
 
 ---
-### 2.1 Source comparison at N=3000, all 3 targets (KT test AUC, parsed from logs)
+### 2.1 Source comparison at N=3000, all 3 targets (KT test AUC, parsed from logs, 6 seeds)
 
-Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_n3000_seed{1,2,42}`, 3 seeds, mean ±pstdev, gain vs scratch in parentheses. Log-verified July 30 2026 (poster_gaps_evidence.txt).
-
-| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
-|---|---|---|---|---|---|
-| assist2017 | 0.6702 ±0.0008 | 0.6934 ±0.0018 (+0.0232) | 0.6970 ±0.0021 (+0.0269) | 0.6890 ±0.0002 (+0.0189) | (=indomain) |
-| ednet | 0.6652 ±0.0007 | 0.6728 ±0.0008 (+0.0076) | (=indomain) | 0.6693 ±0.0003 (+0.0041) | 0.6647 ±0.0012 (-0.0005) |
-| junyi | 0.7352 ±0.0010 | 0.7388 ±0.0002 (+0.0036) | 0.7414 ±0.0002 (+0.0062) | (=indomain) | 0.7342 ±0.0004 (-0.0010) |
-
-Per-seed paired gains vs scratch, assist2017 target: fromednet +0.0263/+0.0253/+0.0290 (3/3 positive), indomain +0.0239/+0.0210/+0.0248, fromjunyi +0.0200/+0.0183/+0.0183.
-
-_Read: the biggest source (EdNet 442K) beats in-domain on both cross-domain targets (assist2017 +0.0269 vs +0.0232; junyi +0.0062 vs +0.0036); on EdNet's own target in-domain leads (+0.0076) and the granularity-closest source (ASSIST) transfers WORST, below scratch (-0.0005). Quantitative backing for the scale-over-granularity claim in section 2._
-
-### 2.2 Source comparison at N=3000, next-skill macro-OVR AUC (parsed from logs)
-
-Runs `edubert_<target>_ns_<t>_<cond>_n3000_seed{1,2,42}`, mean ±pstdev, gain vs scratch in parentheses. Same budget and same sources as 2.1, second task.
+Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_n3000_seed{42,1,2,3,4,5}`, mean ±pstdev, then the gain vs scratch paired by seed with a 20,000-resample bootstrap CI and the count of seeds in the direction of the mean. SUPERSEDES the earlier 3-seed table.
 
 | Target | scratch | indomain | fromednet | fromjunyi | fromassist |
 |---|---|---|---|---|---|
-| assist2017 (92 classes) | 0.9796 ±0.0001 (n=3) | 0.9819 ±0.0000 (+0.0023) | 0.9815 ±0.0002 (+0.0019) | 0.9821 ±0.0002 (+0.0025) | - |
-| ednet (142 classes) | 0.8701 ±0.0007 (n=3) | 0.8847 ±0.0008 (+0.0146) | - | 0.8749 ±0.0005 (+0.0048) | 0.8727 ±0.0004 (+0.0026) |
-| junyi (1326 classes) | 0.9888 ±0.0005 (n=3) | 0.9911 ±0.0006 (+0.0023) | 0.9896 ±0.0002 (+0.0009) | - | 0.9896 ±0.0003 (+0.0009) |
+| assist2017 | 0.6697 ±0.0008 | 0.6927 ±0.0018 (+0.0231 [+0.0220,+0.0239] 6/6) | 0.6957 ±0.0021 (+0.0260 [+0.0250,+0.0274] 6/6) | 0.6910 ±0.0016 (+0.0214 [+0.0196,+0.0231] 6/6) | (=indomain) |
+| ednet | 0.6644 ±0.0014 | 0.6732 ±0.0007 (+0.0088 [+0.0076,+0.0100] 6/6) | (=indomain) | 0.6687 ±0.0010 (+0.0043 [+0.0033,+0.0053] 6/6) | 0.6640 ±0.0017 (-0.0004 [-0.0016,+0.0009] 2/6) |
+| junyi | 0.7352 ±0.0007 | 0.7394 ±0.0007 (+0.0042 [+0.0032,+0.0051] 6/6) | 0.7417 ±0.0004 (+0.0064 [+0.0057,+0.0072] 6/6) | (=indomain) | 0.7340 ±0.0009 (-0.0012 [-0.0020,-0.0001] 1/6) |
 
-_Read: assist2017: best is fromjunyi at +0.0025; ednet: best is indomain at +0.0146; junyi: best is indomain at +0.0023. Next-skill macro-OVR sits far above chance on all three targets, so the absolute values are compressed and the gaps are correspondingly small; read the ordering, not the magnitude, and compare against the knowledge-tracing gaps in 2.1 before making any source claim._
+Per-seed gains are in the inventory; recover them with `analysis/paired_bootstrap_pair.py --tsv run_inventory.tsv --metric test_auc --a <cond stem> --b <scratch stem>`.
+
+_Read: ranking cross-dataset sources by pretraining corpus size (training-split students: ASSIST 1,366, Junyi 49,153, EdNet 353,597) reproduces the observed ordering on all 3 targets. EdNet as a foreign source beats in-domain on both cross-domain targets with NON-OVERLAPPING intervals (assist2017 +0.0260 [+0.0250,+0.0274] vs +0.0231 [+0.0220,+0.0239]; junyi +0.0064 [+0.0057,+0.0072] vs +0.0042 [+0.0032,+0.0051]). On EdNet's own target in-domain leads (+0.0088). The granularity-closest source (ASSIST, 102 skills vs EdNet's 142) does NOT transfer on the EdNet target: -0.0004 with an interval spanning zero, 2/6 seeds, so write "fails to transfer", not "worse than scratch". On the Junyi target ASSIST is -0.0012 with an interval EXCLUDING zero, 1/6 seeds, so there it does cost accuracy. CAVEAT: for the assist2017 target, N=3000 is its FULL training split (1,366 < 3000), so that row is not a reduced-data condition._
+
+### 2.2 Source comparison at N=3000, next-skill macro-OVR AUC (parsed from logs, 6 seeds)
+
+Runs `edubert_<target>_ns_<t>_<cond>_n3000_seed{42,1,2,3,4,5}`, same budget and same sources as 2.1, second task. Same reporting format.
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 (92 classes) | 0.9796 ±0.0002 | 0.9820 ±0.0002 (+0.0024 [+0.0021,+0.0026] 6/6) | 0.9815 ±0.0003 (+0.0019 [+0.0016,+0.0022] 6/6) | 0.9822 ±0.0002 (+0.0026 [+0.0023,+0.0029] 6/6) | - |
+| ednet (142 classes) | 0.8704 ±0.0007 | 0.8849 ±0.0007 (+0.0145 [+0.0143,+0.0147] 6/6) | - | 0.8752 ±0.0006 (+0.0047 [+0.0043,+0.0053] 6/6) | 0.8732 ±0.0005 (+0.0028 [+0.0024,+0.0034] 6/6) |
+| junyi (1326 classes) | 0.9883 ±0.0013 | 0.9912 ±0.0004 (+0.0029 [+0.0020,+0.0043] 6/6) | 0.9897 ±0.0002 (+0.0015 [+0.0004,+0.0028] 4/6) | - | 0.9900 ±0.0001 (+0.0018 [+0.0008,+0.0030] 6/6) |
+
+_Read: THE SCALE ORDERING OF 2.1 DOES NOT CARRY TO THIS TASK. It reproduces on the ednet target only (Junyi +0.0047 > ASSIST +0.0028). On assist2017 the smaller Junyi source beats the larger EdNet source (+0.0026 vs +0.0019), and on junyi the smallest source beats the largest (+0.0018 vs +0.0015, the latter 4/6 seeds). In-domain is also best on 2 of 3 targets here, so the foreign-beats-in-domain reversal of 2.1 does not reproduce either. Absolute values sit between 0.87 and 0.99, so read the ordering and not the magnitude. SCOPE both the scale claim and the foreign-beats-in-domain claim to KNOWLEDGE TRACING._
 
 ## 3. Low-resource advantage & scale boundary  
 
-- **Scale boundary (recorded):** cross-dataset transfer gains are largest when the target is data-poor; at full target scale they fade toward ~0.
-- **Only survivor at full scale:** in-domain EdNet KT gain +0.0069, CI [+0.0065,+0.0075], 6/6 seeds. (in-domain EdNet KT gain at full target scale; only cross-dataset gain that survives (recorded))
+- **Scale boundary (parsed from logs, 6 seeds):** cross-dataset transfer gains are largest when the target is data-poor; at full target scale every cross-dataset gain falls to within noise of zero.
+- **Only survivor at full scale (parsed from logs):** in-domain EdNet KT at 20,000 target students, 0.6846 ±0.0004 against scratch 0.6777 ±0.0004, gain +0.0069 CI [+0.0065,+0.0075], 6/6 seeds, both n=6. This reproduced exactly when recomputed from per-seed logs; it is no longer a recorded value.
 - **Takeaway:** cross-dataset pretraining is a low-resource tool. State the boundary plainly.
 
 ### 3.1 Next-skill N-sweep, assist2017 target (parsed from logs)
