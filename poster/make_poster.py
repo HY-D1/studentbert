@@ -404,8 +404,8 @@ T(cx, ct, W("A different question after R1: the task switches to knowledge traci
             "so every condition uses its full split.", 60),
   16, ls=1.26, color=SLATE)
 ax2 = mkax([cx + 0.054, cy + 0.146, cw - 0.076, 0.080])
-src = ["EdNet source\n(442K students)", "In-domain ASSIST\n(1.7K students)", "Junyi source\n(61K students)"]
-val = [0.0269, 0.0232, 0.0189]
+src = ["EdNet source\n(354K students)", "In-domain ASSIST\n(1.4K students)", "Junyi source\n(49K students)"]
+val = [0.0260, 0.0231, 0.0214]
 cols = [RED, "#8A8B8F", BLUE]
 yp = np.arange(len(src))[::-1]
 ax2.barh(yp, val, height=0.62, color=cols)
