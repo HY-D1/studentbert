@@ -336,14 +336,18 @@ K<=50 = clean eval points. K=100/200 UNCENSORED = LEAKED (14% / 74% per the leak
 
 | K | scratch | indomain | ednet | junyi | read |
 |---|---|---|---|---|---|
-| 5 | **0.7118 +/-0.0256** | 0.6742 +/-0.0158 | 0.6804 +/-0.0307 | 0.6991 +/-0.0122 | scratch best (+0.0128) |
+| 5 | **0.7118 +/-0.0256** | 0.6742 +/-0.0158 | 0.6804 +/-0.0307 | 0.6991 +/-0.0122 | scratch best (+0.0127) |
 | 10 | **0.7210 +/-0.0055** | 0.6754 +/-0.0080 | 0.7144 +/-0.0106 | 0.7028 +/-0.0045 | scratch best (+0.0066) |
-| 20 | **0.7023 +/-0.0080** | 0.6634 +/-0.0175 | 0.6815 +/-0.0318 | 0.6747 +/-0.0175 | scratch best (+0.0209) |
-| 50 | 0.7654 +/-0.0054 | 0.7282 +/-0.0253 | 0.7508 +/-0.0330 | **0.7699 +/-0.0025** | tied (junyi +0.0045, within seed noise) |
+| 20 | **0.7024 +/-0.0080** | 0.6634 +/-0.0175 | 0.6815 +/-0.0318 | 0.6747 +/-0.0175 | scratch best (+0.0209) |
+| 50 | 0.7654 +/-0.0053 | 0.7281 +/-0.0253 | 0.7508 +/-0.0330 | **0.7699 +/-0.0025** | tied (junyi +0.0045, within seed noise) |
 | 100 (LEAKED) | 0.7891 +/-0.0122 | 0.8068 +/-0.0026 | 0.7832 +/-0.0284 | 0.8033 +/-0.0061 | inflated, do not report |
 | 200 (LEAKED) | 0.8865 +/-0.0454 | 0.8971 +/-0.0121 | 0.9029 +/-0.0163 | 0.9085 +/-0.0143 | inflated, do not report |
 
-_Read: pretraining is WORSE than scratch on ASSIST dropout at every clean K, with in-domain intervals excluding zero at K=5/10/20/50 and 0/3 seeds positive each time. Write "produces a worse student-level classifier than random initialization", not "does not help". W7 censored recovery (recorded): K=100 scratch 0.768 > ednet 0.765 > junyi 0.763 > indomain 0.759 (cohort 1315/1366); K=200 scratch 0.732, indomain 0.762, ednet 0.692, junyi 0.731 (cohort 1118, high variance, report with N caveat)._
+Source for K=5/10/20/50: w6_dropoutK_s42 (7987745), w6_dropoutK_s1 (7987751), w6_dropoutK_s2 (7987752). Per-seed AUC read from the W&B run summaries at 5 dp, not from the 4 dp log banners; means and standard deviations formed before rounding, ties rounded away from zero. K=100/200 rows are unchanged 4 dp values and are not reported anywhere. w5_dropout_k50 (7853281) covers K=50 only and is superseded; it is kept below as a reproduction check, not as a data source.
+
+Reproduction check, same command, same encoder checkpoints, same seed, unchanged dropout code path, all nodes gpu:v100-sxm2: 7853281 ran on d1002, 7987745 on d1019, 7987751 and 7987752 on d1017. Same-seed absolute differences across the 12 K=50 cells are min 0.0012, median 0.0134, max 0.0435. The 8 cells comparing d1002 with d1017 span 0.0035 to 0.0435, so node pairing does not predict the size. src/utils.py set_seed seeds random, numpy and torch and sets no determinism flags. KT n3000 runs duplicated the same way differ by at most 0.0024.
+
+_Read: in-domain pretraining is WORSE than scratch on ASSIST dropout at every clean K. In-domain intervals exclude zero at K=5/10/20 with 0/3 seeds positive; at K=50 seed42 reaches +0.0007, so that interval spans zero and 1/3 seeds are positive. From-junyi is +0.0045 at K=50 on 3/3 seeds, which is inside the reproduction spread recorded above, so no direction is read from it. Write "produces a worse student-level classifier than random initialization", not "does not help". W7 censored recovery (recorded): K=100 scratch 0.768 > ednet 0.765 > junyi 0.763 > indomain 0.759 (cohort 1315/1366); K=200 scratch 0.732, indomain 0.762, ednet 0.692, junyi 0.731 (cohort 1118, high variance, report with N caveat)._
 
 ---
 ### 8.2 EdNet dropout at n3000: corrected full 8-seed grid
