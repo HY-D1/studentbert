@@ -89,3 +89,6 @@ queue_n3000/
 queue_base2/
 source_scale_gain.pdf
 drip_*.log
+run_inventory.tsv
+run_inventory_quarantined.tsv
+results.json
