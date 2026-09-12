@@ -163,8 +163,17 @@ def build_dropout_labels(processed_dir, max_seq_len):
         sid = int(sid_str)
         if sid in sid_to_row:
             labels[sid_to_row[sid]] = int(lab)
-    for sid, row in sid_to_row.items():
-        labels.setdefault(row, 0)
+    missing = [row for row in sid_to_row.values() if row not in labels]
+    if missing:
+        raise SystemExit(
+            "%d of %d students in sequences.npz have no dropout label. "
+            "They are below the eligibility minimum used when "
+            "dropout_labels.json was built. Earlier revisions defaulted "
+            "them to label 0, which defeated the eligibility filter in "
+            "StudentSeqDataset. Rebuild the label file with a "
+            "--min_interactions at or below the preprocessing floor, or "
+            "drop those students from splits.json."
+            % (len(missing), len(sid_to_row)))
     pos_rate = float(np.mean([labels[r] for r in range(len(sid_to_row))]))
     return labels, pos_rate, meta.get("threshold_interactions", -1)
 
@@ -454,6 +463,12 @@ def main():
         labels, pos_rate, mean_total = build_dropout_labels(args.processed_dir, args.max_seq_len)
         print(f"[dropout] label=bottom-quartile disengagement; positive rate={pos_rate:.4f}")
         if wb: wb.log({"data/pos_rate": pos_rate})
+        if args.n_students:
+            print("[dropout] WARNING: --n_students=%d is IGNORED by the "
+                  "dropout task and always has been. The flag applies to "
+                  "next-skill only. Training uses the full eligible "
+                  "training split. A run name containing nNNNN does not "
+                  "describe this cohort." % args.n_students)
         def mk(split): return StudentSeqDataset(args.processed_dir, split,
                                                 args.max_seq_len, labels,
                                                 k_prefix=args.k_prefix, window_censor=args.window_censor)
