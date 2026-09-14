@@ -86,6 +86,10 @@ def main() -> None:
     ap.add_argument("--max_seq_len", type=int, default=512)
     ap.add_argument("--max_interactions", type=int, default=None,
                     help="if set, pretrain on a subset of ~this many interactions (tiny exp)")
+    ap.add_argument("--n_students", type=int, default=None,
+                    help="if set, pretrain on a seeded random subsample of this "
+                         "many TRAINING students (source-scale ablation). "
+                         "Default None uses the whole training split.")
     ap.add_argument("--d_model", type=int, default=256)
     ap.add_argument("--n_layers", type=int, default=6)
     ap.add_argument("--seed", type=int, default=42)
@@ -103,7 +107,11 @@ def main() -> None:
     dataset = Path(args.processed_dir).name
     run_name = f"edubert_{dataset}_{args.run_type}"
 
-    train_ds = InteractionDataset(args.processed_dir, "train", args.max_seq_len)
+    train_ds = InteractionDataset(args.processed_dir, "train", args.max_seq_len,
+                                  n_students=args.n_students,
+                                  subsample_seed=args.seed)
+    if args.n_students is not None:
+        print(f"source subsample: {len(train_ds)} training students (requested {args.n_students}, draw seed {args.seed})", flush=True)
     note = ""
     if args.max_interactions is not None:
         train_ds, total_int, n_stu = subset_by_interactions(

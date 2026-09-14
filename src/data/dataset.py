@@ -29,9 +29,16 @@ PAD_IDX = 0
 
 
 class InteractionDataset(Dataset):
-    def __init__(self, processed_dir: str, split: str, max_seq_len: int = 512):
+    def __init__(self, processed_dir: str, split: str, max_seq_len: int = 512,
+                 n_students: int | None = None, subsample_seed: int = 42):
         """processed_dir: folder containing sequences.npz + splits.json.
         split: 'train' | 'val' | 'test'.
+        n_students: if set, keep a seeded random subsample of this many
+        students from the split. Default None reproduces the previous
+        behaviour exactly, so existing results are unaffected.
+        subsample_seed: seed for that draw. Passing a different seed at the
+        same size gives an independent draw, which is how source-sampling
+        variance can be measured later without changing this code.
         """
         d = Path(processed_dir)
         data = np.load(d / "sequences.npz")
@@ -47,6 +54,15 @@ class InteractionDataset(Dataset):
         # map student_id -> row index so we can select this split's sequences
         id_to_row = {int(sid): i for i, sid in enumerate(self.student_ids)}
         self.rows = [id_to_row[s] for s in wanted if s in id_to_row]
+        if n_students is not None and n_students < len(self.rows):
+            # sort first: `wanted` is a set, so an unsorted draw would depend
+            # on set iteration order and would not be reproducible.
+            ordered = sorted(self.rows)
+            rng = np.random.default_rng(subsample_seed)
+            pick = rng.choice(len(ordered), size=n_students, replace=False)
+            self.rows = [ordered[i] for i in sorted(pick.tolist())]
+        self.n_students_requested = n_students
+        self.subsample_seed = subsample_seed
 
     def __len__(self) -> int:
         return len(self.rows)
