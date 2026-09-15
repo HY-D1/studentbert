@@ -100,3 +100,11 @@ wandb_dupes.txt
 *_inventory.tsv
 queue_*/
 stale_*/
+inventory_stdout.txt
+sacct_all.txt
+audit_report.txt
+wandb_*.csv
+wandb_dupes.txt
+*_inventory.tsv
+queue_*/
+stale_*/
