@@ -10,14 +10,11 @@ dist/
 .venv/
 venv/
 .conda/
-
 # Environment / secrets
 .env
 *.key
-
 # macOS
 .DS_Store
-
 # Data & artifacts (live on cluster, never commit)
 /data/
 !data/sample/
@@ -26,20 +23,15 @@ outputs/
 *.npz
 *.parquet
 *.csv
-
 # Experiment tracking
 wandb/
-
 # Notebooks
 .ipynb_checkpoints/
-
 # IDE
 .vscode/
 .idea/
-
 # Logs
 *.log
-
 # run artifacts
 *.pt
 audit_output.txt
@@ -48,7 +40,6 @@ embedding_analysis/
 embedding_analysis_matched/
 results.json
 log_formats.txt
-
 # analysis outputs: regenerate via parse_nextskill_full.py / make_lak_figure.py
 nextskill_results.json
 nextskill_results_*.csv
@@ -91,18 +82,8 @@ source_scale_gain.pdf
 drip_*.log
 run_inventory.tsv
 run_inventory_quarantined.tsv
-results.json
 inventory_stdout.txt
 sacct_all.txt
-audit_report.txt
-wandb_*.csv
-wandb_dupes.txt
-*_inventory.tsv
-queue_*/
-stale_*/
-inventory_stdout.txt
-sacct_all.txt
-audit_report.txt
 wandb_*.csv
 wandb_dupes.txt
 *_inventory.tsv
