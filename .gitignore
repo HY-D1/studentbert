@@ -92,3 +92,11 @@ drip_*.log
 run_inventory.tsv
 run_inventory_quarantined.tsv
 results.json
+inventory_stdout.txt
+sacct_all.txt
+audit_report.txt
+wandb_*.csv
+wandb_dupes.txt
+*_inventory.tsv
+queue_*/
+stale_*/
