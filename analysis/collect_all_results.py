@@ -476,7 +476,7 @@ def main():
     # Sections this script does NOT regenerate. Overwriting RESULTS.md while any
     # of them are present silently destroys them.
     MANUAL = ["### 2.1", "### 2.2", "### 3.1", "### 3.2", "### 6.1", "### 8.1",
-              "### 8.2", "## 10."]
+              "### 8.2", "## 10.", "## 11."]
     if os.path.exists(args.out_md) and not args.force:
         existing = open(args.out_md, errors="ignore").read()
         present = [m for m in MANUAL if m in existing]
