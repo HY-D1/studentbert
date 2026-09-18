@@ -438,7 +438,7 @@ were re-run. The 353,597 row is the pre-existing full-corpus encoder
 | 15,000 | 3.6959 / 3.6867 / 3.6952 | +0.0002 | -0.0023 | 0.0010 |
 | 49,153 | 3.1054 / 3.0965 / 3.1116 | +0.0177 | +0.0014 | 0.0018 |
 | 150,000 | 2.9565 / 2.9613 / 2.9585 | +0.0240 | +0.0043 | 0.0012 |
-| 353,597 | 2.8784 (one draw only) | +0.0260 | +0.0064 | n/a |
+| 353,597 | 2.8784 / 2.8872 / 2.8740 | +0.0250 | +0.0055 | 0.0034 |
 
 Gains are means over the three draws, each draw itself a 6-seed mean paired
 against the same scratch controls (assist2017 scratch 0.6697, junyi 0.7352).
@@ -447,6 +447,29 @@ two rows are exact size matches to the other two sources in section 2.1.
 
 Per-draw gains at 150,000, assist2017: +0.0233 / +0.0245 / +0.0243.
 Per-draw gains at 150,000, junyi: +0.0043 / +0.0042 / +0.0044.
+Per-draw gains at 353,597, assist2017: +0.0233 / +0.0250 / +0.0267.
+Per-draw gains at 353,597, junyi: +0.0043 / +0.0061 / +0.0060.
+All eighteen 353,597 draw-by-target cells are positive on 6 of 6 seeds and
+every per-draw bootstrap interval excludes zero.
+
+THE 353,597 ROW WAS REVISED DOWNWARD ON 2026-09-18. It previously read +0.0260
+and +0.0064 from a single encoder, `edubert_ednet_pretrain_full_encoder.pt`
+(loss 2.8784, log `pretrain_ednet_7744629.log`, built 2026-06-20). Two further
+encoders were built under the section-11 recipe, `..._n353597d1` (loss 2.8872,
+job 10410464) and `..._n353597d2` (loss 2.8740, job 10410468), and their 24
+transfer runs collected (jobs 10418184 to 10418706, all COMPLETED). The
+pre-existing encoder is the WEAKEST of the three on both targets, so the
+single-draw figures were low rather than high. Quote +0.0250 and +0.0055.
+
+ONE PROPERTY OF THIS ROW DIFFERS FROM EVERY OTHER SIZE. At full corpus
+`--n_students 353597` selects the entire training split, so there is nothing to
+subsample and the three draws differ in the pretraining seed ONLY. At every
+smaller size a draw varies both the sampled students and the initialization.
+The 0.0034 and 0.0019 spreads here therefore bound initialization variance
+alone and are not directly comparable to the spreads in the table above. Worth
+noting that they are nonetheless the same order of magnitude, which suggests
+initialization variance rather than sampling variance dominates encoder fit
+across the whole ladder.
 
 THE 1,366 ROW IS A STABILITY BOUNDARY, NOT A MEASUREMENT. Four encoders at that
 size span 0.7088 in final mlm loss (4.5344 to 5.2432) against a chance value of
@@ -488,8 +511,15 @@ this is the first clean loss-versus-transfer test: loss falls smoothly and
 monotonically while transfer is a threshold, with 50.6% of the total loss
 improvement (4.5344 to 3.6959) buying a transfer change of -0.0001 to -0.0004.
 Loss tracks transfer ordinally (Spearman -0.83 on both targets) but not
-proportionally. CAVEAT: the 353,597 row rests on ONE encoder and cannot get
-further draws without re-pretraining the whole corpus._
+proportionally. (c) The curve SATURATES at the top. Going from
+150,000 to the full 353,597 students, a 2.4-fold increase in corpus, buys
++0.0010 on assist2017 (+0.0240 to +0.0250) and +0.0012 on junyi (+0.0043 to
++0.0055). Both are smaller than the draw spread at the larger size, 0.0034 and
+0.0019, so the final step of the curve is NOT resolvable at three draws. The
+defensible statement is that transfer rises steeply from 5,000 to 49,153,
+continues to 150,000, and then flattens; do not read the top of the curve as
+still climbing. This is the source-side analogue of the target-side saturation
+in section 4._
 
 DIGIT COLLISION: this Spearman -0.83 is a THIRD quantity at that magnitude,
 alongside the probe-vs-transfer rho +0.83 (section 6) and the scale/pps
