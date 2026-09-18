@@ -56,8 +56,15 @@
 #   bash tools/drip_submit.sh queue_srcscale_ft
 #
 # The second invocation is not a mistake: the fine-tune queue can only be
-# written once the encoders it points at exist, and this script refuses to
-# emit fine-tune jobs for a checkpoint that is not on disk.
+# written once the encoders it points at are FINISHED, and this script refuses
+# to emit fine-tune jobs against an unfinished checkpoint.
+#
+# "Finished" means the pretraining job printed "best mlm_loss", not merely that
+# the .pt file exists. pretrain_edubert.py saves on every loss improvement, so
+# the file appears minutes into a run. On 2026-09-15 a file-existence gate let
+# 24 fine-tune jobs load 150,000-student encoders about 70 minutes early, which
+# produced a draw spread of 0.0175 that fell to 0.0012 on the valid rerun. Do
+# not weaken this check back to [ -f ].
 
 set -uo pipefail
 
@@ -99,6 +106,7 @@ rm -f "$PQDIR"/*.sbatch "$FQDIR"/*.sbatch
 # ---------------------------------------------------------------- encoders
 pcount=0
 have=0
+inprogress=0
 for SIZE in $SIZES; do
   for DRAW in $DRAWS; do
     if [ "$DRAW" = "42" ]; then
@@ -108,11 +116,24 @@ for SIZE in $SIZES; do
     fi
     CK="../checkpoints/edubert_ednet_pretrain_ednet_${TAG}_encoder.pt"
     if [ -f "$CODE/$CK" ]; then
-      echo "have encoder, skipping: $CK"
-      have=$((have + 1))
+      if grep -l -q "best mlm_loss" srcscale_pretrain_ednet_${TAG}_*.log 2>/dev/null; then
+        echo "have encoder, skipping: $CK"
+        have=$((have + 1))
+        continue
+      fi
+      echo "IN PROGRESS, not usable yet: $CK"
+      echo "  A checkpoint exists but its pretraining job has not printed"
+      echo "  'best mlm_loss', so training has not finished. pretrain_edubert.py"
+      echo "  saves on every loss improvement, so the file appears long before"
+      echo "  the run ends. Loading it now yields a half-trained encoder."
+      echo "  Wait for COMPLETED, then re-run this generator:"
+      echo "    sacct -X -n --starttime today --format=JobName%40,State | grep ${TAG}"
+      inprogress=$((inprogress + 1))
       continue
     fi
-    if [ "$SIZE" -ge 100000 ]; then
+    if [ "$SIZE" -ge 300000 ]; then
+      WALL=06:00:00
+    elif [ "$SIZE" -ge 100000 ]; then
       WALL=03:00:00
     elif [ "$SIZE" -ge 20000 ]; then
       WALL=01:30:00
@@ -184,7 +205,11 @@ for SIZE in $SIZES; do
 done
 
 echo
-echo "encoders to run   : $pcount   (already on disk: $have)"
+echo "encoders to run   : $pcount   (finished on disk: $have)"
+if [ "$inprogress" -gt 0 ]; then
+  echo "encoders IN PROGRESS: $inprogress   <- checkpoint exists but the job has"
+  echo "                        not finished. Nothing was emitted against these."
+fi
 echo "fine-tune jobs    : $fcount   (sizes still missing an encoder: $missing)"
 echo "gpu type          : $GPUTYPE"
 echo "sizes             : $SIZES"
