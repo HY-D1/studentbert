@@ -12,6 +12,17 @@
 #            default batch). PROBE_GPU should match the existing probe7 runs (builder report).
 #   logme    3 jobs: the leakage-safe KT LogME on Track B, one per target, scoring scratch and
 #            the three full encoders at seeds 42 1 2 on the N=3000 learner draw.
+#   logmediag 3 jobs: scripts/diagnose_logme.py on the same draw (every layer, and in-domain
+#            encoders re-scored with the skill table at its random start).
+#   trackb7  264 KT jobs: Track B grown to 7 targets x 7 full encoders (+ scratch), N=3000,
+#            20 epochs, 6 seeds, the pinned grid's recipe. The 3 x 3 cells the grid already holds
+#            are not re-run. TB7_GPU must be set (the grid is v100-sxm2).
+#   objdraws 6 pretraining jobs now, 288 fine-tunes later: EdNet skill_only and correct_only
+#            encoders rebuilt at seeds 42 1 2 under the full encoder's recipe (10 epochs, batch
+#            128, warmup 0.05), then every recipe-matched draw (these six plus full at 353,597
+#            d1 and d2) fine-tuned on the six EdNet-source Track A targets at the Track A budget.
+#            Fine-tunes are written only for encoders whose pretraining log printed
+#            "best mlm_loss"; rerun the generator after the pretraining jobs finish. OBJ_GPU.
 #
 # Log prefix tg1_ and run-name token tg_ are new on purpose: w9_ and w10_ are already taken
 # (w9_mt1_, w9_probe_indom_, w10_nsk_), and a shared run name is what let two campaigns collide
@@ -33,7 +44,7 @@ TIMING="${TIMING:-0}"
 DATASETS7="assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006"
 
 if [ -z "$QUEUES" ]; then
-  echo "set QUEUES to one or more of: scratch probe logme"
+  echo "set QUEUES to one or more of: scratch probe logme logmediag trackb7 objdraws"
   exit 1
 fi
 cd "$CODE" || exit 1
@@ -167,6 +178,101 @@ if wants logme; then
       "PYTHONPATH=. $PY scripts/score_transferability.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") --out tg1_logme_kt_${DS}.jsonl"
   done
   echo "logme queue: $Q"
+fi
+
+if wants logmediag; then
+  : "${LOGME_GPU:?set LOGME_GPU (any is fine: scoring is deterministic per seed and light)}"
+  GRES="$(gres_line "$LOGME_GPU")" || exit 1
+  Q="$CODE/queue_tg1_logmediag"
+  mkdir -p "$Q"
+  rm -f "$Q"/*.sbatch
+  CKS=""
+  for SRC in assist2017 ednet junyi; do CKS="$CKS ../checkpoints/edubert_${SRC}_pretrain_full_encoder.pt"; done
+  for DS in assist2017 ednet junyi; do
+    emit "$Q" "tg1_logmediag_${DS}" "tg1_logmediag_${DS}" "$GRES" 04:00:00 48G \
+      "PYTHONPATH=. $PY scripts/diagnose_logme.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") --out tg1_logmediag_kt_${DS}.jsonl"
+  done
+  echo "logmediag queue: $Q"
+fi
+
+if wants trackb7; then
+  : "${TB7_GPU:?set TB7_GPU to the N=3000 grid pool (v100-sxm2)}"
+  GRES="$(gres_line "$TB7_GPU")" || exit 1
+  for SRC in $DATASETS7; do
+    if [ ! -f "../checkpoints/edubert_${SRC}_pretrain_full_encoder.pt" ]; then
+      echo "MISSING ENCODER: edubert_${SRC}_pretrain_full_encoder.pt"
+      exit 1
+    fi
+  done
+  Q="$CODE/queue_tg1_trackb7"
+  mkdir -p "$Q"
+  rm -f "$Q"/*.sbatch
+  for T in $DATASETS7; do
+    case "$T" in
+      assist2017|ednet|junyi) CONDS="fromalgebra2005 frombridge2006 fromassist2009 fromalgebra2006" ;;
+      *) CONDS="scratch indomain"; for SRC in $DATASETS7; do [ "$SRC" != "$T" ] && CONDS="$CONDS from$SRC"; done ;;
+    esac
+    for COND in $CONDS; do
+      case "$COND" in
+        scratch) INIT="--init scratch" ;;
+        indomain) INIT="--init pretrained --encoder_ckpt ../checkpoints/edubert_${T}_pretrain_full_encoder.pt" ;;
+        *) INIT="--init pretrained --encoder_ckpt ../checkpoints/edubert_${COND#from}_pretrain_full_encoder.pt" ;;
+      esac
+      for S in $(seeds "42 1 2 3 4 5"); do
+        RT="tgb_${T}_${COND}_n3000_seed${S}"
+        emit "$Q" "tg1_${RT}" "edubert_${T}_${RT}" "$GRES" 02:00:00 24G \
+          "PYTHONPATH=. $PY scripts/finetune_edubert.py --processed_dir ../processed/$T $INIT --n_students 3000 --seed $S --epochs 20 --run_type $RT --wandb"
+      done
+    done
+  done
+  echo "trackb7 queue: $Q"
+fi
+
+if wants objdraws; then
+  : "${OBJ_GPU:?set OBJ_GPU (v100-sxm2 matches the source-scale encoders)}"
+  GRES="$(gres_line "$OBJ_GPU")" || exit 1
+  QP="$CODE/queue_tg1_objdraws_pretrain"
+  QF="$CODE/queue_tg1_objdraws_ft"
+  mkdir -p "$QP" "$QF"
+  rm -f "$QP"/*.sbatch "$QF"/*.sbatch
+  READY=""
+  for D in 42 1 2; do
+    for OBJ in skill_only correct_only; do
+      RT="pretrain_ednet_${OBJ}_r128_d${D}"
+      if grep -l -q "best mlm_loss" tg1_${RT}_*.log 2>/dev/null; then
+        READY="$READY ${OBJ}:${D}:../checkpoints/edubert_ednet_${RT}_encoder.pt"
+        continue
+      fi
+      emit "$QP" "tg1_${RT}" "edubert_ednet_${RT}" "$GRES" 08:00:00 64G \
+        "PYTHONPATH=. $PY scripts/pretrain_edubert.py --processed_dir ../processed/ednet --objective $OBJ --epochs 10 --batch_size 128 --lr 1e-3 --warmup_frac 0.05 --dropout 0.1 --seed $D --run_type $RT --wandb"
+    done
+  done
+  for D in 1 2; do
+    if grep -l -q "best mlm_loss" srcscale_pretrain_ednet_n353597d${D}_*.log 2>/dev/null; then
+      READY="$READY full:${D}:../checkpoints/edubert_ednet_pretrain_ednet_n353597d${D}_encoder.pt"
+    else
+      echo "full-objective draw d$D at 353,597 has no finished pretraining log; skipping it"
+    fi
+  done
+  for item in $READY; do
+    OBJ="${item%%:*}"; rest="${item#*:}"; D="${rest%%:*}"; CK="${rest#*:}"
+    for T in assist2017 junyi algebra2005 bridge2006 assist2009 algebra2006; do
+      case "$T" in
+        assist2017) BUD=n1000; NS=1000; WALL=01:00:00 ;;
+        junyi) BUD=n1000; NS=1000; WALL=04:00:00 ;;
+        bridge2006) BUD=full; NS=100000; WALL=06:00:00 ;;
+        algebra2006) BUD=full; NS=100000; WALL=05:00:00 ;;
+        *) BUD=full; NS=100000; WALL=03:00:00 ;;
+      esac
+      for S in $(seeds "42 1 2 3 4 5"); do
+        RT="tga_${OBJ}_r128d${D}_${BUD}_seed${S}"
+        emit "$QF" "tg1_${T}_${RT}" "edubert_${T}_${RT}" "$GRES" "$WALL" 24G \
+          "PYTHONPATH=. $PY scripts/finetune_edubert.py --processed_dir ../processed/$T --init pretrained --encoder_ckpt $CK --n_students $NS --seed $S --epochs 30 --run_type $RT --wandb"
+      done
+    done
+  done
+  echo "objdraws pretraining queue: $QP"
+  echo "objdraws fine-tune queue:   $QF   (encoders ready: $(echo $READY | wc -w) of 8)"
 fi
 
 echo "written $written   skipped (log exists) $skip_log   skipped (already submitted) $skip_done"

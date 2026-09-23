@@ -53,8 +53,11 @@ while :; do
     f=$(ls "$QDIR"/*.sbatch 2>/dev/null | head -1)
     [ -z "$f" ] && break
     if [ "$DRYRUN" = "1" ]; then
-      echo "[dry] would submit $(basename "$f")   (queue has $mine of my jobs)"
-      mv "$f" "$QDIR/done/"
+      for g in "$QDIR"/*.sbatch; do
+        echo "[dry] would submit $(basename "$g")   (queue has $mine of my jobs)"
+      done
+      echo "DRYRUN: queue left untouched, $pending file(s) still pending"
+      exit 0
     else
       out=$(sbatch "$f" 2>&1)
       rc=$?

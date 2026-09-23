@@ -40,9 +40,14 @@ def apply(text: str, old: str, new: str, why: str) -> str:
     return text.replace(old, new, 1)
 
 
+ANCHOR2 = "logs_list_*.txt\n"
+BLOCK2 = "logs_list_*.txt\ntg1_logmediag_kt_*.jsonl\n"
+
+
 def main() -> None:
     src = TARGET.read_text(encoding="utf-8")
     out = apply(src, ANCHOR, BLOCK, "ignore tg1 outputs")
+    out = apply(out, ANCHOR2, BLOCK2, "ignore tg1 LogME diagnostics")
     if out != src:
         TARGET.write_text(out, encoding="utf-8")
     print("md5", hashlib.md5(TARGET.read_bytes()).hexdigest())

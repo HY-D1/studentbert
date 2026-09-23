@@ -302,6 +302,29 @@ def test_O5_candidates_share_the_target_sample():
         assert s[0].score != p[0].score
 
 
+def test_diagnostic_layers_reproduce_the_estimator():
+    _torch()
+    import importlib.util as _u
+
+    from src.estimators.features import (build_backbone, cap_positions, kt_features,
+                                         sample_target)
+
+    spec = _u.spec_from_file_location("diagnose_logme", REPO / "scripts" / "diagnose_logme.py")
+    diag = _u.module_from_spec(spec)
+    spec.loader.exec_module(diag)
+    with tempfile.TemporaryDirectory() as tmp:
+        tgt = _make_processed(Path(tmp), "tgt")
+        bb = build_backbone(6, seed=7, d_model=16, n_layers=2, max_len=64)
+        sub, _, _ = sample_target(tgt, 12, 7, 64)
+        F, y, _ = kt_features(bb, sub, "cpu")
+        sel = cap_positions(len(y), 150, 7)
+        assert diag.n_positions(sub) == len(y)
+        feats, y2, _ = diag.layer_features(bb, sub, sel, "cpu")
+        assert len(feats) == 3, "embedding output plus one entry per encoder layer"
+        assert np.allclose(feats[-1], F[sel], rtol=0, atol=1e-6) and np.array_equal(y2, y[sel])
+        assert not np.allclose(feats[0], feats[-1], atol=1e-3), "layers should differ"
+
+
 def test_O6_score_orientation():
     def mk(c, score, direction="higher_is_better", est="e"):
         return EstimatorResult(est, "F", c, "t", 1, score, direction, 1, 1, 0.0, 0.0, None)
@@ -461,11 +484,65 @@ def test_builder_classifies_every_known_family():
         "edubert_ednet_tg_probe7_ednet_skill_only_s42": ("probe7", "ednet", "skill_only"),
         "edubert_assist2017_probe2_ednet_seed1": ("probe2", "assist2017", "src:ednet"),
         "edubert_junyi_probe2_junyi_fromassist_seed2": ("probe2", "junyi", "src:assist2017"),
+        "edubert_assist2017_trunc_skill_only_k160_seed3": ("A", "assist2017", "skill_only"),
+        "edubert_ednet_ktfull_ednet_fromjunyi_n20000_seed1": ("B", "ednet", "src:junyi"),
+        "edubert_assist2017_ednet_cold_pre_n100_s42": ("B", "assist2017", "src:ednet"),
+        "edubert_assist2017_cold_scr_n25_s1": ("B", "assist2017", "scratch"),
+        "edubert_assist2017_drop_assist_fromjunyi_cens_k200_seed2": ("C-drop", "assist2017",
+                                                                     "src:junyi"),
+        "edubert_bridge2006_tgb_bridge2006_fromassist2009_n3000_seed4": ("B", "bridge2006",
+                                                                         "src:assist2009"),
+        "edubert_algebra2005_tga_correct_only_r128d1_full_seed5": ("A", "algebra2005",
+                                                                   "correct_only@r128d1"),
     }
     for run, want in cases.items():
         f = classify(run, "kt")
         assert f and (f["track"], f["target"], f["candidate"]) == want, (run, f)
     assert classify("edubert_assist2017_kt_ednet_fromednet_n3000_seed1", "kt") is None
+    f = classify("edubert_ednet_regime_ednet_full_n1000_seed2", "kt")
+    assert f["source"] == "junyi" and f["budget"] == "n1000", f
+    assert classify("edubert_assist2017_trunc_full_k512_seed1", "kt")["budget"] == "trunc_K512"
+    assert classify("edubert_assist2017_drop_assist_scratch_cens_k100_seed1", "dropout")["censored"]
+
+
+def test_builder_keeps_the_confirmatory_holdout_closed():
+    with tempfile.TemporaryDirectory() as tmp_s:
+        tmp = Path(tmp_s)
+        _write(tmp, "tg1_x_1.log", _kt_log("edubert_xes3g5m_kt_xes_scratch_n3000_seed1", "scratch",
+                                             0.7, rid="h1"))
+        rows, _ = _build(tmp)
+        (e,) = rows.values()
+        assert e["exclusion"].startswith("confirmatory holdout"), e["exclusion"]
+
+
+def test_builder_ragged_cell_uses_pairwise_seeds():
+    from analysis.build_transfer_benchmark import cell_stats
+
+    import random as _random
+
+    vals = {"scratch": {1: 0.50, 2: 0.52, 3: 0.51, 4: 0.49},
+            "src:a": {1: 0.60, 2: 0.61, 3: 0.62, 4: 0.59},
+            "src:b": {1: 0.55, 2: 0.56}}
+    rows = {r["candidate"]: r for r in cell_stats(vals, 2000, _random.Random(0))}
+    assert rows["src:a"]["gain_k_of_n"] == "4/4", rows["src:a"]["gain_k_of_n"]
+    assert rows["src:b"]["gain_k_of_n"] == "2/2", rows["src:b"]["gain_k_of_n"]
+
+
+def test_builder_ladder_guard_and_results_md_check():
+    from analysis import build_transfer_benchmark as btb
+
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        rs = tmp / "RESULTS.md"
+        rs.write_text("Per-draw gains at 353,597, junyi: +0.0043 / +0.0061 / +0.0060.\n")
+        cells = btb.results_md_cells(str(rs))
+        assert cells[("S11", "junyi", "n353597_d42")] == 0.0043
+        assert cells[("S11", "junyi", "n353597_d2")] == 0.0060
+        design = btb.expected_cells()
+        keys = {(t_, g, b, c, s) for t_, g, b, c, s in design}
+        assert len(keys) == len(design), "expected design has colliding keys"
+        assert ("B", "assist2017", "n100", "src:ednet", 42) in keys
+        assert ("B", "assist2017", "n3000", "src:ednet", 42) in keys
 
 
 # --------------------------------------------------------------------------- runner

@@ -101,3 +101,4 @@ inventory_stdout_*.txt
 sacct_*.txt
 nodes_gres_*.txt
 logs_list_*.txt
+tg1_logmediag_kt_*.jsonl

@@ -45,7 +45,7 @@ def main() -> None:
     cols = ["name", "mtime_utc", "bytes", "md5", "epoch", "mlm_loss", "num_skills",
             "objective_effective", *FIELDS]
     with open(a.out, "w", newline="") as fh:
-        w = csv.writer(fh, delimiter="\t")
+        w = csv.writer(fh, delimiter="\t", lineterminator="\n")
         w.writerow(cols)
         for p in paths:
             ck = torch.load(p, map_location="cpu", weights_only=False)

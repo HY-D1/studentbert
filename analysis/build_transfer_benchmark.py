@@ -62,10 +62,18 @@ WANDB_KEY = {"test_auc": "test/auc", "test_ece": "test/ece", "test_probe_acc": "
 PREFER = {"B": ("N3000P", "W6"), "C-ns": ("N3000P", "W6"), "C-drop": ("W6", "W5")}
 SHORT = {"assist": "assist2017", "ednet": "ednet", "junyi": "junyi",
          "fromassist": "assist2017", "fromednet": "ednet", "fromjunyi": "junyi"}
+# Track A candidates by source. The EdNet-target cells (w8_regime_ednet) loaded the Junyi
+# objective encoders, per every one of their logs; RESULTS.md 4 labels them EdNet-source.
+JUNYI_OBJ_ENCODER = {"full": "edubert_junyi_pretrain_full_encoder.pt",
+                     "skill_only": "edubert_junyi_pretrain_junyi_skill_only_encoder.pt",
+                     "correct_only": "edubert_junyi_pretrain_junyi_correct_only_encoder.pt"}
 OBJ_ENCODER = {"full": "edubert_ednet_pretrain_full_encoder.pt",
                "skill_only": "edubert_ednet_pretrain_ednet_skill_only_encoder.pt",
                "correct_only": "edubert_ednet_pretrain_ednet_correct_only_encoder.pt"}
 LOG_TOL = 5.001e-5  # a 4 dp log value may differ from full precision by half a unit
+# Confirmatory holdout (MRAP K), chosen 2026-09-22: its results stay out of every table until
+# the method freeze is committed and --open-holdout is passed.
+HOLDOUT = ("xes3g5m",)
 
 DEVICE_KV = re.compile(r"(\w+)=(\S+)")
 LOADED = re.compile(r"^loaded (\d+)/(\d+) (?:encoder )?tensors from (\S+)")
@@ -80,7 +88,9 @@ _A_ORIG = "(full|skill_only|correct_only|scratch)"
 TRACK_A = [
     (re.compile(rf"^edubert_(assist2017)_(?:tg_)?objabl_{_A_ORIG}_n1000_seed(\d+)$"), "n1000"),
     (re.compile(rf"^edubert_(junyi)_(?:tg_)?objabl2_{_A_ORIG}_n1000_seed(\d+)$"), "n1000"),
-    (re.compile(rf"^edubert_(ednet)_(?:tg_)?regime_ednet_{_A_ORIG}_n1000_seed(\d+)$"), "n1000"),
+    (re.compile(rf"^edubert_(ednet)_(?:tg_)?regime_ednet_{_A_ORIG}_n1000_seed(\d+)$"),
+     "n1000:junyi"),
+    (re.compile(rf"^edubert_(assist2017)_trunc_{_A_ORIG}_k(\d+)_seed(\d+)$"), "trunc"),
     (re.compile(r"^edubert_(algebra2005)_algabl_(full|skill_only|correct_only)_seed(\d+)$"),
      "full_split"),
     (re.compile(r"^edubert_(bridge2006)_bridgeabl_(full|skill_only|correct_only)_seed(\d+)$"),
@@ -106,6 +116,17 @@ RX_DROP = [
     re.compile(r"^edubert_(junyi)_drop_junyi_(scratch|indomain|fromassist|fromednet)_k(\d+)"
                r"_n\d+_seed(\d+)$"),
 ]
+RX_KTFULL = re.compile(rf"^edubert_(ednet|junyi)_ktfull_(ednet|junyi)_{_COND}_n(\d+)_seed(\d+)$")
+RX_COLD = re.compile(r"^edubert_(assist2017)_(cold_pre|cold_scr|ednet_cold_pre|junyi_cold_pre)"
+                     r"_n(\d+)_s(\d+)$")
+COLD_SRC = {"cold_pre": "assist2017", "cold_scr": "", "ednet_cold_pre": "ednet",
+            "junyi_cold_pre": "junyi"}
+RX_CENS = re.compile(r"^edubert_(assist2017)_drop_assist_(scratch|indomain|fromednet|fromjunyi)"
+                     r"_cens_k(\d+)_seed(\d+)$")
+RX_TGB = re.compile(r"^edubert_([a-z0-9]+)_tgb_\1_(scratch|indomain|from[a-z0-9]+)"
+                    r"_n3000_seed(\d+)$")
+RX_TGA = re.compile(r"^edubert_([a-z0-9]+)_tga_(full|skill_only|correct_only)_r128d(\d+)"
+                    r"_(n1000|full)_seed(\d+)$")
 RX_P7 = re.compile(r"^edubert_([a-z0-9]+)_(?:tg_)?probe7_\1_(full|scratch|skill_only|correct_only)"
                    r"_s(\d+)$")
 RX_P2A = re.compile(r"^edubert_(assist2017)_probe2_(ednet|junyi|indomain|scratch)_seed(\d+)$")
@@ -242,8 +263,38 @@ def classify(run: str, kind: str) -> dict | None:
         if m := rx.match(run):
             tgt, cand, seed = m.group(1), m.group(2), int(m.groups()[-1])
             pre = cand != "scratch"
-            return _fam("A", tgt, cand, seed, budget=budget, source="ednet" if pre else "",
+            src = "ednet"
+            if budget == "trunc":
+                budget = f"trunc_K{m.group(3)}"
+            elif ":" in budget:
+                budget, src = budget.split(":")
+            return _fam("A", tgt, cand, seed, budget=budget, source=src if pre else "",
                         objective=cand if pre else "")
+    if m := RX_TGA.match(run):
+        tgt, obj, draw, budget, seed = m.groups()
+        return _fam("A", tgt, f"{obj}@r128d{draw}", int(seed),
+                    budget="n1000" if budget == "n1000" else "full_split", source="ednet",
+                    objective=obj, draw=int(draw))
+    if m := RX_TGB.match(run):
+        tgt, cond, seed = m.groups()
+        src = "" if cond == "scratch" else (tgt if cond == "indomain" else cond[4:])
+        return _fam("B", tgt, f"src:{src}" if src else "scratch", int(seed), budget="n3000",
+                    source=src, objective="full" if src else "")
+    if (m := RX_KTFULL.match(run)) and SHORT[m.group(2)] == m.group(1):
+        tgt, cond = m.group(1), m.group(3)
+        src = _src(tgt, cond)
+        return _fam("B", tgt, f"src:{src}" if src else "scratch", int(m.group(5)),
+                    budget=f"n{m.group(4)}", source=src, objective="full" if src else "")
+    if m := RX_COLD.match(run):
+        src = COLD_SRC[m.group(2)]
+        return _fam("B", m.group(1), f"src:{src}" if src else "scratch", int(m.group(4)),
+                    budget=f"n{m.group(3)}", source=src, objective="full" if src else "")
+    if m := RX_CENS.match(run):
+        tgt, cond, k, seed = m.group(1), m.group(2), int(m.group(3)), int(m.group(4))
+        src = _src(tgt, cond)
+        return _fam("C-drop", tgt, f"src:{src}" if src else "scratch", seed, K=k,
+                    budget=f"K{k}cens", source=src, objective="full" if src else "",
+                    censored=True)
     for rx, track in ((RX_B, "B"), (RX_NS, "C-ns")):
         if (m := rx.match(run)) and SHORT[m.group(2)] == m.group(1):
             tgt, cond, seed = m.group(1), m.group(3), int(m.group(4))
@@ -279,8 +330,13 @@ def classify(run: str, kind: str) -> dict | None:
 def expected_encoder(f: dict) -> str | None:
     if f["candidate"] == "scratch" or f["track"] == "baseline":
         return None
+    if f["track"] == "A" and f.get("draw") not in ("", None):
+        obj = f["objective"]
+        if obj == "full":
+            return f"edubert_ednet_pretrain_ednet_n353597d{f['draw']}_encoder.pt"
+        return f"edubert_ednet_pretrain_ednet_{obj}_r128_d{f['draw']}_encoder.pt"
     if f["track"] in ("A", "probe7"):
-        return OBJ_ENCODER[f["objective"]]
+        return (JUNYI_OBJ_ENCODER if f["source"] == "junyi" else OBJ_ENCODER)[f["objective"]]
     if f["track"] == "S11":
         if f["size"] == 353597 and f["draw"] == 42:
             return OBJ_ENCODER["full"]
@@ -350,7 +406,8 @@ def exclude(e: dict, reason: str) -> None:
         e["exclusion"] = reason
 
 
-def annotate(execs: list[dict], sacct: dict, gres: dict, wandb: dict) -> None:
+def annotate(execs: list[dict], sacct: dict, gres: dict, wandb: dict,
+             open_holdout: bool = False) -> None:
     for e in execs:
         e["seed"] = seed_of(e)
         e["campaign"] = campaign_of(e["file"])
@@ -363,10 +420,14 @@ def annotate(execs: list[dict], sacct: dict, gres: dict, wandb: dict) -> None:
         e["gpu_type"] = gres.get(e["node"], "unknown" if e["node"] else "")
         f = e["fam"]
         e["leakage_status"] = "clean"
+        if not open_holdout and any(h in e["run"] for h in HOLDOUT):
+            exclude(e, "confirmatory holdout: open only after the method freeze "
+                       "(--open-holdout)")
         if e["kind"] in inv.QUARANTINE:
             e["leakage_status"] = "quarantined"
             exclude(e, inv.QUARANTINE[e["kind"]])
-        elif f and f["track"] == "C-drop" and f["K"] > (50 if f["target"] == "assist2017" else 10):
+        elif (f and f["track"] == "C-drop" and not f.get("censored")
+              and f["K"] > (50 if f["target"] == "assist2017" else 10)):
             e["leakage_status"] = "leaked_K"
             exclude(e, "dropout label leaks at this K (clean: ASSISTments K<=50, EdNet and "
                        "Junyi K<=10)")
@@ -577,12 +638,17 @@ def cell_stats(values: dict[str, dict[int, float]], boots: int, rng: random.Rand
             r["top_equivalent"] = "yes" if lo <= 0 else "no"
         r["tau_b_mean"] = st.mean(taus) if taus else ""
         r["top1_seed_agreement"] = f"{top1_hits}/{n}"
-        if "scratch" in mat and c != "scratch":
-            d = [mat[c][i] - mat["scratch"][i] for i in range(n)]
-            lo, hi = boot_mean_ci(d, idx)
+        if "scratch" in values and c != "scratch":
+            # Pairwise seeds, not the all-candidate intersection: a ragged cell (EdNet dropout,
+            # after unresolved copies leave) should not lose a pair's seeds to a third candidate.
+            ps = sorted(set(values[c]) & set(values["scratch"]))
+            d = [values[c][s] - values["scratch"][s] for s in ps]
+            pidx = [[rng.randrange(len(ps)) for _ in ps] for _ in range(boots)] if len(ps) != n \
+                else idx
+            lo, hi = boot_mean_ci(d, pidx) if len(ps) >= 2 else (float("nan"), float("nan"))
             toward = sum(x > 0 for x in d) if st.mean(d) >= 0 else sum(x < 0 for x in d)
             r.update(gain_vs_scratch=st.mean(d), gain_ci=f"[{lo:+.6f}, {hi:+.6f}]",
-                     gain_k_of_n=f"{toward}/{n}",
+                     gain_k_of_n=f"{toward}/{len(ps)}",
                      transfer_sign="positive" if lo > 0 else ("negative" if hi < 0
                                                               else "spans zero"))
     return rows
@@ -637,6 +703,13 @@ def results_md_cells(path: str | None) -> dict:
         if len(c) >= 3 and re.match(r"^[a-z]", c[0]) and c[0] not in ("Dataset",):
             cells[("probe7", c[0], "full")] = num(c[1])
             cells[("probe7", c[0], "scratch")] = num(c[2])
+    text = "\n".join(lines)
+    rx = re.compile(r"Per-draw gains at ([\d,]+), (assist2017|junyi): ([^\n]+?)\.(?:\n|$)")
+    for m in rx.finditer(text):
+        vals = re.findall(r"[-+]\d\.\d+", m.group(3))
+        size = m.group(1).replace(",", "")
+        for draw, v in zip((42, 1, 2), vals):  # RESULTS.md 11 lists d42 / d1 / d2
+            cells[("S11", m.group(2), f"n{size}_d{draw}")] = float(v)
     return {k: v for k, v in cells.items() if v is not None}
 
 
@@ -712,30 +785,37 @@ def exec_rows(execs: list[dict], encoders: dict) -> list[dict]:
 def write_tsv(path: Path, rows: list[dict], cols: list[str] | None = None) -> None:
     cols = cols or (list(rows[0]) if rows else [])
     with path.open("w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=cols, delimiter="\t", extrasaction="ignore")
+        w = csv.DictWriter(fh, fieldnames=cols, delimiter="\t", extrasaction="ignore",
+                           lineterminator="\n")
         w.writeheader()
         for r in rows:
             w.writerow({k: ("" if r.get(k) is None else r.get(k)) for k in cols})
 
 
 def expected_cells() -> list[tuple]:
+    """(track, target, budget, candidate, seed) for every cell the design promises."""
     out = []
+    obj4 = ("full", "skill_only", "correct_only", "scratch")
+    src4 = ("scratch", "src:assist2017", "src:ednet", "src:junyi")
     for tgt in ("assist2017", "ednet", "junyi", "algebra2005", "bridge2006", "assist2009",
                 "algebra2006"):
-        for c in ("full", "skill_only", "correct_only", "scratch"):
-            out += [("A", tgt, c, s) for s in SEEDS6]
-        for c in ("full", "scratch", "skill_only", "correct_only"):
-            out += [("probe7", tgt, c, s) for s in SEEDS3]
+        budget = "n1000" if tgt in ("assist2017", "ednet", "junyi") else "full_split"
+        out += [("A", tgt, budget, c, s) for c in obj4 for s in SEEDS6]
+        out += [("probe7", tgt, "", c, s) for c in obj4 for s in SEEDS3]
+    for k in (10, 20, 40, 80, 160, 320, 512):
+        out += [("A", "assist2017", f"trunc_K{k}", c, s) for c in obj4 for s in SEEDS6]
     for track in ("B", "C-ns"):
         for tgt in ("assist2017", "ednet", "junyi"):
-            for c in ("scratch", "src:assist2017", "src:ednet", "src:junyi"):
-                out += [(track, tgt, c, s) for s in SEEDS6]
+            out += [(track, tgt, "n3000", c, s) for c in src4 for s in SEEDS6]
+    out += [("B", "ednet", "n20000", c, s) for c in src4 for s in SEEDS6]
+    out += [("B", "junyi", "n40000", c, s) for c in src4 for s in SEEDS6]
+    for n in (25, 50, 100, 200, 500, 1000):
+        out += [("B", "assist2017", f"n{n}", c, s) for c in src4 for s in SEEDS3]
     draws = {1366: (42, 1, 2, 3), 5000: (42, 1, 2), 15000: (42, 1, 2), 49153: (42, 1, 2),
              150000: (42, 1, 2), 353597: (1, 2)}
     for tgt in ("assist2017", "junyi"):
         for size, ds in draws.items():
-            for d in ds:
-                out += [("S11", tgt, f"ednet_n{size}_d{d}", s) for s in SEEDS6]
+            out += [("S11", tgt, "n3000", f"ednet_n{size}_d{d}", s) for d in ds for s in SEEDS6]
     return out
 
 
@@ -749,7 +829,12 @@ def main() -> None:
     ap.add_argument("--results-md", default="RESULTS.md")
     ap.add_argument("--outdir", default="benchmark")
     ap.add_argument("--dup-tol", type=float, default=0.0005)
+    ap.add_argument("--open-holdout", action="store_true",
+                    help="include the confirmatory holdout; only after the method freeze commit")
     ap.add_argument("--boots", type=int, default=20000)
+    ap.add_argument("--margin", type=float, default=0.001,
+                    help="practical-equivalence margin on the track metric; 0.001 exceeds the "
+                         "largest W6-versus-pinned shift of a mean (0.0006, 2026-09-22)")
     a = ap.parse_args()
 
     files = []
@@ -764,7 +849,7 @@ def main() -> None:
         facts.append(fc)
     sacct, gres = load_sacct(a.sacct), load_gres(a.gres)
     wandb, encoders = load_wandb(a.wandb), load_encoders(a.encoders)
-    annotate(execs, sacct, gres, wandb)
+    annotate(execs, sacct, gres, wandb, a.open_holdout)
     dups = resolve_duplicates(execs, a.dup_tol)
     pair_notes = pair_scratch(execs)
 
@@ -779,6 +864,8 @@ def main() -> None:
     rng = random.Random(0)
     prim = primary(execs)
     cellvals: dict = defaultdict(lambda: defaultdict(dict))
+    cellcfg: dict = defaultdict(set)
+    sig_keys = ("epochs", "batch_size", "lr", "warmup_frac", "dropout", "max_seq_len")
     collisions = []
     for e in prim:
         f = e["fam"]
@@ -790,10 +877,18 @@ def main() -> None:
                 collisions.append(f"{cell} {f['candidate']} seed {e['seed']}: job {e['job_id']}")
                 continue
             slot[e["seed"]] = e["values"][metric]
+            cfg = (e["wandb_rec"] or {}).get("config") or {}
+            if cfg:
+                cellcfg[cell].add(tuple(cfg.get(k) for k in sig_keys))
     gold = []
     for (track, tgt, budget), vals in sorted(cellvals.items()):
-        for r in cell_stats(vals, a.boots, rng):
-            ebv = ("measured (S11 353,597: three draws)" if track == "B"
+        crow = cell_stats(vals, a.boots, rng)
+        best_mean = max(r["mean"] for r in crow)
+        sigs = cellcfg[(track, tgt, budget)]
+        for r in crow:
+            r["top_equivalent_practical"] = "yes" if best_mean - r["mean"] <= a.margin else "no"
+            r["config_signatures"] = len(sigs) if sigs else ""
+            ebv = ("measured (S11 353,597: three draws)" if track == "B" and budget == "n3000"
                    and r["candidate"] == "src:ednet" and tgt in ("assist2017", "junyi")
                    else ("n/a" if r["candidate"] == "scratch" else "unmeasured: one encoder"))
             gold.append({"track": track, "target": tgt, "budget": budget, **r,
@@ -807,10 +902,17 @@ def main() -> None:
         if e["gain"] == "":
             continue
         if f["track"] == "S11":
-            s11[(f["target"], f["size"])][f["draw"]][e["seed"]] = e["gain"]
-        elif f["track"] == "B" and f["candidate"] == "src:ednet" and f["target"] in ("assist2017",
-                                                                                    "junyi"):
-            s11[(f["target"], 353597)][42][e["seed"]] = e["gain"]
+            key, draw = (f["target"], f["size"]), f["draw"]
+        elif (f["track"] == "B" and f["budget"] == "n3000" and f["candidate"] == "src:ednet"
+              and f["target"] in ("assist2017", "junyi")):
+            key, draw = (f["target"], 353597), 42
+        else:
+            continue
+        if e["seed"] in s11[key][draw]:
+            collisions.append(f"S11 {key} d{draw} seed {e['seed']}: second primary execution "
+                              f"(job {e['job_id']}) ignored")
+            continue
+        s11[key][draw][e["seed"]] = e["gain"]
     s11_rows = []
     for (tgt, size), draws in sorted(s11.items()):
         per = {d: st.mean(v.values()) for d, v in draws.items()}
@@ -841,13 +943,15 @@ def main() -> None:
         f = e["fam"]
         if not f or e["seed"] is None:
             continue
-        key = (f["track"], f["target"], f["candidate"], e["seed"])
+        budget = "" if f["track"].startswith("probe") else f["budget"]
+        key = (f["track"], f["target"], budget, f["candidate"], e["seed"])
         if not e["exclusion"]:
             status[key] = "primary"
         elif status.get(key) != "primary":
             status[key] = "excluded: " + e["exclusion"]
-    missing = [{"track": t, "target": g, "candidate": c, "seed": s,
-                "status": status.get((t, g, c, s), "missing")} for t, g, c, s in expected_cells()]
+    missing = [{"track": t, "target": g, "budget": b, "candidate": c, "seed": s,
+                "status": status.get((t, g, b, c, s), "missing")}
+               for t, g, b, c, s in expected_cells()]
     write_tsv(out / "missing_cells.tsv", missing)
 
     ids = sorted({e["wandb_id"] for e in execs if e["wandb_id"] and e["fam"]})
@@ -860,13 +964,16 @@ def main() -> None:
             ours[(track, tgt, c)] = (st.mean(v.values()), len(v))
     for (track, tgt, c), v in probes.items():
         ours[(track, tgt, c)] = (st.mean(v.values()), len(v))
+    for (tgt, size), draws in s11.items():
+        for d, v in draws.items():
+            ours[("S11", tgt, f"n{size}_d{d}")] = (st.mean(v.values()), len(v))
     mism = []
     for key, rv in sorted(results_md_cells(a.results_md).items()):
         mine = ours.get(key)
         if mine is None:
             mism.append({"cell": "|".join(key), "results_md": rv, "builder": "", "n": "",
                          "diff": "", "note": "no primary executions"})
-        elif abs(mine[0] - rv) > LOG_TOL:
+        elif abs(mine[0] - rv) > (1.5e-4 if key[0] == "S11" else LOG_TOL):
             mism.append({"cell": "|".join(key), "results_md": rv, "builder": mine[0],
                          "n": mine[1], "diff": mine[0] - rv, "note": ""})
     write_tsv(out / "results_md_mismatches.tsv", mism,
@@ -951,6 +1058,10 @@ def write_report(out, a, files, execs, facts, dups, gold, s11_rows, missing, mis
           f"{q4(g['mean'])} | {q4(g['gain_vs_scratch'])} {g['gain_k_of_n']} | "
           f"{g['transfer_sign']} | {p_best} | {g['top_equivalent']} | {q4(g['tau_b_mean'])} | "
           f"{g['top1_seed_agreement']} | {g['encoder_build_variance']} |")
+    mixed = sorted({(g["track"], g["target"], g["budget"]) for g in gold
+                    if isinstance(g.get("config_signatures"), int) and g["config_signatures"] > 1})
+    W("\n## Cells whose candidates ran under different fine-tune configs\n")
+    W("\n".join(f"- {c}" for c in mixed) if mixed else "none")
     if s11_rows:
         W("\n## Section 11 ladder (gain against the Track B scratch controls)\n")
         for r in s11_rows:
