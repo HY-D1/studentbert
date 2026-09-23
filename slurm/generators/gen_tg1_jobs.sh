@@ -12,6 +12,9 @@
 #            default batch). PROBE_GPU should match the existing probe7 runs (builder report).
 #   logme    3 jobs: the leakage-safe KT LogME on Track B, one per target, scoring scratch and
 #            the three full encoders at seeds 42 1 2 on the N=3000 learner draw.
+#   logme7   7 jobs: the same LogME on Track B's 7 x 7 grid, scratch plus all seven full
+#            encoders on every target. Re-scores the 12 pairs already scored, which must
+#            reproduce tg1_logme_kt_<ds>.jsonl exactly (a determinism check at scale).
 #   logmediag 3 jobs: scripts/diagnose_logme.py on the same draw (every layer, and in-domain
 #            encoders re-scored with the skill table at its random start).
 #   trackb7  264 KT jobs: Track B grown to 7 targets x 7 full encoders (+ scratch), N=3000,
@@ -44,7 +47,7 @@ TIMING="${TIMING:-0}"
 DATASETS7="assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006"
 
 if [ -z "$QUEUES" ]; then
-  echo "set QUEUES to one or more of: scratch probe logme logmediag trackb7 objdraws"
+  echo "set QUEUES to one or more of: scratch probe logme logme7 logmediag trackb7 objdraws"
   exit 1
 fi
 cd "$CODE" || exit 1
@@ -178,6 +181,28 @@ if wants logme; then
       "PYTHONPATH=. $PY scripts/score_transferability.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") --out tg1_logme_kt_${DS}.jsonl"
   done
   echo "logme queue: $Q"
+fi
+
+if wants logme7; then
+  : "${LOGME_GPU:?set LOGME_GPU (any is fine: scoring is deterministic per seed and light)}"
+  GRES="$(gres_line "$LOGME_GPU")" || exit 1
+  CKS=""
+  for SRC in $DATASETS7; do
+    CK="../checkpoints/edubert_${SRC}_pretrain_full_encoder.pt"
+    if [ ! -f "$CK" ]; then
+      echo "MISSING ENCODER: $CK"
+      exit 1
+    fi
+    CKS="$CKS $CK"
+  done
+  Q="$CODE/queue_tg1_logme7"
+  mkdir -p "$Q"
+  rm -f "$Q"/*.sbatch
+  for DS in $DATASETS7; do
+    emit "$Q" "tg1_logme7_${DS}" "tg1_logme7_${DS}" "$GRES" 04:00:00 32G \
+      "PYTHONPATH=. $PY scripts/score_transferability.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") --out tg1_logme_kt_7x7_${DS}.jsonl"
+  done
+  echo "logme7 queue: $Q"
 fi
 
 if wants logmediag; then
