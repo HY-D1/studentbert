@@ -149,8 +149,14 @@ def main() -> None:
                                                    max_positions=a.max_positions,
                                                    min_group=a.min_group, device=device,
                                                    randomize_skill_table=rnd)
+                    diff = None
                     if not rnd:
-                        # The final layer must equal the main estimator's features exactly.
+                        # The final layer must match the main estimator's features. The two come
+                        # from separate forward passes (this one with hooks attached), which can
+                        # take different float32 kernel paths on GPU, so they agree to rounding,
+                        # not bit for bit: 1e-6 was too tight (all three jobs, 2026-09-23). The
+                        # check is for misaligned positions, which differ by order 1, so 1e-3
+                        # separates the cases; the observed difference is recorded either way.
                         bb = build_backbone(target_num_skills(a.target_dir), seed=seed)
                         if ck is not None:
                             load_candidate(bb, ck, target)
@@ -158,16 +164,22 @@ def main() -> None:
                         sub, _, _ = sample_target(a.target_dir, a.n_students, seed)
                         F, yy, _ = kt_features(bb, sub, device)
                         sel = cap_positions(len(yy), a.max_positions, seed)
-                        # GPU kernels need not repeat bit for bit, hence a tolerance, not equality.
-                        if not (np.allclose(F[sel], f_last, rtol=0, atol=1e-6)
-                                and np.array_equal(yy[sel], y)):
+                        if F[sel].shape != f_last.shape or not np.array_equal(yy[sel], y):
+                            raise SystemExit(f"final layer misaligned with the estimator for {c} "
+                                             f"seed {seed}: shapes {F[sel].shape} vs "
+                                             f"{f_last.shape}")
+                        diff = float(np.max(np.abs(F[sel] - f_last)))
+                        if diff > 1e-3:
                             raise SystemExit(f"final layer differs from the estimator for {c} "
-                                             f"seed {seed}")
+                                             f"seed {seed}: max abs diff {diff:.3g}")
+                    for r in rs:
+                        r.metadata["final_layer_max_abs_diff_vs_estimator"] = diff
                     for r in rs:
                         fh.write(json.dumps(r.to_json()) + "\n")
                     fh.flush()
                     plain = [r for r in rs if "per_skill" not in r.estimator]
                     print(f"DIAG target={target} seed={seed} cand={Path(c).name} skillrand={rnd} "
+                          f"maxdiff={diff} "
                           + " ".join(f"L{r.metadata['layer']}={r.score:.5f}" for r in plain),
                           flush=True)
 
