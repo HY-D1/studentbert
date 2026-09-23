@@ -1064,14 +1064,14 @@ def main() -> None:
     write_tsv(out / "pretrain_runs.tsv", pre, ["run", "file", "job_id", "best_mlm_loss", "epochs"])
 
     write_report(out, a, files, execs, facts, dups, gold, s11_rows, missing, mism, collisions,
-                 pair_notes, ids, sacct, wandb, encoders)
+                 pair_notes, ids, sacct, wandb, encoders, draw_means)
     print(f"wrote {out}/ : executions.tsv ({len(rows)} rows), gold_cells.tsv, ladder_s11.tsv, "
           f"probe_cells.tsv, duplicates.tsv, missing_cells.tsv, results_md_mismatches.tsv, "
           f"pretrain_runs.tsv, wandb_ids_needed.txt ({len(ids)} ids), report.md")
 
 
 def write_report(out, a, files, execs, facts, dups, gold, s11_rows, missing, mism, collisions,
-                 pair_notes, ids, sacct, wandb, encoders) -> None:
+                 pair_notes, ids, sacct, wandb, encoders, draw_means) -> None:
     L = []
     W = L.append
     prim = primary(execs)

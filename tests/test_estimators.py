@@ -606,6 +606,34 @@ def test_draws_are_replicates_not_candidates():
     assert ("tgt", "n1000", "full") in dm and ("tgt", "n1000", "correct_only") not in dm
 
 
+def test_builder_main_runs_end_to_end():
+    # The helper above stops before main(); this runs the whole build, report included, so a
+    # defect in the writing stage (a NameError in write_report on 2026-09-23) cannot pass.
+    from analysis import build_transfer_benchmark as btb
+
+    with tempfile.TemporaryDirectory() as tmp_s:
+        tmp = Path(tmp_s)
+        for seed, v in ((1, 0.70), (2, 0.71)):
+            for cond, off in (("scratch", 0.0), ("fromjunyi", 0.01)):
+                init = "scratch" if cond == "scratch" else "pretrained"
+                enc = None if cond == "scratch" else "edubert_junyi_pretrain_full_encoder.pt"
+                _write(tmp, f"kt_{cond}_{seed}_1{seed}.log",
+                       _kt_log(f"edubert_assist2017_kt_assist_{cond}_n3000_seed{seed}", init,
+                               v + off, seed=seed, encoder=enc, rid=f"id{cond}{seed}"))
+        out = tmp / "bench"
+        argv = sys.argv
+        sys.argv = ["build_transfer_benchmark.py", "--logdir", str(tmp), "--outdir", str(out),
+                    "--boots", "200"]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                btb.main()
+        finally:
+            sys.argv = argv
+        report = (out / "report.md").read_text()
+        assert "## Track A encoder draws" in report and "## RESULTS.md cross-check" in report
+        assert (out / "gold_cells.tsv").exists() and (out / "missing_cells.tsv").exists()
+
+
 def test_builder_ragged_cell_uses_pairwise_seeds():
     from analysis.build_transfer_benchmark import cell_stats
 
