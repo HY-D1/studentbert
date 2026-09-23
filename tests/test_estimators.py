@@ -10,7 +10,10 @@ Torch tests skip without torch; --require-torch turns every skip into a failure.
 from __future__ import annotations
 
 import ast
+import contextlib
+import csv
 import importlib.util
+import io
 import json
 import math
 import sys
@@ -515,6 +518,49 @@ def test_builder_keeps_the_confirmatory_holdout_closed():
         assert e["exclusion"].startswith("confirmatory holdout"), e["exclusion"]
 
 
+def test_evaluator_views_and_truncation_policies():
+    from analysis import evaluate_estimators as ev
+
+    vals = {"scratch": {1: 0.80, 2: 0.81, 3: 0.80, 4: 0.81},
+            "src:a": {1: 0.70, 2: 0.71, 3: 0.70, 4: 0.71},
+            "src:b": {1: 0.60, 2: 0.61, 3: 0.60, 4: 0.61}}
+    full = ev.annotate(vals, 0.001, 500)
+    pre = ev.annotate({c: v for c, v in vals.items() if c != "scratch"}, 0.001, 500)
+    r = ev.judge({"src:a": 2.0, "src:b": 1.0}, pre, full, 0.001)
+    assert r["top1"] and r["equivalent"], "best pretrained pick must be tied with the view's best"
+    assert r["negative_choice"], "negative transfer is still judged against scratch"
+    pol = ev.lodo_policies()
+    assert pol["LODO pps_effective"]("assist2017", "trunc_K10") == "correct_only"
+    assert pol["LODO pps_effective"]("assist2017", "trunc_K512") == "full"
+    ks = {pol["LODO n_skills"]("assist2017", f"trunc_K{k}") for k in (10, 40, 512)}
+    assert len(ks) == 1, "a cap-free feature must not change with K"
+    # End to end through main(): scratch wins the cell outright, the size rule picks the best
+    # pretrained source, and the pretrained view must count that pick as tied with its best.
+    cols = ["track", "metric", "target_dataset", "budget", "candidate", "finetune_seed", "value",
+            "valid_for_primary_analysis", "run_id", "log_file"]
+    lines = ["\t".join(cols)]
+    for cand, base in (("scratch", 0.80), ("src:ednet", 0.70), ("src:assist2017", 0.60)):
+        for seed, eps in ((1, 0.0), (2, 0.01), (3, 0.0), (4, 0.01)):
+            lines.append("\t".join(["B", "test_auc", "junyi", "n40000", cand, str(seed),
+                                    str(base + eps), "yes", f"r_{cand}_{seed}", "x.log"]))
+    with tempfile.TemporaryDirectory() as tmp:
+        ex = Path(tmp) / "executions.tsv"
+        ex.write_text("\n".join(lines) + "\n")
+        argv = sys.argv
+        sys.argv = ["evaluate_estimators.py", "--executions", str(ex), "--boots", "500",
+                    "--out-prefix", str(Path(tmp) / "e")]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                ev.main()
+        finally:
+            sys.argv = argv
+        got = {r["view"]: r for r in csv.DictReader(open(Path(tmp) / "e_cells.tsv"),
+                                                    delimiter="\t")
+               if r["estimator"] == "largest source"}
+        assert got["pretrained"]["top1"] == "True" and got["pretrained"]["equivalent"] == "True"
+        assert got["practical"]["top1"] == "False" and got["practical"]["negative_choice"] == "True"
+
+
 def test_builder_ragged_cell_uses_pairwise_seeds():
     from analysis.build_transfer_benchmark import cell_stats
 
@@ -538,6 +584,13 @@ def test_builder_ladder_guard_and_results_md_check():
         cells = btb.results_md_cells(str(rs))
         assert cells[("S11", "junyi", "n353597_d42")] == 0.0043
         assert cells[("S11", "junyi", "n353597_d2")] == 0.0060
+        cellvals = {("A", "assist2017", "n1000"): {"full": {1: 0.69, 2: 0.69}},
+                    ("A", "assist2017", "trunc_K10"): {"full": {1: 0.60, 2: 0.60}},
+                    ("B", "ednet", "n3000"): {"scratch": {1: 0.66}},
+                    ("B", "ednet", "n20000"): {"scratch": {1: 0.68}}}
+        ours = btb.cross_check_means(cellvals, {}, {})
+        assert ours[("A", "assist2017", "full")][0] == 0.69, "truncation cell leaked in"
+        assert ours[("B", "ednet", "scratch")][0] == 0.66, "full-scale cell leaked in"
         design = btb.expected_cells()
         keys = {(t_, g, b, c, s) for t_, g, b, c, s in design}
         assert len(keys) == len(design), "expected design has colliding keys"

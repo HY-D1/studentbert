@@ -661,6 +661,33 @@ def q4(x) -> str:
 
 
 # --------------------------------------------------------------------------- RESULTS.md check
+def reported_budget(track: str, target: str) -> str:
+    """The one budget each RESULTS.md table reports (sections 4, 2.1, 2.2)."""
+    if track == "A":
+        return "n1000" if target in ("assist2017", "ednet", "junyi") else "full_split"
+    return "n3000"
+
+
+def cross_check_means(cellvals: dict, probes: dict, s11: dict) -> dict:
+    """Builder means keyed like results_md_cells(), one budget per cell.
+
+    Keying by (track, target, candidate) alone let a truncation or full-scale cell overwrite
+    the budget RESULTS.md actually reports (v2 build, 2026-09-23).
+    """
+    ours: dict = {}
+    for (track, tgt, budget), vals in cellvals.items():
+        if budget != reported_budget(track, tgt):
+            continue
+        for c, v in vals.items():
+            ours[(track, tgt, c)] = (st.mean(v.values()), len(v))
+    for (track, tgt, c), v in probes.items():
+        ours[(track, tgt, c)] = (st.mean(v.values()), len(v))
+    for (tgt, size), draws in s11.items():
+        for d, v in draws.items():
+            ours[("S11", tgt, f"n{size}_d{d}")] = (st.mean(v.values()), len(v))
+    return ours
+
+
 def results_md_cells(path: str | None) -> dict:
     """Means RESULTS.md reports for sections 4 (Track A), 2.1 (B), 2.2 (C-ns) and 6 (probe7)."""
     if not path or not Path(path).exists():
@@ -957,16 +984,8 @@ def main() -> None:
     ids = sorted({e["wandb_id"] for e in execs if e["wandb_id"] and e["fam"]})
     (out / "wandb_ids_needed.txt").write_text("\n".join(ids) + ("\n" if ids else ""))
 
-    # RESULTS.md cross-check over primary means
-    ours: dict = {}
-    for (track, tgt, _b), vals in cellvals.items():
-        for c, v in vals.items():
-            ours[(track, tgt, c)] = (st.mean(v.values()), len(v))
-    for (track, tgt, c), v in probes.items():
-        ours[(track, tgt, c)] = (st.mean(v.values()), len(v))
-    for (tgt, size), draws in s11.items():
-        for d, v in draws.items():
-            ours[("S11", tgt, f"n{size}_d{d}")] = (st.mean(v.values()), len(v))
+    # RESULTS.md cross-check over primary means, at the budget each section reports
+    ours = cross_check_means(cellvals, probes, s11)
     mism = []
     for key, rv in sorted(results_md_cells(a.results_md).items()):
         mine = ours.get(key)

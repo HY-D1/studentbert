@@ -73,10 +73,18 @@ def load_gold(path: str) -> tuple[dict, dict]:
 
 
 def annotate(values: dict, margin: float, boots: int) -> dict:
+    """Gold for exactly these candidates: means, best and ties all over their shared seeds.
+
+    Computed per view, so "tied with best" in the pretrained view means tied with the best
+    pretrained candidate, not with scratch (v2 read 10/11 top-1 but 9/11 tied, 2026-09-23).
+    """
     stats = {r["candidate"]: r for r in cell_stats(values, boots, random.Random(0))}
-    best = max(stats, key=lambda c: stats[c]["mean"])
+    common = sorted(set.intersection(*(set(v) for v in values.values())))
     for c, r in stats.items():
-        r["practical_tie"] = stats[best]["mean"] - r["mean"] <= margin
+        r["gold"] = st.mean(values[c][s] for s in common) if common else r["mean"]
+    best = max(stats, key=lambda c: stats[c]["gold"])
+    for c, r in stats.items():
+        r["practical_tie"] = stats[best]["gold"] - r["gold"] <= margin
         r["equivalent"] = r["top_equivalent"] in ("best", "yes") or r["practical_tie"]
     return stats
 
@@ -103,17 +111,21 @@ def spearman(a: dict, b: dict) -> float:
     return num / den if den else float("nan")
 
 
-def judge(scores: dict, stats: dict, margin: float, ranking: bool = True) -> dict:
-    """Metrics of one ranking against gold; ranking=False scores a bare choice (a policy)."""
+def judge(scores: dict, stats: dict, signs: dict, margin: float, ranking: bool = True) -> dict:
+    """Metrics of one ranking against gold; ranking=False scores a bare choice (a policy).
+
+    stats is the view's gold (annotate on the view's candidates); signs is the full cell's, so
+    negative transfer is always judged against scratch.
+    """
     keys = [c for c in scores if c in stats]
-    gold = {c: stats[c]["mean"] for c in keys}
+    gold = {c: stats[c]["gold"] for c in keys}
     choice = max(keys, key=lambda c: scores[c])
     best, worst = max(gold, key=gold.get), min(gold, key=gold.get)
     out = {"choice": choice, "top1": choice == best, "equivalent": stats[choice]["equivalent"],
            "regret": gold[best] - gold[choice],
            "norm_regret": (gold[best] - gold[choice]) / (gold[best] - gold[worst])
            if gold[best] > gold[worst] else 0.0,
-           "negative_choice": stats[choice].get("transfer_sign") == "negative"}
+           "negative_choice": signs[choice].get("transfer_sign") == "negative"}
     if ranking and len(keys) > 2:
         out["rho"] = spearman({c: scores[c] for c in keys}, gold)
         out["tau"] = kendall_tau_b([scores[c] for c in keys], [gold[c] for c in keys])
@@ -143,13 +155,26 @@ def logme_scores(paths: list[str]) -> dict:
 
 
 def lodo_policies() -> dict:
-    """{policy: {target: objective}} for the LODO single-feature rules of lodo_regime.py."""
+    """{policy: fn(target, budget) -> objective} for lodo_regime.py's single-feature rules.
+
+    Each rule is refit without the held-out dataset. On a truncation cell (budget trunc_K) the
+    held-out dataset is seen at cap K, so its effective pps is min(median, K) / skills, exactly
+    lodo_regime's definition; the six training datasets stay at their natural cap of 512.
+    Features that do not depend on the cap give the same prediction at every K, as they should.
+    """
     rows = lodo_regime.build(512)
     out = {}
     for feat in ("pps_effective", "n_skills", "n_students"):
-        folds = lodo_regime.run(rows, feat)
-        out[f"LODO {feat}"] = {f["held"]: ("full" if f["pred"] == "skill" else "correct_only")
-                               for f in folds}
+        def policy(target, budget, feat=feat):
+            train = [r for r in rows if r[0] != target]
+            if len(train) == len(rows):
+                return None
+            t, d, _, _ = lodo_regime.fit_threshold([r[1][feat] for r in train],
+                                                   [r[2] for r in train])
+            cap = int(budget.split("_K")[1]) if budget.startswith("trunc_K") else 512
+            held = {r[0]: r[1] for r in lodo_regime.build(cap)}[target][feat]
+            return "full" if lodo_regime.predict(held, t, d) == "skill" else "correct_only"
+        out[f"LODO {feat}"] = policy
     return out
 
 
@@ -164,6 +189,7 @@ def main() -> None:
 
     cells, probes = load_gold(a.executions)
     stats = {k: annotate(v, a.margin, a.boots) for k, v in cells.items() if len(v) >= 2}
+    view_cache: dict = {}
     rows = []
 
     def record(est, cell, seed, view, scores, extra=None, ranking=True):
@@ -174,8 +200,12 @@ def main() -> None:
             return
         if len(keep) < 2:
             return
+        vkey = (cell, frozenset(keep))
+        if vkey not in view_cache:
+            view_cache[vkey] = annotate({c: cells[cell][c] for c in keep}, a.margin, a.boots)
         rows.append({"estimator": est, "track": cell[0], "target": cell[1], "budget": cell[2],
-                     "seed": seed, "view": view, **judge(keep, s, a.margin, ranking),
+                     "seed": seed, "view": view,
+                     **judge(keep, view_cache[vkey], s, a.margin, ranking),
                      "_scores": keep, **(extra or {})})
 
     lscores = logme_scores(a.scores)
@@ -203,7 +233,7 @@ def main() -> None:
     policies.update(lodo_policies())
     for cell in [k for k in stats if k[0] == "A"]:
         for name, pol in policies.items():
-            obj = name.split()[-1] if name.startswith("always") else pol.get(cell[1])
+            obj = name.split()[-1] if name.startswith("always") else pol(cell[1], cell[2])
             if obj and obj in stats[cell]:
                 pick = {obj: 1.0, **{c: 0.0 for c in stats[cell] if c != obj}}
                 record(name, cell, "-", "pretrained", pick, ranking=False)
