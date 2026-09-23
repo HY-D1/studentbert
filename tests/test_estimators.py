@@ -539,16 +539,20 @@ def test_evaluator_views_and_truncation_policies():
     cols = ["track", "metric", "target_dataset", "budget", "candidate", "finetune_seed", "value",
             "valid_for_primary_analysis", "run_id", "log_file"]
     lines = ["\t".join(cols)]
-    for cand, base in (("scratch", 0.80), ("src:ednet", 0.70), ("src:assist2017", 0.60)):
+    for cand, base in (("scratch", 0.80), ("src:big", 0.70), ("src:small", 0.60),
+                       ("src:unscored", 0.75)):
         for seed, eps in ((1, 0.0), (2, 0.01), (3, 0.0), (4, 0.01)):
-            lines.append("\t".join(["B", "test_auc", "junyi", "n40000", cand, str(seed),
+            lines.append("\t".join(["B", "test_auc", "tgt", "n3000", cand, str(seed),
                                     str(base + eps), "yes", f"r_{cand}_{seed}", "x.log"]))
     with tempfile.TemporaryDirectory() as tmp:
         ex = Path(tmp) / "executions.tsv"
         ex.write_text("\n".join(lines) + "\n")
+        for ds, n in (("big", 50), ("small", 5), ("unscored", 1)):
+            (Path(tmp) / ds).mkdir()
+            (Path(tmp) / ds / "splits.json").write_text(json.dumps({"train": list(range(n))}))
         argv = sys.argv
         sys.argv = ["evaluate_estimators.py", "--executions", str(ex), "--boots", "500",
-                    "--out-prefix", str(Path(tmp) / "e")]
+                    "--processed-root", tmp, "--out-prefix", str(Path(tmp) / "e")]
         try:
             with contextlib.redirect_stdout(io.StringIO()):
                 ev.main()
@@ -557,8 +561,49 @@ def test_evaluator_views_and_truncation_policies():
         got = {r["view"]: r for r in csv.DictReader(open(Path(tmp) / "e_cells.tsv"),
                                                     delimiter="\t")
                if r["estimator"] == "largest source"}
-        assert got["pretrained"]["top1"] == "True" and got["pretrained"]["equivalent"] == "True"
+        assert got["pretrained"]["top1"] == "False", "src:unscored (0.75) beats src:big (0.70)"
+        assert got["pretrained"]["coverage"] == "3/3", "sizes must cover every source"
         assert got["practical"]["top1"] == "False" and got["practical"]["negative_choice"] == "True"
+        assert abs(float(got["practical"]["regret"]) - 0.10) < 1e-9
+        (Path(tmp) / "junyi").mkdir()
+        (Path(tmp) / "junyi" / "splits.json").write_text(json.dumps({"train": [1, 2]}))
+        try:
+            ev.train_split_sizes(tmp, {"src:junyi"})
+        except SystemExit as err:
+            assert "49153" in str(err)
+        else:
+            raise AssertionError("a size that disagrees with RESULTS.md must stop the run")
+    # Coverage: an unscored candidate that is best still counts against the choice.
+    vals3 = {"src:a": {1: 0.60, 2: 0.61}, "src:b": {1: 0.70, 2: 0.71},
+             "src:c": {1: 0.50, 2: 0.51}}
+    st3 = ev.annotate(vals3, 0.001, 200)
+    r = ev.judge({"src:a": 1.0, "src:c": 0.0}, st3, st3, 0.001)
+    assert not r["top1"] and r["coverage"] == "2/3" and abs(r["regret"] - 0.10) < 1e-9
+
+
+def test_draws_are_replicates_not_candidates():
+    from analysis.build_transfer_benchmark import split_draw_cells
+
+    seeds = {1: 0.0, 2: 0.002}
+    cell = {"scratch": {s: 0.60 + e for s, e in seeds.items()},
+            "full": {s: 0.70 + e for s, e in seeds.items()},
+            "skill_only": {s: 0.69 + e for s, e in seeds.items()},
+            "correct_only": {s: 0.66 + e for s, e in seeds.items()}}
+    for obj, base in (("full", 0.70), ("skill_only", 0.68), ("correct_only", 0.67)):
+        for d, off in ((42, 0.0), (1, 0.003), (2, -0.003)):
+            if obj == "full" and d == 42:
+                continue
+            cell[f"{obj}@r128d{d}"] = {s: base + off + e for s, e in seeds.items()}
+    out, dm = split_draw_cells({("A", "tgt", "n1000"): cell})
+    assert set(out[("A", "tgt", "n1000")]) == {"scratch", "full", "skill_only", "correct_only"}
+    r128 = out[("A-r128", "tgt", "n1000")]
+    assert set(r128) == {"scratch", "full", "skill_only", "correct_only"}
+    assert abs(r128["skill_only"][1] - 0.68) < 1e-12 and abs(r128["full"][1] - 0.70) < 1e-12
+    assert abs(dm[("tgt", "n1000", "correct_only")][1] - 0.674) < 1e-12, "mean over both seeds"
+    del cell["correct_only@r128d2"]
+    out, dm = split_draw_cells({("A", "tgt", "n1000"): cell})
+    assert ("A-r128", "tgt", "n1000") not in out, "no cell until every objective has 3 draws"
+    assert ("tgt", "n1000", "full") in dm and ("tgt", "n1000", "correct_only") not in dm
 
 
 def test_builder_ragged_cell_uses_pairwise_seeds():

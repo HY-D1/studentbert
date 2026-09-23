@@ -40,13 +40,16 @@ from pathlib import Path
 
 try:
     from analysis import lodo_regime
-    from analysis.build_transfer_benchmark import TRACK_METRIC, cell_stats, kendall_tau_b, q4
+    from analysis.build_transfer_benchmark import (TRACK_METRIC, cell_stats, kendall_tau_b, q4,
+                                                   split_draw_cells)
 except ModuleNotFoundError:  # run without PYTHONPATH=.
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from analysis import lodo_regime
-    from analysis.build_transfer_benchmark import TRACK_METRIC, cell_stats, kendall_tau_b, q4
+    from analysis.build_transfer_benchmark import (TRACK_METRIC, cell_stats, kendall_tau_b, q4,
+                                                   split_draw_cells)
 
-TRAIN_SPLIT = {"src:assist2017": 1366, "src:junyi": 49153, "src:ednet": 353597}
+# Pretraining scale as the papers quote it (training-split learners); splits.json must agree.
+DOCUMENTED_TRAIN = {"assist2017": 1366, "junyi": 49153, "ednet": 353597}
 CKPT = re.compile(r"^edubert_([a-z0-9]+)_pretrain_full_encoder\.pt$")
 
 
@@ -69,7 +72,28 @@ def load_gold(path: str) -> tuple[dict, dict]:
                 cells[(t, r["target_dataset"], r["budget"])][r["candidate"]][seed] = v
             elif t == "probe2":
                 probes[r["target_dataset"]][r["candidate"]][seed] = v
+    cells, _ = split_draw_cells(cells)
     return cells, probes
+
+
+def train_split_sizes(root: str, sources: set[str]) -> dict:
+    """{"src:<ds>": training-split learners} read from <root>/<ds>/splits.json.
+
+    The encoders pretrain on the train partition only, so that is the size the rule ranks by.
+    A missing file stops the run instead of silently dropping a candidate from the ranking.
+    """
+    out = {}
+    for src in sorted(sources):
+        ds = src.split(":", 1)[1]
+        f = Path(root) / ds / "splits.json"
+        if not f.exists():
+            raise SystemExit(f"largest source: no {f}; pass --processed-root")
+        n = len(json.loads(f.read_text())["train"])
+        if ds in DOCUMENTED_TRAIN and n != DOCUMENTED_TRAIN[ds]:
+            raise SystemExit(f"{f} has {n} training learners, RESULTS.md scale says "
+                             f"{DOCUMENTED_TRAIN[ds]}")
+        out[src] = n
+    return out
 
 
 def annotate(values: dict, margin: float, boots: int) -> dict:
@@ -114,18 +138,22 @@ def spearman(a: dict, b: dict) -> float:
 def judge(scores: dict, stats: dict, signs: dict, margin: float, ranking: bool = True) -> dict:
     """Metrics of one ranking against gold; ranking=False scores a bare choice (a policy).
 
-    stats is the view's gold (annotate on the view's candidates); signs is the full cell's, so
-    negative transfer is always judged against scratch.
+    stats is the gold of the whole view (every candidate in it, scored or not), so a choice is
+    judged against the best available action; an estimator that cannot score a candidate does
+    not get to leave it out. Rank correlations use the scored candidates, reported with the
+    coverage. signs is the full cell's, so negative transfer is always judged against scratch.
     """
     keys = [c for c in scores if c in stats]
-    gold = {c: stats[c]["gold"] for c in keys}
+    allg = {c: r["gold"] for c, r in stats.items()}
+    gold = {c: allg[c] for c in keys}
     choice = max(keys, key=lambda c: scores[c])
-    best, worst = max(gold, key=gold.get), min(gold, key=gold.get)
+    best, worst = max(allg, key=allg.get), min(allg, key=allg.get)
     out = {"choice": choice, "top1": choice == best, "equivalent": stats[choice]["equivalent"],
-           "regret": gold[best] - gold[choice],
-           "norm_regret": (gold[best] - gold[choice]) / (gold[best] - gold[worst])
-           if gold[best] > gold[worst] else 0.0,
-           "negative_choice": signs[choice].get("transfer_sign") == "negative"}
+           "regret": allg[best] - allg[choice],
+           "norm_regret": (allg[best] - allg[choice]) / (allg[best] - allg[worst])
+           if allg[best] > allg[worst] else 0.0,
+           "negative_choice": signs[choice].get("transfer_sign") == "negative",
+           "coverage": f"{len(keys)}/{len(allg)}"}
     if ranking and len(keys) > 2:
         out["rho"] = spearman({c: scores[c] for c in keys}, gold)
         out["tau"] = kendall_tau_b([scores[c] for c in keys], [gold[c] for c in keys])
@@ -185,6 +213,8 @@ def main() -> None:
     ap.add_argument("--margin", type=float, default=0.001)
     ap.add_argument("--boots", type=int, default=20000)
     ap.add_argument("--out-prefix", required=True)
+    ap.add_argument("--processed-root", default="../processed",
+                    help="where <dataset>/splits.json live, for the largest-source rule")
     a = ap.parse_args()
 
     cells, probes = load_gold(a.executions)
@@ -194,15 +224,15 @@ def main() -> None:
 
     def record(est, cell, seed, view, scores, extra=None, ranking=True):
         s = stats[cell]
-        keep = {c: v for c, v in scores.items()
-                if c in s and (view == "practical" or c != "scratch")}
+        cands = [c for c in s if view == "practical" or c != "scratch"]
+        keep = {c: v for c, v in scores.items() if c in cands}
         if view == "practical" and "scratch" not in keep:
             return
-        if len(keep) < 2:
+        if not keep or len(cands) < 2:
             return
-        vkey = (cell, frozenset(keep))
+        vkey = (cell, frozenset(cands))
         if vkey not in view_cache:
-            view_cache[vkey] = annotate({c: cells[cell][c] for c in keep}, a.margin, a.boots)
+            view_cache[vkey] = annotate({c: cells[cell][c] for c in cands}, a.margin, a.boots)
         rows.append({"estimator": est, "track": cell[0], "target": cell[1], "budget": cell[2],
                      "seed": seed, "view": view,
                      **judge(keep, view_cache[vkey], s, a.margin, ranking),
@@ -220,8 +250,10 @@ def main() -> None:
                     "peak_mb": max(v[1]["peak_memory_mb"] or 0 for v in cand.values())}
             for view in ("pretrained", "practical"):
                 record(est, cell, seed, view, sc, cost)
+    b_sources = {c for k in stats if k[0] == "B" for c in stats[k] if c.startswith("src:")}
+    train = train_split_sizes(a.processed_root, b_sources) if b_sources else {}
     for cell in [k for k in stats if k[0] == "B"]:
-        sizes = {c: TRAIN_SPLIT[c] for c in stats[cell] if c in TRAIN_SPLIT}
+        sizes = {c: train[c] for c in stats[cell] if c in train}
         for view in ("pretrained", "practical"):
             record("largest source", cell, "-", view, {**sizes, "scratch": 0})
         pr = probes.get(cell[1], {})
@@ -231,7 +263,7 @@ def main() -> None:
                 record("masked-skill probe", cell, seed, view, sc)
     policies = {f"always {o}": {} for o in ("full", "skill_only", "correct_only")}
     policies.update(lodo_policies())
-    for cell in [k for k in stats if k[0] == "A"]:
+    for cell in [k for k in stats if k[0] in ("A", "A-r128")]:
         for name, pol in policies.items():
             obj = name.split()[-1] if name.startswith("always") else pol(cell[1], cell[2])
             if obj and obj in stats[cell]:
@@ -254,7 +286,7 @@ def main() -> None:
         stab.append({"estimator": est, "target": tgt, "view": view, "seed_tau_mean": st.mean(taus)})
 
     cols = ["estimator", "track", "target", "budget", "seed", "view", "choice", "top1",
-            "equivalent", "regret", "norm_regret", "negative_choice", "rho", "tau",
+            "equivalent", "regret", "norm_regret", "negative_choice", "coverage", "rho", "tau",
             "pair_acc_decisive", "n_decisive", "extract_s", "score_s", "peak_mb"]
     with open(f"{a.out_prefix}_cells.tsv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, delimiter="\t", extrasaction="ignore",

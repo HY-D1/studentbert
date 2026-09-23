@@ -51,7 +51,7 @@ SEEDS6 = (42, 1, 2, 3, 4, 5)
 SEEDS3 = (42, 1, 2)
 TRACK_METRIC = {"A": "test_auc", "B": "test_auc", "S11": "test_auc", "C-ns": "test_macro_ovr_auc",
                 "C-drop": "test_auc", "probe7": "test_probe_acc", "probe2": "test_probe_acc",
-                "baseline": "test_auc"}
+                "baseline": "test_auc", "A-r128": "test_auc"}
 WANDB_KEY = {"test_auc": "test/auc", "test_ece": "test/ece", "test_probe_acc": "test/probe_acc",
              "test_top_1_acc": "test/top1", "test_top_5_acc": "test/top5",
              "test_macro_ovr_auc": "test/macro_auc", "test_macro_top1": "test/macro_top1",
@@ -661,6 +661,53 @@ def q4(x) -> str:
 
 
 # --------------------------------------------------------------------------- RESULTS.md check
+DRAWS = (42, 1, 2)
+
+
+def split_draw_cells(cellvals: dict) -> tuple[dict, dict]:
+    """Separate Track A encoder draws from the single-encoder candidates (MRAP M).
+
+    A draw ("obj@r128dD") rebuilds one objective under the full encoder's recipe; it is a
+    replicate of one action, not a rival to it. Legacy Track A cells keep only single-encoder
+    candidates, which is what RESULTS.md 4 reports. An "A-r128" cell exists once all three
+    objectives have all three draws (full: the pre-existing encoder as d42, plus 353,597 d1 and
+    d2): one candidate per objective, its per-seed value the mean over the draws, on the seeds
+    every draw has. Returns (cells, draw_means) with draw_means[(target, budget, objective)] =
+    {draw: mean over those seeds}, for every objective whose draws are complete.
+    """
+    out: dict = {}
+    draws: dict = defaultdict(lambda: defaultdict(dict))
+    for key, vals in cellvals.items():
+        if key[0] != "A":
+            out[key] = vals
+            continue
+        legacy = {c: v for c, v in vals.items() if "@" not in c}
+        for c, v in vals.items():
+            if "@r128d" in c:
+                obj, d = c.split("@r128d")
+                draws[(key[1], key[2])][obj][int(d)] = v
+        if legacy:
+            out[key] = legacy
+    draw_means: dict = {}
+    for (tgt, budget), objs in draws.items():
+        legacy = out.get(("A", tgt, budget), {})
+        if "full" in legacy:
+            objs["full"].setdefault(42, legacy["full"])
+        cell = {"scratch": legacy["scratch"]} if "scratch" in legacy else {}
+        for obj, dmap in objs.items():
+            if set(dmap) != set(DRAWS):
+                continue
+            seeds = sorted(set.intersection(*(set(dmap[d]) for d in DRAWS)))
+            if len(seeds) < 2:
+                continue
+            cell[obj] = {s: st.mean(dmap[d][s] for d in DRAWS) for s in seeds}
+            draw_means[(tgt, budget, obj)] = {d: st.mean(dmap[d][s] for s in seeds)
+                                              for d in DRAWS}
+        if all(o in cell for o in ("full", "skill_only", "correct_only")):
+            out[("A-r128", tgt, budget)] = cell
+    return out, draw_means
+
+
 def reported_budget(track: str, target: str) -> str:
     """The one budget each RESULTS.md table reports (sections 4, 2.1, 2.2)."""
     if track == "A":
@@ -843,6 +890,19 @@ def expected_cells() -> list[tuple]:
     for tgt in ("assist2017", "junyi"):
         for size, ds in draws.items():
             out += [("S11", tgt, "n3000", f"ednet_n{size}_d{d}", s) for d in ds for s in SEEDS6]
+    seven = ("assist2017", "ednet", "junyi", "algebra2005", "bridge2006", "assist2009",
+             "algebra2006")
+    for tgt in seven:
+        new = ("algebra2005", "bridge2006", "assist2009", "algebra2006")
+        srcs = new if tgt in ("assist2017", "ednet", "junyi") else seven
+        cands = [f"src:{x}" for x in srcs] + ([] if tgt in ("assist2017", "ednet", "junyi")
+                                              else ["scratch"])
+        out += [("B", tgt, "n3000", c, s) for c in cands for s in SEEDS6]
+    for tgt in ("assist2017", "junyi", "algebra2005", "bridge2006", "assist2009", "algebra2006"):
+        budget = "n1000" if tgt in ("assist2017", "junyi") else "full_split"
+        cands = ["full@r128d1", "full@r128d2"] + [f"{o}@r128d{d}" for o in
+                                                  ("skill_only", "correct_only") for d in DRAWS]
+        out += [("A", tgt, budget, c, s) for c in cands for s in SEEDS6]
     return out
 
 
@@ -907,6 +967,7 @@ def main() -> None:
             cfg = (e["wandb_rec"] or {}).get("config") or {}
             if cfg:
                 cellcfg[cell].add(tuple(cfg.get(k) for k in sig_keys))
+    cellvals, draw_means = split_draw_cells(cellvals)
     gold = []
     for (track, tgt, budget), vals in sorted(cellvals.items()):
         crow = cell_stats(vals, a.boots, rng)
@@ -1079,6 +1140,14 @@ def write_report(out, a, files, execs, facts, dups, gold, s11_rows, missing, mis
           f"{g['top1_seed_agreement']} | {g['encoder_build_variance']} |")
     mixed = sorted({(g["track"], g["target"], g["budget"]) for g in gold
                     if isinstance(g.get("config_signatures"), int) and g["config_signatures"] > 1})
+    W("\n## Track A encoder draws, recipe-matched (per-draw mean over shared seeds)\n")
+    if draw_means:
+        for (tgt, budget, obj), dm in sorted(draw_means.items()):
+            vals = list(dm.values())
+            W(f"- {tgt} {budget} {obj}: " + ", ".join(f"d{d} {v:.4f}" for d, v in dm.items())
+              + f"; draw spread {max(vals) - min(vals):.4f}")
+    else:
+        W("no objective has all three draws yet")
     W("\n## Cells whose candidates ran under different fine-tune configs\n")
     W("\n".join(f"- {c}" for c in mixed) if mixed else "none")
     if s11_rows:
