@@ -30,6 +30,13 @@ if [ -z "$QDIR" ] || [ ! -d "$QDIR" ]; then
 fi
 
 mkdir -p "$QDIR/done"
+if [ "$DRYRUN" != "1" ] && command -v flock >/dev/null 2>&1; then
+  exec 9>"$QDIR/.drip.lock"
+  if ! flock -n 9; then
+    echo "another drip_submit loop already owns $QDIR; exiting, nothing submitted"
+    exit 1
+  fi
+fi
 total=$(ls "$QDIR"/*.sbatch 2>/dev/null | wc -l)
 if [ "$total" -eq 0 ]; then
   echo "nothing to submit: $QDIR holds no *.sbatch (already drained?)"
@@ -43,6 +50,11 @@ echo "cap        : $CAP concurrent, polling every ${SLEEP}s"
 echo "node       : $(hostname)"
 [ "$DRYRUN" = "1" ] && echo "DRYRUN: nothing will actually be submitted"
 echo
+if [ "$DRYRUN" = "1" ]; then
+  for g in "$QDIR"/*.sbatch; do echo "[dry] would submit $(basename "$g")"; done
+  echo "DRYRUN: queue left untouched, $total file(s) pending"
+  exit 0
+fi
 
 while :; do
   pending=$(ls "$QDIR"/*.sbatch 2>/dev/null | wc -l)
