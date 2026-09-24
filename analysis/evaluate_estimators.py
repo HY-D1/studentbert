@@ -177,8 +177,8 @@ def logme_scores(paths: list[str]) -> dict:
             if cand is None:
                 continue
             n = r["metadata"].get("n_students_requested")
-            out[(r["estimator"], r["target"], f"n{n}" if n else "full_split")][r["seed"]][cand] = \
-                (r["score"], r)
+            budget = r["metadata"].get("target_budget") or (f"n{n}" if n else "full_split")
+            out[(r["estimator"], r["target"], budget)][r["seed"]][cand] = (r["score"], r)
     return out
 
 

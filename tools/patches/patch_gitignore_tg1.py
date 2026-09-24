@@ -42,12 +42,15 @@ def apply(text: str, old: str, new: str, why: str) -> str:
 
 ANCHOR2 = "logs_list_*.txt\n"
 BLOCK2 = "logs_list_*.txt\ntg1_logmediag_kt_*.jsonl\n"
+ANCHOR3 = "tg1_logmediag_kt_*.jsonl\n"
+BLOCK3 = "tg1_logmediag_kt_*.jsonl\ntg1_task2_kt_*.jsonl\ntg1_fewshot_kt_*.jsonl\n"
 
 
 def main() -> None:
     src = TARGET.read_text(encoding="utf-8")
     out = apply(src, ANCHOR, BLOCK, "ignore tg1 outputs")
     out = apply(out, ANCHOR2, BLOCK2, "ignore tg1 LogME diagnostics")
+    out = apply(out, ANCHOR3, BLOCK3, "ignore tg1 Task 2 scores")
     if out != src:
         TARGET.write_text(out, encoding="utf-8")
     print("md5", hashlib.md5(TARGET.read_bytes()).hexdigest())

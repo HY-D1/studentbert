@@ -15,6 +15,10 @@
 #   logme7   7 jobs: the same LogME on Track B's 7 x 7 grid, scratch plus all seven full
 #            encoders on every target. Re-scores the 12 pairs already scored, which must
 #            reproduce tg1_logme_kt_<ds>.jsonl exactly (a determinism check at scale).
+#   task2feat 7 jobs: scripts/score_task2.py (H-score, shrunk H-score, NLEEP at K 4/8/16) on
+#            the 7 x 7 grid, same learner draw and features as LogME.
+#   task2fewshot 7 jobs: scripts/fewshot_proxy.py, 5-epoch fine-tunes on 50 and 200
+#            training-split learners scored on 100 more; validation and test untouched.
 #   logmediag 3 jobs: scripts/diagnose_logme.py on the same draw (every layer, and in-domain
 #            encoders re-scored with the skill table at its random start).
 #   trackb7  264 KT jobs: Track B grown to 7 targets x 7 full encoders (+ scratch), N=3000,
@@ -47,7 +51,7 @@ TIMING="${TIMING:-0}"
 DATASETS7="assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006"
 
 if [ -z "$QUEUES" ]; then
-  echo "set QUEUES to one or more of: scratch probe logme logme7 logmediag trackb7 objdraws"
+  echo "set QUEUES to one or more of: scratch probe logme logme7 task2feat task2fewshot logmediag trackb7 objdraws"
   exit 1
 fi
 cd "$CODE" || exit 1
@@ -204,6 +208,35 @@ if wants logme7; then
   done
   echo "logme7 queue: $Q"
 fi
+
+for Q2 in task2feat task2fewshot; do
+  if wants "$Q2"; then
+    : "${LOGME_GPU:?set LOGME_GPU (any is fine for scoring)}"
+    GRES="$(gres_line "$LOGME_GPU")" || exit 1
+    CKS=""
+    for SRC in $DATASETS7; do
+      CK="../checkpoints/edubert_${SRC}_pretrain_full_encoder.pt"
+      if [ ! -f "$CK" ]; then
+        echo "MISSING ENCODER: $CK"
+        exit 1
+      fi
+      CKS="$CKS $CK"
+    done
+    Q="$CODE/queue_tg1_$Q2"
+    mkdir -p "$Q"
+    rm -f "$Q"/*.sbatch
+    for DS in $DATASETS7; do
+      if [ "$Q2" = "task2feat" ]; then
+        emit "$Q" "tg1_task2feat_${DS}" "tg1_task2feat_${DS}" "$GRES" 06:00:00 48G \
+          "PYTHONPATH=. $PY scripts/score_task2.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") --out tg1_task2_kt_${DS}.jsonl"
+      else
+        emit "$Q" "tg1_task2fewshot_${DS}" "tg1_task2fewshot_${DS}" "$GRES" 04:00:00 24G \
+          "PYTHONPATH=. $PY scripts/fewshot_proxy.py --target_dir ../processed/$DS --candidates scratch$CKS --n_fit 50 200 --n_eval 100 --epochs 5 --seeds $(seeds "42 1 2") --out tg1_fewshot_kt_${DS}.jsonl"
+      fi
+    done
+    echo "$Q2 queue: $Q"
+  fi
+done
 
 if wants logmediag; then
   : "${LOGME_GPU:?set LOGME_GPU (any is fine: scoring is deterministic per seed and light)}"

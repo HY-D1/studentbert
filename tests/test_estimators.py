@@ -226,6 +226,7 @@ def test_O2_estimators_never_read_results():
     banned_text = ("RESULTS", "inventory", "perseed", "sacct", "wandb", ".tsv")
     files = sorted((REPO / "src" / "estimators").glob("*.py"))
     files.append(REPO / "scripts" / "score_transferability.py")
+    files += [REPO / "scripts" / "score_task2.py", REPO / "scripts" / "fewshot_proxy.py"]
     for path in files:
         tree = ast.parse(path.read_text())
         body = tree.body[1:] if tree.body and isinstance(getattr(tree.body[0], "value", None),
@@ -573,6 +574,12 @@ def test_evaluator_views_and_truncation_policies():
             assert "49153" in str(err)
         else:
             raise AssertionError("a size that disagrees with RESULTS.md must stop the run")
+    with tempfile.TemporaryDirectory() as tmp:
+        j = Path(tmp) / "p.jsonl"
+        j.write_text(json.dumps({"estimator": "fewshot_ft_fit50_e5", "candidate": "scratch",
+                                 "target": "tgt", "seed": 1, "score": 0.6,
+                                 "metadata": {"target_budget": "n3000"}}) + "\n")
+        assert ("fewshot_ft_fit50_e5", "tgt", "n3000") in ev.logme_scores([str(j)])
     # Coverage: an unscored candidate that is best still counts against the choice.
     vals3 = {"src:a": {1: 0.60, 2: 0.61}, "src:b": {1: 0.70, 2: 0.71},
              "src:c": {1: 0.50, 2: 0.51}}
@@ -632,6 +639,101 @@ def test_builder_main_runs_end_to_end():
         report = (out / "report.md").read_text()
         assert "## Track A encoder draws" in report and "## RESULTS.md cross-check" in report
         assert (out / "gold_cells.tsv").exists() and (out / "missing_cells.tsv").exists()
+
+
+def test_task2_hscore_identities():
+    from src.estimators.hscore import hscore, ledoit_wolf
+
+    rng = np.random.default_rng(0)
+    y = rng.integers(0, 2, 2000)
+    f = rng.normal(size=(2000, 12)) + 0.8 * y[:, None] * rng.normal(size=12)
+    h, info = hscore(f, y)
+    p1 = y.mean()
+    p0 = 1 - p1
+    d = f[y == 1].mean(0) - f[y == 0].mean(0)
+    cov = np.cov(f.T, bias=True)
+    assert abs(h - p0 * p1 * d @ np.linalg.pinv(cov) @ d) < 1e-9, "binary closed form"
+    a = rng.normal(size=(12, 12)) + 3 * np.eye(12)
+    assert abs(hscore(f @ a, y)[0] - h) < 1e-8, "invariant to invertible linear maps"
+    assert hscore(rng.normal(size=(2000, 12)), y)[0] < 0.1 * h, "random features score low"
+    shrunk_cov, s = ledoit_wolf(f - f.mean(0))
+    assert 0.0 <= s <= 1.0 and np.linalg.eigvalsh(shrunk_cov).min() > 0
+    assert hscore(f, y, shrink=True)[1]["shrinkage"] == s
+    try:
+        hscore(f, np.zeros(2000))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("one class must be refused")
+
+
+def test_task2_nleep_properties():
+    from src.estimators.nleep import gmm_diag, nleep, pca
+
+    rng = np.random.default_rng(1)
+    y = rng.integers(0, 2, 1500)
+    f = rng.normal(size=(1500, 16)) + 1.5 * y[:, None] * rng.normal(size=16)
+    p1 = y.mean()
+    entropy = -(p1 * np.log(p1) + (1 - p1) * np.log(1 - p1))
+    assert abs(nleep(f, y, k=1)[0] + entropy) < 1e-12, "one component gives minus H(y)"
+    s8 = nleep(f, y, k=8, dim=8, seed=3)[0]
+    assert s8 <= 0 and s8 == nleep(f, y, k=8, dim=8, seed=3)[0]
+    assert s8 > nleep(rng.normal(size=(1500, 16)), y, k=8, dim=8, seed=3)[0] + 0.05
+    from src.estimators.nleep import leep_from_resp
+
+    hard = np.eye(2)[y]
+    assert abs(leep_from_resp(hard, y)) < 1e-12, "clusters equal to the labels give LEEP 0"
+    ll = gmm_diag(pca(f, 8), 4, seed=2)["loglik"]
+    assert all(b >= a - 1e-9 for a, b in zip(ll, ll[1:])), "EM never lowers the likelihood"
+
+
+def test_fewshot_proxy_protocol():
+    torch = _torch()
+    import importlib.util as _u
+
+    import src.data.dataset as dsmod
+    from src.estimators.features import build_backbone, cap_positions, kt_features, sample_target
+
+    spec = _u.spec_from_file_location("fewshot_proxy", REPO / "scripts" / "fewshot_proxy.py")
+    fp = _u.module_from_spec(spec)
+    spec.loader.exec_module(fp)
+    a1, b1 = fp.draw_learners(40, 10, 12, 5)
+    a2, b2 = fp.draw_learners(40, 10, 12, 5)
+    assert not set(a1) & set(b1) and list(a1) == list(a2) and list(b1) == list(b2)
+    try:
+        fp.draw_learners(20, 10, 12, 5)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an oversized draw must be refused")
+    with tempfile.TemporaryDirectory() as tmp:
+        tgt = _make_processed(Path(tmp), "tgt", n_students=60)
+        ck = Path(tmp) / "enc.pt"
+        torch.save({"model_state": build_backbone(6, seed=0).state_dict()}, ck)
+        splits_read = []
+        real = dsmod.InteractionDataset.__init__
+
+        def spy(self, d, split, *args, **kw):
+            splits_read.append(split)
+            return real(self, d, split, *args, **kw)
+
+        fp.InteractionDataset.__init__ = spy
+        try:
+            score, info = fp.run_proxy(str(ck), str(tgt), seed=1, n_fit=16, n_eval=16, epochs=2)
+        finally:
+            fp.InteractionDataset.__init__ = real
+        assert set(splits_read) == {"train"}, f"proxy read {splits_read}"
+        assert 0.0 <= score <= 1.0 and len(info["eval_auc_by_epoch"]) == 2
+        assert info["load"]["loaded"] == info["load"]["total"] > 0, "in-domain loads every tensor"
+        spec2 = _u.spec_from_file_location("score_task2", REPO / "scripts" / "score_task2.py")
+        st2 = _u.module_from_spec(spec2)
+        spec2.loader.exec_module(st2)
+        f, y, _, _ = st2.features_like_logme(None, tgt, seed=3, n_students=20,
+                                             max_positions=200, device="cpu")
+        sub, _, _ = sample_target(tgt, 20, 3)
+        f2, y2, _ = kt_features(build_backbone(6, seed=3), sub, "cpu")
+        sel = cap_positions(len(y2), 200, 3)
+        assert np.allclose(f, f2[sel], atol=1e-6) and np.array_equal(y, y2[sel])
 
 
 def test_builder_ragged_cell_uses_pairwise_seeds():

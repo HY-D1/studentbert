@@ -102,3 +102,5 @@ sacct_*.txt
 nodes_gres_*.txt
 logs_list_*.txt
 tg1_logmediag_kt_*.jsonl
+tg1_task2_kt_*.jsonl
+tg1_fewshot_kt_*.jsonl
