@@ -229,9 +229,11 @@ if wants exposure; then
   mkdir -p "$Q"
   rm -f "$Q"/*.sbatch
   for DS in $DATASETS7; do
+    # Task 2 walltime from measured task2feat runs; its feature cap (50,000 positions) means a
+    # validation draw is not proportionally faster. LogME measured under 5 minutes everywhere.
     case "$DS" in
-      ednet|junyi) WALL=03:00:00 ;;
-      *) WALL=01:00:00 ;;
+      algebra2006) WALL_T2=06:00:00 ;;
+      *) WALL_T2=03:00:00 ;;
     esac
     for P in val trainmatch; do
       if [ "$P" = "val" ]; then
@@ -239,9 +241,9 @@ if wants exposure; then
       else
         PARGS="--match_split val --score_tag trainmatch"
       fi
-      emit "$Q" "tg1_exposure_${P}_logme_${DS}" "tg1_exposure_${P}_logme_${DS}" "$GRES" "$WALL" 32G \
+      emit "$Q" "tg1_exposure_${P}_logme_${DS}" "tg1_exposure_${P}_logme_${DS}" "$GRES" 01:00:00 32G \
         "PYTHONPATH=. $PY scripts/score_transferability.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") $PARGS --out tg1_exposure_${P}_logme_kt_${DS}.jsonl"
-      emit "$Q" "tg1_exposure_${P}_task2_${DS}" "tg1_exposure_${P}_task2_${DS}" "$GRES" "$WALL" 48G \
+      emit "$Q" "tg1_exposure_${P}_task2_${DS}" "tg1_exposure_${P}_task2_${DS}" "$GRES" "$WALL_T2" 48G \
         "PYTHONPATH=. $PY scripts/score_task2.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") $PARGS --out tg1_exposure_${P}_task2_kt_${DS}.jsonl"
     done
   done
