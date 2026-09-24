@@ -48,10 +48,10 @@ RECORDED = {
   "objrev_ednet_to_junyi_correct_minus_skill": {
      "value": None, "note": "correct 0.728 > full 0.723 > skill 0.715; 6/6 seeds, CI excludes 0 (recorded)"},
   "objrev_algebra2006_skill_minus_correct": {
-     "value": "+0.0186", "ci": "[+0.0149,+0.0228]", "seeds": "6/6",
+     "value": "+0.0186", "ci": "[+0.0148,+0.0227]", "seeds": "6/6",
      "note": "seventh and final dataset; preprocessed 2026-07-25 17:41 and evaluated the same evening, after the ordering had been set on the other six. The written prediction was committed 18:39:09, AFTER the skill_only logs (18:22-18:25), so this is an out-of-sample test and NOT a documented advance prediction (recorded)"},
   "scale_indomain_ednet_fullscale": {
-     "value": "+0.0069", "ci": "[+0.0065,+0.0075]", "seeds": "6/6",
+     "value": "+0.0070", "ci": "[+0.0066,+0.0075]", "seeds": "6/6",
      "note": "in-domain EdNet KT gain at full target scale; only cross-dataset gain that survives (recorded)"},
   "task1_truncation_K512": {
      "value": "-0.0265", "ci": "[-0.0280,-0.0253]", "seeds": "0/6",
@@ -354,7 +354,8 @@ def render_md(coll):
     # 4. Objective reversal
     W("\n---\n## 4. Objective reversal (headline)\n")
     W("Best pretraining objective is target-dependent. Per-dataset objective ablation "
-      "(EdNet-source encoders: full / skill_only / correct_only -> target), from logs:\n")
+      "(EdNet-source encoders: full / skill_only / correct_only -> target, except the ednet row, "
+      "whose encoders are Junyi-source), from logs:\n")
     oa = coll.get("objective_ablation",{})
     W("| Target | full | skill_only | correct_only | pattern |")
     W("|---|---|---|---|---|")
@@ -369,15 +370,15 @@ def render_md(coll):
     W("\n**Paired-by-seed contrasts, all 7 targets (analysis/paired_bootstrap_objective.py over objabl_perseed.csv, 6 seeds, 20000 bootstrap resamples, rng seed 0):**\n")
     W("| Target | skill_only - correct_only | 95% CI | seeds in predicted direction |")
     W("|---|---|---|---|")
-    for _t, _m, _ci in [("assist2017","+0.0240","[+0.0222, +0.0261]"),
-                        ("ednet","-0.0069","[-0.0078, -0.0055]"),
-                        ("junyi","-0.0122","[-0.0136, -0.0110]"),
+    for _t, _m, _ci in [("assist2017","+0.0240","[+0.0222, +0.0262]"),
+                        ("ednet","-0.0068","[-0.0078, -0.0054]"),
+                        ("junyi","-0.0122","[-0.0137, -0.0110]"),
                         ("algebra2005","+0.0228","[+0.0173, +0.0281]"),
-                        ("bridge2006","+0.0105","[+0.0093, +0.0116]"),
+                        ("bridge2006","+0.0106","[+0.0093, +0.0116]"),
                         ("assist2009","+0.0030","[+0.0023, +0.0038]"),
-                        ("algebra2006","+0.0186","[+0.0148, +0.0228]")]:
+                        ("algebra2006","+0.0186","[+0.0148, +0.0227]")]:
         W(f"| {_t} | {_m} | {_ci} | 6/6 |")
-    W("\n_All 7 intervals exclude 0 and all 7 are unanimous across 6 seeds in the direction the regime label predicts. Exact one-sided sign p = 0.0156 for every row, which is the floor at 6 seeds. NOTE: ednet skill-correct -0.0069 is NOT the same quantity as the in-domain EdNet full-scale KT gain +0.0069 in section 3._")
+    W("\n_All 7 intervals exclude 0 and all 7 are unanimous across 6 seeds in the direction the regime label predicts. Exact one-sided sign p = 0.0156 for every row, which is the floor at 6 seeds. NOTE: ednet skill-correct -0.0068 and the in-domain EdNet full-scale KT gain +0.0070 in section 3 are different quantities; the contrasts are full-precision reruns of paired_bootstrap_objective.py (2026-09-23)._")
     W("\n**Recorded reversals (paired bootstrap):**")
     W(f"- EdNet->ASSIST: {RECORDED['objrev_ednet_to_assist_skill_minus_correct']['note']}")
     W(f"- EdNet->Junyi: {RECORDED['objrev_ednet_to_junyi_correct_minus_skill']['note']}")
