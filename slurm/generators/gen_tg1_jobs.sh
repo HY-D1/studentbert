@@ -317,10 +317,10 @@ if wants objdraws; then
     for T in assist2017 junyi algebra2005 bridge2006 assist2009 algebra2006; do
       case "$T" in
         assist2017) BUD=n1000; NS=1000; WALL=01:00:00 ;;
-        junyi) BUD=n1000; NS=1000; WALL=04:00:00 ;;
-        bridge2006) BUD=full; NS=100000; WALL=06:00:00 ;;
-        algebra2006) BUD=full; NS=100000; WALL=05:00:00 ;;
-        *) BUD=full; NS=100000; WALL=03:00:00 ;;
+        junyi) BUD=n1000; NS=1000; WALL=01:00:00 ;;
+        bridge2006) BUD=full; NS=100000; WALL=01:00:00 ;;
+        algebra2006) BUD=full; NS=100000; WALL=01:00:00 ;;
+        *) BUD=full; NS=100000; WALL=01:00:00 ;;
       esac
       for S in $(seeds "42 1 2 3 4 5"); do
         RT="tga_${OBJ}_r128d${D}_${BUD}_seed${S}"
