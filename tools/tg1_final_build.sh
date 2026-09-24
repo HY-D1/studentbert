@@ -24,13 +24,58 @@ if [ -z "$TASK2" ]; then
   echo "no Task 2 score files named in queue_tg1_task2*/done; stopping before evaluation"
   exit 1
 fi
-missing=""
-for f in $TASK2; do [ -s "$f" ] || missing="$missing $f"; done
-if [ -n "$missing" ]; then
-  echo "Task 2 score files missing or empty:$missing; stopping before evaluation"
+# Completeness, not just presence: a non-empty file passed on 2026-09-24 although its job had been
+# cancelled after 4 of 8 candidates. Every score file must cover seeds 42, 1 and 2 with the same
+# candidates for every estimator and seed; the grid scorers must also cover all 8 candidates.
+check_scores() {
+  "$PY" - "$@" << 'PYEOF'
+import json
+import sys
+from collections import defaultdict
+
+want, files, bad = int(sys.argv[1]), sys.argv[2:], []
+for f in files:
+    by = defaultdict(set)
+    try:
+        for line in open(f):
+            r = json.loads(line)
+            by[(r["estimator"], r["seed"])].add(r["candidate"])
+    except FileNotFoundError:
+        bad.append(f"{f}: missing")
+        continue
+    if not by:
+        bad.append(f"{f}: empty")
+        continue
+    ests, seeds = {e for e, _ in by}, {s for _, s in by}
+    before = len(bad)
+    if seeds != {42, 1, 2}:
+        bad.append(f"{f}: seeds {sorted(seeds)}, expected [1, 2, 42]")
+    # Candidate counts are compared per estimator across seeds: diagnostic variants such as
+    # *_skillrand legitimately score only the in-domain candidate.
+    for e in sorted(ests):
+        ncand = max(len(by.get((e, s), ())) for s in seeds)
+        if want and ncand != want:
+            bad.append(f"{f}: {e} has {ncand} candidates, expected {want}")
+        for s in sorted(seeds):
+            if len(by.get((e, s), ())) != ncand:
+                bad.append(f"{f}: {e} seed {s} has {len(by.get((e, s), ()))} of {ncand} candidates")
+    state = "complete" if len(bad) == before else "INCOMPLETE"
+    print(f"  {state}: {f} ({len(ests)} estimators x {len(seeds)} seeds)")
+if bad:
+    print("INCOMPLETE score files:")
+    for b in bad:
+        print("  " + b)
+    sys.exit(1)
+PYEOF
+}
+GRID="$(ls tg1_logme_kt_7x7_*.jsonl | tr '\n' ' ')"
+DIAG="$(ls tg1_logmediag_kt_*.jsonl | tr '\n' ' ')"
+echo "$(date +%T) checking score files"
+if ! check_scores 8 $GRID $TASK2 || ! check_scores 0 $DIAG; then
+  echo "stopping before evaluation: rerun the jobs behind the incomplete files first"
   exit 1
 fi
-SCORES="$(ls tg1_logme_kt_7x7_*.jsonl tg1_logmediag_kt_*.jsonl | tr '\n' ' ')$TASK2"
+SCORES="$GRID$DIAG$TASK2"
 echo "$(date +%T) evaluation over: $SCORES"
 srun --mem=8G --time=00:30:00 --cpus-per-task=2 bash -c "PYTHONPATH=. $PY analysis/evaluate_estimators.py --executions $OUT/executions.tsv --scores $SCORES --out-prefix $OUT/estimators"
 cp tg1_logme_kt_*.jsonl tg1_logmediag_kt_*.jsonl $TASK2 "$OUT/"

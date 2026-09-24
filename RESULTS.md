@@ -530,5 +530,114 @@ DIGIT COLLISION: this Spearman -0.83 is a THIRD quantity at that magnitude,
 alongside the probe-vs-transfer rho +0.83 (section 6) and the scale/pps
 confound r -0.83 (section 5). Never mix them.
 
+## 12. Transfer benchmark and estimator evaluation (final build 2026-09-24, benchmark_final/, tools/tg1_final_build.sh)
+
+Built by analysis/build_transfer_benchmark.py from every log, joined to the W&B summaries at full
+precision: 1,767 executions valid for primary analysis (1,763 W&B-verified, 4 log-only), and every
+cell of the expected design present (the 1,366 ladder rung is excluded as unstable). Duplicate
+copies are resolved by campaign preference, then COMPLETED over other states, then, within 0.0005,
+the lowest job id; copies that still disagree are excluded, never chosen by value. Evaluation by
+analysis/evaluate_estimators.py: a candidate ties with the best when the paired bootstrap interval
+(20,000 resamples) includes zero or the gap is within 0.001 AUC (above the largest measured rerun
+shift of a mean, 0.0006), and every choice is judged against all candidates in the cell.
+
+### 12.1 Source selection, KT, N=3000, 7 sources x 7 targets (6 seeds; gains against scratch)
+
+| target | best source (top-equivalent, gain) | EdNet, the largest source | sources with gain CI below zero |
+|---|---|---|---|
+| assist2017 | ednet +0.0261 | +0.0261, rank 1 of 7 | algebra2005 -0.0017 |
+| ednet | ednet (in-domain) +0.0088 | +0.0088, rank 1 of 7 | none |
+| junyi | ednet +0.0065 | +0.0065, rank 1 of 7 | assist2017 -0.0012, assist2009 -0.0029, algebra2006 -0.0029, algebra2005 -0.0034, bridge2006 -0.0034 |
+| algebra2005 | junyi +0.0369 | +0.0266, rank 7 of 7 | none |
+| bridge2006 | junyi +0.0084, bridge2006 (in-domain) +0.0079 | +0.0014, rank 6 of 7 | none |
+| assist2009 | assist2009 (in-domain) +0.0010, junyi +0.0006, scratch | -0.0010, rank 5 of 7 | algebra2005 -0.0013, assist2017 -0.0018 |
+| algebra2006 | junyi +0.0087 | +0.0018, rank 4 of 7 | algebra2005 -0.0015 |
+
+_Read: the largest source (EdNet, 353,597 training learners) is the best source on 3 of 7 targets.
+Junyi Academy is best or tied for best on three of the four later datasets. The smallest sources
+hurt: Algebra 2005 is below zero on 4 targets, and every later-dataset source is below zero into
+Junyi._
+
+### 12.2 Recipe-matched objective comparison (each objective rebuilt 3 times under the full encoder's recipe, 10 epochs, batch 128, 5% warm-up; per-seed values averaged over the builds; 6 seeds; EdNet source)
+
+| target | full | skill_only | correct_only | scratch | skill minus correct | best (top-equivalent) |
+|---|---|---|---|---|---|---|
+| assist2017 | 0.6895 | 0.6863 | 0.6639 | 0.6648 | +0.0224 | full |
+| junyi | 0.7231 | 0.7159 | 0.7283 | 0.7121 | -0.0124 | correct_only |
+| algebra2005 | 0.7867 | 0.7876 | 0.7721 | 0.7806 | +0.0155 | skill_only, full, scratch |
+| bridge2006 | 0.7748 | 0.7731 | 0.7670 | 0.7733 | +0.0060 | full |
+| assist2009 | 0.8704 | 0.8695 | 0.8670 | 0.8698 | +0.0025 | full, scratch |
+| algebra2006 | 0.7892 | 0.7886 | 0.7785 | 0.7867 | +0.0102 | full, skill_only |
+
+Build against seed variance (draw by seed layout, 3 builds on shared fine-tune seeds, all 18
+objective-target pairs): the full objective shows no build effect on any target (every p above
+0.5); the single-signal objectives reach p < 0.05 in 3 of 12 pairs, about one expected by chance.
+Every build SD is at most 0.0012, against seed SDs of 0.0007 to 0.0045 (0.0161 for the noisy
+algebra2005 correct_only cell).
+
+_Read: skill minus correct keeps its sign on all six targets, so the objective reversal is not a
+product of the recipe mismatch in the original single-signal encoders, and correct_only stays below
+scratch on the four later datasets. Decision uncertainty in this benchmark comes mainly from
+fine-tune seeds, not encoder builds._
+
+### 12.3 Transferability estimators, KT, the seven N=3000 cells (pretrained view; 7 targets x 3 estimator seeds; the practical view, with scratch as an option, gives the same ordering)
+
+| estimator | rankings | rho | top-1 | tied with best | regret mean / max | negative picks | own-encoder picks |
+|---|---|---|---|---|---|---|---|
+| hscore_kt_causal | 21 | +0.5221 | 11/21 | 14/21 | 0.0012 / 0.0103 | 0 | 15 |
+| logme_kt_causal | 21 | +0.4507 | 10/21 | 13/21 | 0.0017 / 0.0103 | 0 | 14 |
+| largest source | 7 | +0.4031 | 3/7 | 3/7 | 0.0038 / 0.0103 | 0 | 1 |
+| fewshot_ft_fit200_e5 | 21 | +0.3027 | 5/21 | 8/21 | 0.0036 / 0.0103 | 3 | 12 |
+| fewshot_ft_fit50_e5 | 21 | +0.2211 | 3/21 | 4/21 | 0.0038 / 0.0098 | 3 | 13 |
+| logme_kt_causal_per_skill | 21 | +0.1003 | 2/21 | 5/21 | 0.0077 / 0.0278 | 5 | 8 |
+| nleep_k4_kt_causal | 21 | -0.1837 | 1/21 | 2/21 | 0.0090 / 0.0278 | 6 | 1 |
+| nleep_k8_kt_causal | 21 | -0.1531 | 2/21 | 2/21 | 0.0078 / 0.0278 | 4 | 0 |
+| nleep_k16_kt_causal | 21 | -0.3197 | 2/21 | 2/21 | 0.0080 / 0.0278 | 2 | 0 |
+
+hscore_shrunk equals hscore; the largest-source rule has one ranking per target. Scores use the
+leakage-safe causal features of src/estimators/features.py on 3,000 target learners, capped at
+50,000 positions.
+
+_Read: H-score is the strongest estimator, narrowly ahead of LogME. Both beat the largest-source
+rule on regret and rank correlation and never pick a negative-transfer source. NLEEP ranks the
+candidates backwards, and a short fine-tuning proxy (5 epochs on 50 or 200 learners) is weak and
+unstable._
+
+### 12.4 The repeated failure: preference for the target's own encoder
+
+H-score picks the target's own encoder in 15 of 21 rankings, LogME in 14 and the few-shot proxy in
+12. That is right on EdNet (in-domain best), Bridge 2006 and ASSISTments 2009 (in-domain tied for
+best), and wrong for all three estimators on ASSISTments 2017 (EdNet best) and Algebra 2006 (Junyi
+best). Ruled out as causes by the LogME diagnostics (scripts/diagnose_logme.py, three original
+targets): the trained skill table, since re-scoring the in-domain encoder with its skill table at
+the random start leaves the ASSISTments 2017 pick unchanged on 3 of 3 seeds; and layer choice, with
+rank correlation by layer L0 +0.20, L1 -0.40, L2 -0.40, L3 +0.04, L4 +0.24, L5 +0.62, L6 +0.42,
+where L5 still picks in-domain on ASSISTments 2017. Per-skill LogME fails at every layer.
+
+### 12.5 Budget hypothesis for that failure (not supported)
+
+Hypothesis: the estimators see little target data, the in-domain encoder leads at small budgets,
+and a larger foreign source overtakes it by N=3000. The KT budget sweep on ASSISTments 2017 (full
+fine-tuning; N=25 to 1000 from the W3/W4 curves, 3 seeds, batch 32; N=3000 from the pinned grid,
+6 seeds; gains against scratch, with the count of seeds in the direction of the mean):
+
+| budget | in-domain | EdNet | Junyi | top-equivalent |
+|---|---|---|---|---|
+| 25 | +0.0103 (2/3) | +0.0149 (2/3) | -0.0012 (1/3) | ednet, assist2017, scratch |
+| 50 | -0.0095 (3/3) | -0.0028 (3/3) | -0.0149 (3/3) | scratch |
+| 100 | +0.0002 (1/3) | +0.0048 (3/3) | -0.0035 (3/3) | ednet |
+| 200 | +0.0023 (2/3) | +0.0125 (3/3) | +0.0041 (2/3) | ednet |
+| 500 | +0.0121 (3/3) | +0.0236 (3/3) | +0.0122 (3/3) | ednet |
+| 1000 | +0.0205 (3/3) | +0.0269 (3/3) | +0.0170 (3/3) | ednet |
+| 3000 | +0.0231 (6/6) | +0.0261 (6/6) | +0.0214 (6/6) | ednet |
+
+_Read: EdNet leads at every budget from N=100 to 3,000 and the in-domain encoder never leads, so
+scarce target data does not favour the in-domain encoder. The few-shot proxy still ranks it first
+on both failure targets at seed 42, by small margins (ASSISTments 2017 at 200 learners, 0.6288
+against 0.6270 for EdNet), which points to its short training rather than to data size. One
+mechanism remains open and testable: every estimator samples target learners from the train split
+(src/estimators/features.py), the in-domain encoder's own pretraining partition, while the gold is
+measured on unseen test learners. Scoring the estimators on validation learners would test it._
+
 _End of consolidated results._
 
