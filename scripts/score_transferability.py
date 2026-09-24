@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 
 from src.estimators.kt_logme import ranks_by_seed, score_kt_logme
+from src.estimators.protocol import add_protocol_args, resolve_protocol
 
 
 def main() -> None:
@@ -34,7 +35,9 @@ def main() -> None:
     ap.add_argument("--min_group", type=int, default=20)
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", required=True)
+    add_protocol_args(ap)
     a = ap.parse_args()
+    split, n_draw, extra = resolve_protocol(a)
 
     for c in a.candidates:
         if c != "scratch" and not Path(c).is_file():
@@ -46,9 +49,10 @@ def main() -> None:
             prints = set()
             for c in a.candidates:
                 rs = score_kt_logme(None if c == "scratch" else c, a.target_dir, seed=seed,
-                                    n_students=a.n_students, max_positions=a.max_positions,
-                                    min_group=a.min_group, device=a.device)
+                                    n_students=n_draw, max_positions=a.max_positions,
+                                    min_group=a.min_group, device=a.device, split=split)
                 for r in rs:
+                    r.metadata.update(extra)
                     fh.write(json.dumps(r.to_json()) + "\n")
                     fh.flush()
                     prints.add(r.metadata["sample_fingerprint"])

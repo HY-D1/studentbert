@@ -19,6 +19,10 @@
 #            the 7 x 7 grid, same learner draw and features as LogME.
 #   task2fewshot 7 jobs: scripts/fewshot_proxy.py, 5-epoch fine-tunes on 50 and 200
 #            training-split learners scored on 100 more; validation and test untouched.
+#   exposure 28 jobs: the pretraining-exposure test (RESULTS.md 12.5). The LogME and Task 2
+#            scorers on the 7 x 7 grid, re-run on the validation learners (--split val) and
+#            on a train draw of the same size (--match_split val). Output
+#            tg1_exposure_*.jsonl, read by analysis/exposure_report.py.
 #   logmediag 3 jobs: scripts/diagnose_logme.py on the same draw (every layer, and in-domain
 #            encoders re-scored with the skill table at its random start).
 #   trackb7  264 KT jobs: Track B grown to 7 targets x 7 full encoders (+ scratch), N=3000,
@@ -51,7 +55,7 @@ TIMING="${TIMING:-0}"
 DATASETS7="assist2017 ednet junyi algebra2005 bridge2006 assist2009 algebra2006"
 
 if [ -z "$QUEUES" ]; then
-  echo "set QUEUES to one or more of: scratch probe logme logme7 task2feat task2fewshot logmediag trackb7 objdraws"
+  echo "set QUEUES to one or more of: scratch probe logme logme7 task2feat task2fewshot exposure logmediag trackb7 objdraws"
   exit 1
 fi
 cd "$CODE" || exit 1
@@ -207,6 +211,41 @@ if wants logme7; then
       "PYTHONPATH=. $PY scripts/score_transferability.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") --out tg1_logme_kt_7x7_${DS}.jsonl"
   done
   echo "logme7 queue: $Q"
+fi
+
+if wants exposure; then
+  : "${LOGME_GPU:?set LOGME_GPU (any is fine for scoring)}"
+  GRES="$(gres_line "$LOGME_GPU")" || exit 1
+  CKS=""
+  for SRC in $DATASETS7; do
+    CK="../checkpoints/edubert_${SRC}_pretrain_full_encoder.pt"
+    if [ ! -f "$CK" ]; then
+      echo "MISSING ENCODER: $CK"
+      exit 1
+    fi
+    CKS="$CKS $CK"
+  done
+  Q="$CODE/queue_tg1_exposure"
+  mkdir -p "$Q"
+  rm -f "$Q"/*.sbatch
+  for DS in $DATASETS7; do
+    case "$DS" in
+      ednet|junyi) WALL=03:00:00 ;;
+      *) WALL=01:00:00 ;;
+    esac
+    for P in val trainmatch; do
+      if [ "$P" = "val" ]; then
+        PARGS="--split val --score_tag val"
+      else
+        PARGS="--match_split val --score_tag trainmatch"
+      fi
+      emit "$Q" "tg1_exposure_${P}_logme_${DS}" "tg1_exposure_${P}_logme_${DS}" "$GRES" "$WALL" 32G \
+        "PYTHONPATH=. $PY scripts/score_transferability.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") $PARGS --out tg1_exposure_${P}_logme_kt_${DS}.jsonl"
+      emit "$Q" "tg1_exposure_${P}_task2_${DS}" "tg1_exposure_${P}_task2_${DS}" "$GRES" "$WALL" 48G \
+        "PYTHONPATH=. $PY scripts/score_task2.py --target_dir ../processed/$DS --candidates scratch$CKS --n_students 3000 --seeds $(seeds "42 1 2") $PARGS --out tg1_exposure_${P}_task2_kt_${DS}.jsonl"
+    done
+  done
+  echo "exposure queue: $Q"
 fi
 
 for Q2 in task2feat task2fewshot; do

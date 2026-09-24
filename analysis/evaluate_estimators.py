@@ -11,7 +11,8 @@ CI of best minus choice includes zero) or practically (the gap is within --margi
 measured rerun effect before any held-out evaluation).
 
 Estimators:
-  LogME and any other scorer   JSON lines from scripts/score_transferability.py (--scores)
+  LogME and any other scorer   JSON lines from scripts/score_transferability.py (--scores);
+                               a --score_tag protocol is reported as estimator@tag
   largest source               pretraining training-split learners (retrospective heuristic)
   masked-skill probe           probe2 rows of executions.tsv (retrospective heuristic)
   Track A policies             always full, always skill_only, always correct_only, and the
@@ -176,9 +177,15 @@ def logme_scores(paths: list[str]) -> dict:
                 cand = f"src:{m.group(1)}"
             if cand is None:
                 continue
-            n = r["metadata"].get("n_students_requested")
-            budget = r["metadata"].get("target_budget") or (f"n{n}" if n else "full_split")
-            out[(r["estimator"], r["target"], budget)][r["seed"]][cand] = (r["score"], r)
+            md = r["metadata"]
+            n = md.get("n_students_requested")
+            budget = md.get("target_budget") or (f"n{n}" if n else "full_split")
+            # A non-default sample protocol keeps its own name (estimator@tag), so a validation
+            # score can never overwrite the train-draw score of the same estimator and seed.
+            tag = md.get("score_tag") or (md["score_split"]
+                                          if md.get("score_split", "train") != "train" else None)
+            est = f"{r['estimator']}@{tag}" if tag else r["estimator"]
+            out[(est, r["target"], budget)][r["seed"]][cand] = (r["score"], r)
     return out
 
 

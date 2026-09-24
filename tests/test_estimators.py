@@ -773,6 +773,187 @@ def test_builder_ladder_guard_and_results_md_check():
         assert ("B", "assist2017", "n3000", "src:ednet", 42) in keys
 
 
+# --------------------------------------------------------------------------- exposure test
+def test_exposure_protocol_arguments():
+    import argparse
+
+    from src.estimators.protocol import add_protocol_args, check_split, resolve_protocol
+
+    def parse(*argv):
+        ap = argparse.ArgumentParser()
+        ap.add_argument("--target_dir", default="unused")
+        ap.add_argument("--n_students", type=int, default=3000)
+        add_protocol_args(ap)
+        with contextlib.redirect_stderr(io.StringIO()):
+            return ap.parse_args(list(argv))
+
+    assert resolve_protocol(parse()) == ("train", 3000, {}), "the default protocol must not change"
+    assert resolve_protocol(parse("--split", "val", "--score_tag", "val")) == \
+        ("val", 3000, {"score_tag": "val", "target_budget": "n3000"})
+    refused = [("--split", "val"), ("--score_tag", "val"), ("--split", "val", "--score_tag", "V-1"),
+               ("--split", "val", "--match_split", "val", "--score_tag", "x"),
+               ("--split", "test", "--score_tag", "x")]
+    for argv in refused:
+        try:
+            resolve_protocol(parse(*argv))
+        except SystemExit:
+            continue
+        raise AssertionError(f"protocol {argv} must be refused")
+    try:
+        check_split("test")
+    except ValueError:
+        return
+    raise AssertionError("the test split holds the gold and must never be scorable")
+
+
+def test_exposure_validation_draw_is_disjoint_and_test_is_refused():
+    _torch()
+    from src.estimators.features import matched_n, sample_target, split_size
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tgt = _make_processed(Path(tmp), "tgt")
+        ids = np.load(tgt / "sequences.npz")["student_ids"]
+        splits = json.loads((tgt / "splits.json").read_text())
+        _, rows_default, fp_default = sample_target(tgt, 12, 7)
+        _, rows_train, fp_train = sample_target(tgt, 12, 7, split="train")
+        assert rows_default == rows_train and fp_default == fp_train, \
+            "the default draw must stay the train draw every earlier score used"
+        _, all_train, _ = sample_target(tgt, None, 7)
+        _, rows_val, fp_val = sample_target(tgt, 12, 7, split="val")
+        assert sorted(int(ids[r]) for r in rows_val) == sorted(splits["val"])
+        assert not set(rows_val) & set(all_train) and fp_val != fp_train
+        assert split_size(tgt, "val") == len(splits["val"])
+        assert matched_n(tgt, 3000, "val") == len(splits["val"])
+        assert matched_n(tgt, 1, "val") == 1 and matched_n(tgt, None, "val") == len(splits["val"])
+        for call in (lambda: sample_target(tgt, 12, 7, split="test"),
+                     lambda: split_size(tgt, "test")):
+            try:
+                call()
+            except ValueError:
+                continue
+            raise AssertionError("the test split holds the gold and must never be scorable")
+
+
+def test_exposure_scores_carry_their_protocol():
+    _torch()
+    import importlib.util as _u
+
+    from src.estimators.kt_logme import score_kt_logme
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tgt = _make_processed(Path(tmp), "tgt")
+        sp = json.loads((tgt / "splits.json").read_text())
+        allids = sp["train"] + sp["val"] + sp["test"]
+        (tgt / "splits.json").write_text(json.dumps({"train": allids[:14], "val": allids[14:20],
+                                                     "test": allids[20:]}))
+        kw = {"n_students": 12, "max_positions": None, "device": "cpu", "d_model": 16,
+              "n_layers": 2, "max_seq_len": 64}
+        a = score_kt_logme(None, tgt, seed=3, **kw)
+        b = score_kt_logme(None, tgt, seed=3, split="train", **kw)
+        v = score_kt_logme(None, tgt, seed=3, split="val", **kw)
+        assert [x.score for x in a] == [x.score for x in b]
+        assert {x.metadata["score_split"] for x in a} == {"train"}
+        assert {x.metadata["score_split"] for x in v} == {"val"}
+        assert v[0].metadata["n_students"] == 6 and v[0].metadata["n_students_requested"] == 12
+        assert v[0].metadata["sample_fingerprint"] != a[0].metadata["sample_fingerprint"]
+        spec = _u.spec_from_file_location("score_task2", REPO / "scripts" / "score_task2.py")
+        t2 = _u.module_from_spec(spec)
+        spec.loader.exec_module(t2)
+        _, _, meta, _ = t2.features_like_logme(None, tgt, seed=3, n_students=12,
+                                               max_positions=None, device="cpu", split="val")
+        assert meta["score_split"] == "val" and meta["n_students"] == 6
+        assert meta["sample_fingerprint"] == v[0].metadata["sample_fingerprint"]
+
+
+def test_evaluator_keeps_sample_protocols_apart():
+    from analysis import evaluate_estimators as ev
+
+    lines = [("scratch", 0.1, {"n_students_requested": 3000}),
+             ("scratch", 0.2, {"n_students_requested": 3000, "score_split": "val",
+                               "score_tag": "val", "target_budget": "n3000"}),
+             ("scratch", 0.3, {"n_students_requested": 170, "score_split": "train",
+                               "score_tag": "trainmatch", "target_budget": "n3000"}),
+             ("edubert_a_pretrain_full_encoder.pt", 0.4,
+              {"n_students_requested": 3000, "score_split": "val"})]
+    with tempfile.TemporaryDirectory() as tmp:
+        j = Path(tmp) / "s.jsonl"
+        j.write_text("".join(json.dumps({"estimator": "logme_kt_causal", "candidate": c,
+                                         "target": "tgt", "seed": 1, "score": s,
+                                         "metadata": md}) + "\n" for c, s, md in lines))
+        got = ev.logme_scores([str(j)])
+    base, val, tm = (("logme_kt_causal" + t, "tgt", "n3000") for t in ("", "@val", "@trainmatch"))
+    assert set(got) == {base, val, tm}, sorted(got)
+    assert got[base][1]["scratch"][0] == 0.1 and got[tm][1]["scratch"][0] == 0.3
+    assert got[val][1]["scratch"][0] == 0.2 and got[val][1]["src:a"][0] == 0.4
+
+
+def test_exposure_report_rule_and_completeness():
+    from analysis import exposure_report as xr
+
+    # In-domain margin per protocol (train, trainmatch, val), the same at all three seeds.
+    # "e" ties on val: preferred means strictly top, so a zero margin is not a preference.
+    # "f" is preferred on val at seed 42 only: 1 of 3 seeds is not a majority.
+    # Scratch scores highest everywhere: the margin is among pretrained candidates only.
+    plans = {"a": (0.2, 0.2, -0.1), "b": (0.2, 0.2, 0.2), "c": (0.2, -0.1, -0.1),
+             "d": (-0.1, 0.2, 0.2), "e": (0.2, 0.2, 0.0), "f": (0.2, 0.2, (0.2, -0.1, -0.1))}
+    recs = []
+    for tgt, margins in plans.items():
+        for prot, m in zip(xr.PROTOCOLS, margins):
+            same = tgt == "b" and prot == "trainmatch"
+            md = {"n_students_requested": 3000, "n_students": 100, "positions_used": 900,
+                  "sample_fingerprint": tgt + ("train" if same else prot)}
+            if prot != "train":
+                md.update(score_tag=prot, target_budget="n3000")
+            for i, seed in enumerate((42, 1, 2)):
+                own = 1.0 if same else 1.0 + (m[i] if isinstance(m, tuple) else m)
+                scores = {"scratch": 1.5, f"edubert_{tgt}_pretrain_full_encoder.pt": own,
+                          "edubert_x_pretrain_full_encoder.pt": 1.0 if not same else 0.8,
+                          "edubert_y_pretrain_full_encoder.pt": 0.5}
+                recs += [{"estimator": "hscore_kt_causal", "candidate": c, "target": tgt,
+                          "seed": seed, "score": s, "metadata": md} for c, s in scores.items()]
+    with tempfile.TemporaryDirectory() as tmp:
+        j = Path(tmp) / "s.jsonl"
+        j.write_text("".join(json.dumps(r) + "\n" for r in recs))
+        data = xr.load([str(j)], "n3000")
+        assert not xr.check_complete(data, ["hscore_kt_causal"], 4)
+        _, summary, determinism = xr.analyse(data, ["hscore_kt_causal"])
+        got = {s["target"]: s["verdict"] for s in summary}
+        assert got == {"a": "exposure", "b": "representation", "c": "sample size",
+                       "d": "no preference", "e": "exposure", "f": "exposure"}, got
+        assert xr.protocol_of({"score_split": "val"}) == "val" and xr.protocol_of({}) == "train"
+        assert len(determinism) == 3 and all(" b " in d for d in determinism), determinism
+        assert all("difference 2.000e-01" in d for d in determinism), \
+            "a changed score on an identical sample must show in the determinism check"
+        argv = sys.argv
+        sys.argv = ["exposure_report.py", "--scores", str(j), "--n-candidates", "4",
+                    "--estimators", "hscore_kt_causal", "--out-prefix", str(Path(tmp) / "x" / "e")]
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                xr.main()
+        finally:
+            sys.argv = argv
+        report = (Path(tmp) / "x" / "e_report.md").read_text()
+        assert "| hscore_kt_causal | a |" in report and "exposure |" in report
+        drop = [r for r in recs if not (r["target"] == "a" and r["seed"] == 2
+                                        and r["metadata"].get("score_tag") == "val")]
+        j.write_text("".join(json.dumps(r) + "\n" for r in drop))
+        bad = xr.check_complete(xr.load([str(j)], "n3000"), ["hscore_kt_causal"], 4)
+        assert bad == ["hscore_kt_causal a val: seeds [1, 42], expected [1, 2, 42]"], bad
+        short = [r for r in recs if not (r["target"] == "b" and r["seed"] == 1 and r["candidate"]
+                                         == "scratch" and r["metadata"].get("score_tag") == "val")]
+        j.write_text("".join(json.dumps(r) + "\n" for r in short))
+        bad = xr.check_complete(xr.load([str(j)], "n3000"), ["hscore_kt_causal"], 4)
+        assert bad == ["hscore_kt_causal b val seed 1: 3 of 4 candidates"], bad
+        clash = dict(recs[0], score=recs[0]["score"] + 1.0)
+        j.write_text("".join(json.dumps(r) + "\n" for r in recs + [recs[0], clash]))
+        try:
+            xr.load([str(j)], "n3000")
+        except SystemExit as err:
+            assert "disagreeing duplicate" in str(err)
+        else:
+            raise AssertionError("a disagreeing duplicate must stop the report")
+
+
 # --------------------------------------------------------------------------- runner
 def main() -> int:
     global _RUNNER

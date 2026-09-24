@@ -26,9 +26,11 @@ from src.estimators.features import (build_backbone, cap_positions, kt_features,
 from src.estimators.hscore import hscore
 from src.estimators.kt_logme import _peak_mb
 from src.estimators.nleep import nleep
+from src.estimators.protocol import add_protocol_args, resolve_protocol
 
 
-def features_like_logme(candidate, target_dir, *, seed, n_students, max_positions, device):
+def features_like_logme(candidate, target_dir, *, seed, n_students, max_positions, device,
+                        split="train"):
     """The exact feature path of src/estimators/kt_logme.score_kt_logme."""
     target = Path(target_dir).name
     t0 = time.perf_counter()
@@ -36,14 +38,14 @@ def features_like_logme(candidate, target_dir, *, seed, n_students, max_position
     load = ({"source": "none", "in_domain": False, "loaded": 0, "total": 0, "skipped": []}
             if candidate is None else load_candidate(bb, candidate, target, device="cpu"))
     bb.to(device)
-    subset, rows, fingerprint = sample_target(target_dir, n_students, seed)
+    subset, rows, fingerprint = sample_target(target_dir, n_students, seed, split=split)
     feats, y, _ = kt_features(bb, subset, device)
     n_all = int(y.size)
     sel = cap_positions(n_all, max_positions, seed)
     meta = {"sample_fingerprint": fingerprint, "n_students": len(rows),
             "n_students_requested": n_students, "positions_total": n_all,
             "positions_used": int(sel.size), "load": load, "device": device,
-            "candidate_path": candidate or "scratch"}
+            "candidate_path": candidate or "scratch", "score_split": split}
     return feats[sel], y[sel], meta, time.perf_counter() - t0
 
 
@@ -58,7 +60,9 @@ def main() -> None:
     ap.add_argument("--nleep_dim", type=int, default=32)
     ap.add_argument("--device", default=None)
     ap.add_argument("--out", required=True)
+    add_protocol_args(ap)
     a = ap.parse_args()
+    split, n_draw, extra = resolve_protocol(a)
     device = a.device or ("cuda" if torch.cuda.is_available() else "cpu")
     target = Path(a.target_dir).name
     with open(a.out, "a") as fh:
@@ -66,8 +70,8 @@ def main() -> None:
             for c in a.candidates:
                 ck = None if c == "scratch" else c
                 feats, y, meta, t_ext = features_like_logme(
-                    ck, a.target_dir, seed=seed, n_students=a.n_students,
-                    max_positions=a.max_positions, device=device)
+                    ck, a.target_dir, seed=seed, n_students=n_draw,
+                    max_positions=a.max_positions, device=device, split=split)
                 jobs = [("hscore_kt_causal", lambda: hscore(feats, y)),
                         ("hscore_shrunk_kt_causal", lambda: hscore(feats, y, shrink=True))]
                 jobs += [(f"nleep_k{k}_kt_causal",
@@ -84,7 +88,7 @@ def main() -> None:
                         n_target_examples=int(y.size), n_target_labels=int(y.size),
                         feature_extraction_time=t_ext, scoring_time=time.perf_counter() - s0,
                         peak_memory_mb=_peak_mb(device), uncertainty_signals=info,
-                        metadata={**meta, "feature_dim": int(feats.shape[1])})
+                        metadata={**meta, **extra, "feature_dim": int(feats.shape[1])})
                     fh.write(json.dumps(r.to_json()) + "\n")
                     line.append(f"{est.replace('_kt_causal', '')}={score:.5f}")
                 fh.flush()

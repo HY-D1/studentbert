@@ -26,6 +26,7 @@ import torch
 from torch.utils.data import DataLoader, Subset
 
 from src.data.dataset import InteractionDataset, collate_fn
+from src.estimators.protocol import check_split
 from src.models.edubert import EduBERT
 from src.utils import set_seed
 
@@ -94,10 +95,32 @@ def encode_causal(backbone: EduBERT, skill, correct, time_bin, key_padding_mask)
     return backbone.encoder(x, mask=causal, src_key_padding_mask=key_padding_mask)
 
 
+def split_size(processed_dir: str | Path, split: str, max_seq_len: int = 512) -> int:
+    """Learners the scorer can draw from in this split, counted by the dataset class itself."""
+    check_split(split)
+    return len(InteractionDataset(str(processed_dir), split, max_seq_len))
+
+
+def matched_n(processed_dir: str | Path, n_students: int | None, match_split: str,
+              max_seq_len: int = 512) -> int:
+    """Size of a train draw that matches a score on match_split: min(n_students, its learners).
+
+    A validation split holds about a tenth of the learners, so comparing its score with the full
+    train draw would confound exposure with sample size.
+    """
+    n = split_size(processed_dir, match_split, max_seq_len)
+    return n if n_students is None else min(n_students, n)
+
+
 def sample_target(processed_dir: str | Path, n_students: int | None, seed: int,
-                  max_seq_len: int = 512):
-    """The fine-tune's learner draw (first_n_students in finetune_edubert.py) for this seed."""
-    ds = InteractionDataset(str(processed_dir), "train", max_seq_len)
+                  max_seq_len: int = 512, split: str = "train"):
+    """The fine-tune's learner draw (first_n_students in finetune_edubert.py) for this seed.
+
+    split="val" draws the same way from the validation learners, which no encoder saw during
+    pretraining. The default is the draw every earlier score used, unchanged.
+    """
+    check_split(split)
+    ds = InteractionDataset(str(processed_dir), split, max_seq_len)
     if n_students is None:
         rows = list(ds.rows)
         subset = ds

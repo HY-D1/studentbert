@@ -33,7 +33,7 @@ def score_kt_logme(candidate: str | None, target_dir: str | Path, *, seed: int,
                    n_students: int | None, max_positions: int | None = 50000,
                    min_group: int = 20, device: str | None = None, d_model: int = 256,
                    n_layers: int = 6, max_seq_len: int = 512,
-                   batch_size: int = 64) -> list[EstimatorResult]:
+                   batch_size: int = 64, split: str = "train") -> list[EstimatorResult]:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     target = Path(target_dir).name
     t0 = time.perf_counter()
@@ -44,7 +44,8 @@ def score_kt_logme(candidate: str | None, target_dir: str | Path, *, seed: int,
     else:
         load = load_candidate(backbone, candidate, target, device="cpu")
     backbone.to(device)
-    subset, rows, fingerprint = sample_target(target_dir, n_students, seed, max_seq_len)
+    subset, rows, fingerprint = sample_target(target_dir, n_students, seed, max_seq_len,
+                                              split=split)
     F, y, nxt = kt_features(backbone, subset, device, batch_size=batch_size)
     n_all = int(y.size)
     sel = cap_positions(n_all, max_positions, seed)
@@ -60,7 +61,7 @@ def score_kt_logme(candidate: str | None, target_dir: str | Path, *, seed: int,
               "n_students_requested": n_students, "positions_total": n_all,
               "positions_used": int(y.size), "positive_rate": float(y.mean()),
               "load": load, "feature_dim": int(F.shape[1]), "device": device,
-              "candidate_path": candidate or "scratch"}
+              "candidate_path": candidate or "scratch", "score_split": split}
     peak = _peak_mb(device)
     out = []
     for est, score, info, t_score in ((PLAIN, s_plain, i_plain, t2 - t1),
