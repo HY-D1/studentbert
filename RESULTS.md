@@ -639,5 +639,90 @@ mechanism remains open and testable: every estimator samples target learners fro
 (src/estimators/features.py), the in-domain encoder's own pretraining partition, while the gold is
 measured on unseen test learners. Scoring the estimators on validation learners would test it._
 
+### 12.6 Exposure test for that failure (validation learners against a size-matched train draw; 3 estimator seeds; exposure_v1/)
+
+Both frozen-feature scorers re-run on the 7 x 7 grid with two more target samples: the
+validation learners (--split val), which no encoder saw (pretraining reads the train split and
+keeps its checkpoint by train loss), and a train draw with as many learners (--match_split val).
+Same candidates, seeds and 50,000-position cap. Code 6ed04fe, with the decision rule fixed in
+analysis/exposure_report.py before any validation score existed; walltimes 6f8c756. 28 jobs,
+Slurm 10590371 to 10594649 (the Junyi validation Task 2 job 10591596 stalled on node d1020, was
+cancelled after 1:03:23 with no output, and ran again as 10594649). Margin: in-domain score minus
+the best other pretrained score, in each estimator's own units. Preferred: strictly top on at
+least 2 of 3 seeds. Verdict: exposure if preferred on the matched train draw and not on
+validation learners, representation if preferred on both, no preference if not preferred on the
+train draw. Where the matched draw is the train draw (EdNet, Junyi) it reproduces the train-draw
+scores exactly.
+
+Files (md5): exposure_summary.tsv adfd97ebdd98d70c618e37ef385bd0f9,
+estimators_summary.tsv 79715b91069b33d6bdbd7d88b5a0bdef,
+estimators_cells.tsv 0801251bb479829d7a461fb1446923cf,
+exposure_report.md 30c2dfd03a9c59cea6d5f6cf104e659d.
+
+| estimator | target | learners train / matched / val | preferred train / matched / val | margin train / matched / val | verdict |
+|---|---|---|---|---|---|
+| hscore_kt_causal | assist2017 | 1366 / 170 / 170 | 3/3 / 3/3 / 1/3 | +0.004011 / +0.004526 / +0.000132 | exposure |
+| hscore_kt_causal | ednet | 3000 / 3000 / 3000 | 3/3 / 3/3 / 3/3 | +0.004880 / +0.004880 / +0.006801 | representation |
+| hscore_kt_causal | junyi | 3000 / 3000 / 3000 | 0/3 / 0/3 / 0/3 | -0.007527 / -0.007527 / -0.005422 | no preference |
+| hscore_kt_causal | algebra2005 | 453 / 56 / 56 | 0/3 / 1/3 / 1/3 | -0.004664 / -0.001162 / -0.002097 | no preference |
+| hscore_kt_causal | bridge2006 | 904 / 113 / 113 | 3/3 / 3/3 / 1/3 | +0.001512 / +0.002433 / -0.001275 | exposure |
+| hscore_kt_causal | assist2009 | 2495 / 311 / 311 | 3/3 / 3/3 / 3/3 | +0.013193 / +0.014235 / +0.016371 | representation |
+| hscore_kt_causal | algebra2006 | 1048 / 131 / 131 | 3/3 / 3/3 / 3/3 | +0.002125 / +0.003730 / +0.006013 | representation |
+| logme_kt_causal | assist2017 | 1366 / 170 / 170 | 3/3 / 3/3 / 1/3 | +0.000939 / +0.001184 / -0.000965 | exposure |
+| logme_kt_causal | ednet | 3000 / 3000 / 3000 | 2/3 / 2/3 / 3/3 | +0.000677 / +0.000677 / +0.001533 | representation |
+| logme_kt_causal | junyi | 3000 / 3000 / 3000 | 0/3 / 0/3 / 0/3 | -0.008027 / -0.008027 / -0.007034 | no preference |
+| logme_kt_causal | algebra2005 | 453 / 56 / 56 | 0/3 / 2/3 / 1/3 | -0.001788 / +0.000672 / -0.000900 | no preference |
+| logme_kt_causal | bridge2006 | 904 / 113 / 113 | 3/3 / 3/3 / 2/3 | +0.001200 / +0.001844 / -0.000039 | representation |
+| logme_kt_causal | assist2009 | 2495 / 311 / 311 | 3/3 / 3/3 / 3/3 | +0.008098 / +0.007405 / +0.010668 | representation |
+| logme_kt_causal | algebra2006 | 1048 / 131 / 131 | 3/3 / 3/3 / 3/3 | +0.001744 / +0.002315 / +0.003353 | representation |
+
+Estimator quality by target sample (the seven N=3000 cells, pretrained view, 21 rankings each):
+
+| estimator | sample | rho | top-1 | tied with best | regret mean / max |
+|---|---|---|---|---|---|
+| hscore_kt_causal | train draw | +0.5221 | 11/21 | 14/21 | 0.0012 / 0.0103 |
+| hscore_kt_causal | matched train draw | +0.4711 | 10/21 | 13/21 | 0.0015 / 0.0103 |
+| hscore_kt_causal | validation learners | +0.5051 | 12/21 | 13/21 | 0.0019 / 0.0103 |
+| logme_kt_causal | train draw | +0.4507 | 10/21 | 13/21 | 0.0017 / 0.0103 |
+| logme_kt_causal | matched train draw | +0.4082 | 8/21 | 11/21 | 0.0021 / 0.0092 |
+| logme_kt_causal | validation learners | +0.4473 | 11/21 | 13/21 | 0.0019 / 0.0103 |
+
+Picks on the two failure targets and on Bridge 2006 (seeds 42, 1, 2; regret against the best source):
+
+| target | estimator | sample | picks | mean regret |
+|---|---|---|---|---|
+| assist2017 | hscore_kt_causal | train draw | assist2017, assist2017, assist2017 | 0.0030 |
+| assist2017 | hscore_kt_causal | matched train draw | assist2017, assist2017, assist2017 | 0.0030 |
+| assist2017 | hscore_kt_causal | validation learners | assist2017, ednet, ednet | 0.0010 |
+| assist2017 | logme_kt_causal | train draw | assist2017, assist2017, assist2017 | 0.0030 |
+| assist2017 | logme_kt_causal | matched train draw | assist2017, assist2017, assist2017 | 0.0030 |
+| assist2017 | logme_kt_causal | validation learners | assist2017, ednet, ednet | 0.0010 |
+| algebra2006 | hscore_kt_causal | train draw | algebra2006, algebra2006, algebra2006 | 0.0017 |
+| algebra2006 | hscore_kt_causal | matched train draw | algebra2006, algebra2006, algebra2006 | 0.0017 |
+| algebra2006 | hscore_kt_causal | validation learners | algebra2006, algebra2006, algebra2006 | 0.0017 |
+| algebra2006 | logme_kt_causal | train draw | algebra2006, algebra2006, algebra2006 | 0.0017 |
+| algebra2006 | logme_kt_causal | matched train draw | algebra2006, algebra2006, algebra2006 | 0.0017 |
+| algebra2006 | logme_kt_causal | validation learners | algebra2006, algebra2006, algebra2006 | 0.0017 |
+| bridge2006 | hscore_kt_causal | train draw | bridge2006, bridge2006, bridge2006 | 0.0005 |
+| bridge2006 | hscore_kt_causal | matched train draw | bridge2006, bridge2006, bridge2006 | 0.0005 |
+| bridge2006 | hscore_kt_causal | validation learners | junyi, junyi, bridge2006 | 0.0002 |
+| bridge2006 | logme_kt_causal | train draw | bridge2006, bridge2006, bridge2006 | 0.0005 |
+| bridge2006 | logme_kt_causal | matched train draw | bridge2006, bridge2006, bridge2006 | 0.0005 |
+| bridge2006 | logme_kt_causal | validation learners | bridge2006, junyi, bridge2006 | 0.0004 |
+
+_Read: pretraining exposure explains the in-domain preference on ASSISTments 2017 and not on
+Algebra 2006. On ASSISTments 2017 both estimators prefer the in-domain encoder on 3 of 3 seeds of
+the matched train draw and on 1 of 3 with validation learners, where the other two seeds pick
+EdNet, the best source. On Algebra 2006 the preference holds on every seed of every sample, its
+margin grows on unseen learners, and Junyi is the only top-equivalent source (12.1), so that
+failure is neither exposure nor gold noise. On Bridge 2006 the estimators disagree (exposure for
+H-score, representation for LogME), but every pick there is tied with the best. Scoring
+validation learners is not a fix: on the five smaller targets a validation split holds an eighth
+as many learners as the train split, and in aggregate both estimators lose rank correlation and
+gain regret; at matched size, unseen learners give the higher rank correlation and top-1. On
+those five targets the train draw and the validation sample hold every learner of their split, so
+there the three seeds differ only in the position subsample and the random skill tables; the
+matched train draw is a different eighth of the train split at each seed._
+
 _End of consolidated results._
 
