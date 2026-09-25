@@ -95,6 +95,7 @@ emit() {
   {
     echo '#!/bin/bash'
     echo '#SBATCH --partition=gpu'
+    echo '#SBATCH --exclude=d1020'
     echo "$gres"
     echo '#SBATCH --cpus-per-task=8'
     echo "#SBATCH --time=$wall"

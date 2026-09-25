@@ -472,7 +472,15 @@ def main():
                     help="TSV from analysis/inventory_runs.py, source for section 1")
     ap.add_argument("--force", action="store_true",
                     help="overwrite --out_md even if it contains hand-added sections")
+    ap.add_argument("--check-3-1", dest="check_3_1", default=None, metavar="LONG_CSV",
+                    help="compare RESULTS.md 3.1 (read from --out_md) with the per-seed "
+                         "nextskill_results_long.csv, write nothing, exit 0 on PASS")
     args = ap.parse_args()
+
+    if args.check_3_1:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from nextskill_31 import check as check_3_1
+        sys.exit(check_3_1(args.out_md, args.check_3_1))
 
     # Sections this script does NOT regenerate. Overwriting RESULTS.md while any
     # of them are present silently destroys them.

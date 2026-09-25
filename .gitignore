@@ -106,3 +106,7 @@ tg1_task2_kt_*.jsonl
 tg1_fewshot_kt_*.jsonl
 tg1_exposure_*.jsonl
 exposure_*/
+# untracked by design: final-build zips, drip_multi lock, dated audit reports
+benchmark_*.zip
+.drip_multi.lock
+audit_20*.txt
