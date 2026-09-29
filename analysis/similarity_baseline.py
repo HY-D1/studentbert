@@ -24,6 +24,7 @@ import math
 import statistics as st
 import sys
 from collections import defaultdict
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 try:
@@ -124,7 +125,12 @@ def _rho_key(x) -> float:
 
 
 def fmt(x) -> str:
-    return f"{x:.4f}" if isinstance(x, float) else str(x)
+    # Decimal from the shortest repr, half away from zero, rounded once; float
+    # formatting would round the binary value half to even (0.00015 -> 0.0001).
+    if isinstance(x, float):
+        d = Decimal(repr(x)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+        return str(d)
+    return str(x)
 
 
 def write(prefix: str, rows: list[dict], summary: list[dict]) -> None:

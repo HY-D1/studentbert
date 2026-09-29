@@ -126,6 +126,13 @@ def test_main_writes_three_files():
         assert "| algebra2006 | src:junyi |" in rep, rep
 
 
+def test_report_rounding_is_decimal_half_up():
+    assert sb.fmt(0.00015) == "0.0002"
+    assert sb.fmt(-0.00015) == "-0.0002"
+    assert sb.fmt(0.1234) == "0.1234"
+    assert sb.fmt(7) == "7"
+
+
 def main() -> int:
     tests = [(n, f) for n, f in globals().items() if n.startswith("test_") and callable(f)]
     failed = 0

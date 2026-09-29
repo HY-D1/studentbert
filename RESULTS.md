@@ -594,8 +594,10 @@ fine-tune seeds, not encoder builds._
 | nleep_k8_kt_causal | 21 | -0.1531 | 2/21 | 2/21 | 0.0078 / 0.0278 | 4 | 0 |
 | nleep_k16_kt_causal | 21 | -0.3197 | 2/21 | 2/21 | 0.0080 / 0.0278 | 2 | 0 |
 
-hscore_shrunk equals hscore; the largest-source rule has one ranking per target. Scores use the
-leakage-safe causal features of src/estimators/features.py on 3,000 target learners, capped at
+hscore_shrunk makes the same pick as hscore in all 21 rankings (top-1 11/21, tied with best 14/21,
+regret 0.0012 / 0.0103) at rho +0.5238; the largest-source rule has one ranking per target. Scores
+use the leakage-safe causal features of src/estimators/features.py on the fine-tune's learner draw
+(3,000 learners on EdNet and Junyi, the whole train split on the five smaller targets), capped at
 50,000 positions.
 
 _Read: H-score is the strongest estimator, narrowly ahead of LogME. Both beat the largest-source
@@ -606,13 +608,15 @@ unstable._
 ### 12.4 The repeated failure: preference for the target's own encoder
 
 H-score picks the target's own encoder in 15 of 21 rankings, LogME in 14 and the few-shot proxy in
-12. That is right on EdNet (in-domain best), Bridge 2006 and ASSISTments 2009 (in-domain tied for
-best), and wrong for all three estimators on ASSISTments 2017 (EdNet best) and Algebra 2006 (Junyi
-best). Ruled out as causes by the LogME diagnostics (scripts/diagnose_logme.py, three original
-targets): the trained skill table, since re-scoring the in-domain encoder with its skill table at
-the random start leaves the ASSISTments 2017 pick unchanged on 3 of 3 seeds; and layer choice, with
-rank correlation by layer L0 +0.20, L1 -0.40, L2 -0.40, L3 +0.04, L4 +0.24, L5 +0.62, L6 +0.42,
-where L5 still picks in-domain on ASSISTments 2017. Per-skill LogME fails at every layer.
+12. That is right on EdNet and ASSISTments 2009, where in-domain is the best source (on ASSISTments
+2009 Junyi and scratch are tied with it), not an error on Bridge 2006, where in-domain is tied with
+Junyi, the best, and wrong for all three estimators on ASSISTments 2017 (EdNet best) and Algebra
+2006 (Junyi best). Ruled out as causes by the LogME diagnostics (scripts/diagnose_logme.py, three
+original targets): the trained skill table, since re-scoring the in-domain encoder with its skill
+table at the random start leaves the ASSISTments 2017 pick unchanged on 3 of 3 seeds; and layer
+choice, with rank correlation by layer L0 +0.20, L1 -0.40, L2 -0.40, L3 +0.04, L4 +0.24, L5 +0.62,
+L6 +0.42, where L5 still picks in-domain on ASSISTments 2017. Neither diagnostic was run on Algebra
+2006. Per-skill LogME fails at every layer.
 
 ### 12.5 Budget hypothesis for that failure (not supported)
 
@@ -723,6 +727,160 @@ gain regret; at matched size, unseen learners give the higher rank correlation a
 those five targets the train draw and the validation sample hold every learner of their split, so
 there the three seeds differ only in the position subsample and the random skill tables; the
 matched train draw is a different eighth of the train split at each seed._
+
+### 12.7 Confidence signals, the foreign-source view and two simple rules (the seven N=3000 cells; analysis/estimator_signals.py, analysis/similarity_baseline.py, analysis/best_average_source.py)
+
+Signals from analysis/estimator_signals.py over the 3 estimator seeds of each target: the modal
+pick, the seeds that agree with it, and the margin of the pick over the runner-up divided by the
+per-candidate seed SD, as that script writes it (6 dp). Mean regret is recomputed from
+estimators_cells.tsv. The foreign-source view, from analysis/similarity_baseline.py, leaves the
+target's own encoder out and judges every choice against the best foreign source. The best-average
+rule (analysis/best_average_source.py, commit 5471edc) scores each source by minus its mean rank as
+a foreign source on the other six targets, so no target's results enter its own scores; it re-judges
+the largest-source rule as a check, which reproduces 12.3 exactly.
+
+Files (md5): estimators_summary.tsv a82f6da1cd995a4d13fd4c6a825969a6, estimators_cells.tsv
+3a69311ffa9b0d90befdb7287f4ce632, signals_main.tsv a3f4c0d80490904618a69ede169f5858,
+similarity_summary.tsv 14ef5a915ca203eed44649da767ec66d, similarity_cells.tsv
+f1ca3ab393d465df3dab7ef8c6d28ddd, best_average_cells.tsv 37a2d6d02d2232da2d06b73248b19596,
+best_average_report.md 028f88245621a2bf83da55b9f346c4c9.
+
+| estimator | target | modal pick | agreement | margin / seed SD | mean regret |
+|---|---|---|---|---|---|
+| hscore_kt_causal | assist2017 | assist2017 | 3/3 | 2.898999 | 0.0030 |
+| hscore_kt_causal | ednet | ednet | 3/3 | 2.328283 | 0.0000 |
+| hscore_kt_causal | junyi | ednet | 3/3 | 0.352872 | 0.0000 |
+| hscore_kt_causal | algebra2005 | junyi | 2/3 | 1.442697 | 0.0034 |
+| hscore_kt_causal | bridge2006 | bridge2006 | 3/3 | 0.768078 | 0.0005 |
+| hscore_kt_causal | assist2009 | assist2009 | 3/3 | 3.045132 | 0.0000 |
+| hscore_kt_causal | algebra2006 | algebra2006 | 3/3 | 0.748992 | 0.0017 |
+| logme_kt_causal | assist2017 | assist2017 | 3/3 | 1.003681 | 0.0030 |
+| logme_kt_causal | ednet | ednet | 2/3 | 0.784816 | 0.0031 |
+| logme_kt_causal | junyi | ednet | 3/3 | 0.202392 | 0.0000 |
+| logme_kt_causal | algebra2005 | junyi | 2/3 | 1.800205 | 0.0034 |
+| logme_kt_causal | bridge2006 | bridge2006 | 3/3 | 0.276234 | 0.0005 |
+| logme_kt_causal | assist2009 | assist2009 | 3/3 | 2.590958 | 0.0000 |
+| logme_kt_causal | algebra2006 | algebra2006 | 3/3 | 1.105673 | 0.0017 |
+
+Foreign-source view (the target's own encoder out; 7 targets):
+
+| estimator | rankings | rho | top-1 | tied with best | regret mean / max | negative picks |
+|---|---|---|---|---|---|---|
+| best average (leave one target out) | 7 | +0.4699 | 5/7 | 5/7 | 0.0020 / 0.0093 | 1 |
+| largest source | 7 | +0.3959 | 3/7 | 3/7 | 0.0037 / 0.0103 | 0 |
+| hscore_shrunk_kt_causal | 21 | +0.3660 | 14/21 | 14/21 | 0.0024 / 0.0233 | 0 |
+| hscore_kt_causal | 21 | +0.3578 | 14/21 | 14/21 | 0.0024 / 0.0233 | 0 |
+| logme_kt_causal | 21 | +0.3442 | 13/21 | 13/21 | 0.0028 / 0.0233 | 0 |
+| fewshot_ft_fit200_e5 | 21 | +0.1864 | 11/21 | 11/21 | 0.0028 / 0.0103 | 4 |
+| similarity_labels | 7 | +0.1429 | 3/7 | 3/7 | 0.0058 / 0.0278 | 1 |
+| similarity_inputs | 7 | +0.1184 | 3/7 | 3/7 | 0.0062 / 0.0278 | 1 |
+| fewshot_ft_fit50_e5 | 21 | +0.0721 | 8/21 | 8/21 | 0.0048 / 0.0229 | 5 |
+| logme_kt_causal_per_skill | 21 | +0.0503 | 8/21 | 8/21 | 0.0064 / 0.0278 | 6 |
+| nleep_k8_kt_causal | 21 | -0.0721 | 2/21 | 3/21 | 0.0071 / 0.0278 | 4 |
+| nleep_k4_kt_causal | 21 | -0.1755 | 1/21 | 2/21 | 0.0084 / 0.0278 | 6 |
+| nleep_k16_kt_causal | 21 | -0.1891 | 2/21 | 2/21 | 0.0073 / 0.0278 | 2 |
+
+Best-average rule against H-score, pretrained view (regret per target; the rule has one ranking per
+target, H-score three):
+
+| target | best-average pick | rule regret | H-score regret |
+|---|---|---|---|
+| assist2017 | junyi | 0.0047 | 0.0030 |
+| ednet | junyi | 0.0045 | 0.0000 |
+| junyi | junyi | 0.0023 | 0.0000 |
+| algebra2005 | junyi | 0.0000 | 0.0034 |
+| bridge2006 | junyi | 0.0000 | 0.0005 |
+| assist2009 | junyi | 0.0004 | 0.0000 |
+| algebra2006 | junyi | 0.0000 | 0.0017 |
+
+Pretrained view, all targets: best average rho +0.4447, top-1 3/7, tied with best 4/7, regret 0.0017
+/ 0.0047, 0 negative picks. Taking the lower of the two regrets on each target, a bound that reads
+the gold, gives 0.0004.
+
+_Read: the logged confidence signals do not flag the two wrong picks. On ASSISTments 2017 and
+Algebra 2006, H-score and LogME pick the in-domain encoder on 3 of 3 seeds, and the 200-learner
+few-shot proxy makes the same pick on at least 2 of 3; H-score's ASSISTments 2017 margin is 2.898999
+seed SDs, while its correct Junyi pick has a margin of 0.352872. With the own encoder removed,
+H-score picks Junyi on Algebra 2006 on every seed; the largest-source rule orders the foreign
+sources better than H-score but H-score picks the winner more often; the dataset-similarity rules
+are weak. The best-average rule picks Junyi on every target in the pretrained view: it is right on
+Algebra 2006, has the highest rank correlation in the foreign-source view, and trails H-score in the
+pretrained view. H-score and the rule lose regret on different targets, and only ASSISTments 2017
+defeats both. The foreign-view maximum of H-score, its shrunk form and LogME comes from one ranking,
+ASSISTments 2017 at seed 42, where all three pick Bridge 2006._
+
+## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
+
+Seven Hugging Face encoders (bert-base-uncased, roberta-base, distilbert-base-uncased,
+emilyalsentzer/Bio_ClinicalBERT, dmis-lab/biobert-v1.1, cardiffnlp/twitter-roberta-base,
+allenai/scibert_scivocab_uncased) on four of the paper's classification tasks (AGNews, MNLI, QNLI,
+RTE), with [CLS] and mean pooling. Features from scripts/task4_extract.py at its defaults: the last
+hidden layer, maximum length 256, a seeded sample of 10,000 training examples that does not depend
+on the encoder (RTE's whole training split of 2,490, so its three seeds see the same examples); 3
+sample seeds; 504 scores. Code 6dd0f0c; extraction Slurm 10673386 to 10673392 (one gpu-partition job
+per encoder), scoring 10673657 (short partition). Gold: the paper's Table 2
+(configs/task4/bassignana2022_table2.tsv, checked against the paper's own correlations by
+analysis/task4_gold_check.py), frozen and fully fine-tuned means over 5 seeds. A choice ties with
+the best within 0.1 points or inside a two-sided 95% interval from the published SDs, a rule fixed
+before any score. The paper's Airline and SciERC tasks were not run; the extractor covers the four
+above. Published-table issues: the RTE mean-pooled rows reproduce the paper's Pearson only to 0.605
+and 0.581 against the printed 0.616 and 0.597, and the MNLI mean-pooled tuned SDs of the last four
+models repeat SciERC's.
+
+Files (md5): task4_eval_summary.tsv 17d4dfd7116bd9d2a0a4642719210c8d, task4_eval_cells.tsv
+d1f2c4fe25d7d51d0a253dc50f3a3260, task4_eval_repro.tsv dab14daf29eb1ba817ab824f7b3e75f3,
+task4_scores.jsonl 52ed7805e369eb479f5ca45afcc1cb34, task4_ceiling_report.md
+dc37d1cc158b39359a646340948a52ba.
+
+LogME reproduction (Spearman between our LogME, mean over seeds, and the published LogME over the 7
+encoders):
+
+| task | pooling | Spearman |
+|---|---|---|
+| agnews | cls | +0.9286 |
+| agnews | mean | +0.8214 |
+| mnli | cls | +0.4144 |
+| mnli | mean | +0.5000 |
+| qnli | cls | +0.6786 |
+| qnli | mean | +0.5714 |
+| rte | cls | +0.5714 |
+| rte | mean | +0.6487 |
+
+Estimators against the published gold (4 tasks x 2 poolings x 3 seeds; regret in points):
+
+| estimator | gold | rho | tau-b | pairwise accuracy | top-1 | tied with best | regret mean / max | seed stability |
+|---|---|---|---|---|---|---|---|---|
+| hscore | frozen | +0.7649 | +0.6111 | 0.8548 | 16/24 | 19/24 | 1.05 / 4.06 | 0.9444 |
+| hscore | tuned | +0.2098 | +0.1825 | 0.5931 | 4/24 | 4/24 | 3.37 / 6.90 | 0.9444 |
+| hscore_shrunk | frozen | +0.7619 | +0.6310 | 0.8437 | 15/24 | 21/24 | 0.86 / 4.06 | 0.9286 |
+| hscore_shrunk | tuned | +0.2143 | +0.1944 | 0.6194 | 2/24 | 5/24 | 3.84 / 6.90 | 0.9286 |
+| logme | frozen | +0.7440 | +0.6071 | 0.8317 | 14/24 | 17/24 | 0.94 / 4.06 | 0.9524 |
+| logme | tuned | +0.2068 | +0.1865 | 0.6070 | 7/24 | 10/24 | 3.07 / 5.87 | 0.9524 |
+
+Reference rankings from the published table alone (analysis/task4_ceiling.py, commit af372a3; one
+ranking per task and pooling): the frozen oracle ranks by the published frozen means; best average
+ranks by mean tuned rank on the other published tasks, same pooling.
+
+| ranking | gold | rho | tau-b | pairwise accuracy | top-1 | tied with best | regret mean / max |
+|---|---|---|---|---|---|---|---|
+| published_logme | frozen | +0.7829 | +0.6824 | 0.8920 | 3/8 | 5/8 | 1.38 / 4.61 |
+| loto_best_average | frozen | +0.3770 | +0.2717 | 0.6447 | 2/8 | 3/8 | 2.43 / 5.54 |
+| frozen_oracle | tuned | +0.3884 | +0.2857 | 0.6821 | 2/8 | 3/8 | 2.31 / 5.87 |
+| published_logme | tuned | +0.5659 | +0.4428 | 0.7626 | 2/8 | 3/8 | 2.84 / 6.16 |
+| loto_best_average | tuned | +0.5363 | +0.4598 | 0.7275 | 0/8 | 2/8 | 1.71 / 3.84 |
+
+Tuned winners: RoBERTa on all six NLI settings, DistilBERT on both AGNews settings. BioBERT, never a
+tuned winner, is H-score's pick in 11 of 24 rankings and LogME's in 15.
+
+_Read: against frozen performance H-score ranks the encoders best (rho +0.7649, top-1 16/24),
+narrowly ahead of LogME (+0.7440), as on StudentBERT. Against full fine-tuning both fall (+0.2098
+and +0.2068) and pick the tuned winner in 4 and 7 of 24 rankings, with seed stability 0.9444 and
+0.9524, so seed spread does not flag the failure. Exact knowledge of frozen performance picks the
+tuned winner in 2 of 8 settings (rho +0.3884), so frozen performance is itself a weak guide to
+fine-tuned performance here. The best-average rule has the lowest mean regret against tuned gold
+(1.71 points) but never picks the winner. Our LogME reproduces the published ranking strongly on
+AGNews and partly on the NLI tasks, and ranks tuned performance worse than the published LogME
+(+0.5659 on the same settings)._
 
 _End of consolidated results._
 
