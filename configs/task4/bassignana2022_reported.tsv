@@ -1,0 +1,30 @@
+# Bassignana, Mueller-Eberstein, Zhang, Plank. Evidence > Intuition: Transferability Estimation for
+# Encoder Selection. EMNLP 2022, pp. 4218-4227. Appendix B, Table 2, reported correlation rows, read from
+# arXiv 2210.11255 v1 on 2026-09-28. Performance in percent over 5 seeds (mean, sd); metric micro-F1,
+# macro-F1 for SciERC. analysis/task4_gold_check.py verifies every row against the paper's own
+# reported correlations; the sd columns cannot be checked that way.
+dataset	pooling	regime	pearson	tau_w
+agnews	mean	frozen	0.954	0.330
+agnews	mean	tuned	0.240	0.559
+agnews	cls	frozen	0.955	0.846
+agnews	cls	tuned	0.344	0.337
+airline	mean	frozen	0.982	0.953
+airline	mean	tuned	0.922	0.912
+airline	cls	frozen	0.982	0.885
+airline	cls	tuned	0.954	0.837
+scierc	mean	frozen	0.930	0.825
+scierc	mean	tuned	0.631	0.521
+scierc	cls	frozen	0.103	-0.016
+scierc	cls	tuned	-0.220	-0.203
+mnli	mean	frozen	0.698	0.429
+mnli	mean	tuned	0.532	0.384
+mnli	cls	frozen	0.959	0.581
+mnli	cls	tuned	0.503	0.619
+qnli	mean	frozen	0.933	0.960
+qnli	mean	tuned	0.663	0.621
+qnli	cls	frozen	0.983	1.000
+qnli	cls	tuned	0.242	0.308
+rte	mean	frozen	0.616	0.450
+rte	mean	tuned	0.597	0.324
+rte	cls	frozen	0.616	0.377
+rte	cls	tuned	0.671	0.472
