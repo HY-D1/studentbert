@@ -329,6 +329,37 @@ def test_diagnostic_layers_reproduce_the_estimator():
         assert not np.allclose(feats[0], feats[-1], atol=1e-3), "layers should differ"
 
 
+def test_diagnostic_scores_hscore_at_every_layer():
+    _torch()
+    import importlib.util as _u
+
+    from src.estimators.features import (build_backbone, cap_positions, sample_target,
+                                         target_num_skills)
+    from src.estimators.hscore import hscore
+
+    spec = _u.spec_from_file_location("diagnose_logme", REPO / "scripts" / "diagnose_logme.py")
+    diag = _u.module_from_spec(spec)
+    spec.loader.exec_module(diag)
+    with tempfile.TemporaryDirectory() as tmp:
+        tgt = _make_processed(Path(tmp), "tgt")
+        out, _ = diag.score_layers(None, tgt, seed=7, n_students=12, max_positions=150,
+                                   min_group=20, device="cpu", d_model=16, n_layers=2,
+                                   max_seq_len=64)
+        bb = build_backbone(target_num_skills(tgt), seed=7, d_model=16, n_layers=2, max_len=64)
+        sub, _, _ = sample_target(tgt, 12, 7, 64)
+        sel = cap_positions(diag.n_positions(sub), 150, 7)
+        feats, y, _ = diag.layer_features(bb, sub, sel, "cpu")
+        hs = {r.estimator: r for r in out if r.estimator.startswith("hscore_kt_causal_L")}
+        assert sorted(hs) == [f"hscore_kt_causal_L{i}" for i in range(3)], sorted(hs)
+        for i, F in enumerate(feats):
+            r = hs[f"hscore_kt_causal_L{i}"]
+            assert abs(r.score - hscore(F, y)[0]) <= 1e-9 * max(1.0, abs(r.score))
+            assert set(r.uncertainty_signals) == {"rank", "n"}
+        lm = [r for r in out if r.estimator.startswith("logme_kt_causal_L")]
+        assert len(lm) == 3 and all(set(r.uncertainty_signals) == {"alpha", "beta", "gamma",
+                                                                   "converged"} for r in lm)
+
+
 def test_O6_score_orientation():
     def mk(c, score, direction="higher_is_better", est="e"):
         return EstimatorResult(est, "F", c, "t", 1, score, direction, 1, 1, 0.0, 0.0, None)

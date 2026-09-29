@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Diagnose where the leakage-safe KT LogME loses the transfer signal (MRAP Section T).
 
+Plain H-score is scored on the same features at every layer as well (estimator names
+hscore_kt_causal_L<k>), for the Algebra 2006 diagnostic of the failure review.
+
 Two questions, each answered from the same learners and positions the main estimator scores:
   layer         Does an earlier layer carry what the final layer loses? Causal features are
                 captured at the embedding output (L0) and after every encoder layer (L1 to L6)
@@ -32,7 +35,13 @@ from src.data.dataset import collate_fn
 from src.estimators.base import EstimatorResult
 from src.estimators.features import (build_backbone, cap_positions, encode_causal, kt_features,
                                      load_candidate, sample_target, target_num_skills)
+from src.estimators.hscore import hscore
 from src.estimators.logme import logme, logme_per_group
+
+
+# Uncertainty signals kept per estimator family; H-score is closed form, so it has no
+# convergence flag to report.
+SIGNALS = {"logme": ("alpha", "beta", "gamma", "converged"), "hscore": ("rank", "n")}
 
 
 def n_positions(subset) -> int:
@@ -104,7 +113,8 @@ def score_layers(candidate, target_dir, *, seed, n_students, max_positions, min_
     for L, F in enumerate(feats):
         for est, fn in ((f"logme_kt_causal_L{L}{suffix}", lambda F=F: logme(F, y)),
                         (f"logme_kt_causal_per_skill_L{L}{suffix}",
-                         lambda F=F: logme_per_group(F, y, nxt, min_group=min_group))):
+                         lambda F=F: logme_per_group(F, y, nxt, min_group=min_group)),
+                        (f"hscore_kt_causal_L{L}{suffix}", lambda F=F: hscore(F, y))):
             s0 = time.perf_counter()
             score, info = fn()
             out.append(EstimatorResult(
@@ -114,7 +124,7 @@ def score_layers(candidate, target_dir, *, seed, n_students, max_positions, min_
                 n_target_examples=int(y.size), n_target_labels=int(y.size),
                 feature_extraction_time=t1 - t0, scoring_time=time.perf_counter() - s0,
                 peak_memory_mb=None,
-                uncertainty_signals={k: info[k] for k in ("alpha", "beta", "gamma", "converged")},
+                uncertainty_signals={k: info[k] for k in SIGNALS[est.split("_kt_")[0]]},
                 metadata={"sample_fingerprint": fp, "n_students_requested": n_students,
                           "layer": L, "skill_table_randomized": randomize_skill_table,
                           "load": load, "positions_used": int(y.size)}))
@@ -177,10 +187,13 @@ def main() -> None:
                     for r in rs:
                         fh.write(json.dumps(r.to_json()) + "\n")
                     fh.flush()
-                    plain = [r for r in rs if "per_skill" not in r.estimator]
+                    plain = [r for r in rs if r.estimator.startswith("logme_kt_causal_L")]
+                    hs = [r for r in rs if r.estimator.startswith("hscore_kt_causal_L")]
                     print(f"DIAG target={target} seed={seed} cand={Path(c).name} skillrand={rnd} "
                           f"maxdiff={diff} "
-                          + " ".join(f"L{r.metadata['layer']}={r.score:.5f}" for r in plain),
+                          + " ".join(f"L{r.metadata['layer']}={r.score:.5f}" for r in plain)
+                          + " | hscore "
+                          + " ".join(f"L{r.metadata['layer']}={r.score:.5f}" for r in hs),
                           flush=True)
 
 
