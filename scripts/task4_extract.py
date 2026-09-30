@@ -10,6 +10,9 @@ from __future__ import annotations
 #       --out_dir /projects/algl/dai.hany/task4/features
 
 import argparse
+import csv
+import hashlib
+import io
 import json
 import sys
 import time
@@ -17,12 +20,24 @@ from pathlib import Path
 
 import numpy as np
 
-# task -> (hub id, config, (first text column, second text column or None))
+# task -> (hub id, config, (first text column, second text column or None)); hub "local"
+# reads the split pinned in LOCAL instead of the Hugging Face hub
 TASKS = {
     "agnews": ("fancyzhx/ag_news", None, ("text", None)),
     "mnli": ("nyu-mll/glue", "mnli", ("premise", "hypothesis")),
     "qnli": ("nyu-mll/glue", "qnli", ("question", "sentence")),
     "rte": ("nyu-mll/glue", "rte", ("sentence1", "sentence2")),
+    "airline": ("local", None, ("text", None)),
+}
+# Local tasks read a train split made outside this repo: task -> (file, md5, text column,
+# labels). airline: the authors' own converter (mainlp/logme-nlp, commit 0046c725,
+# sentiment/convert.py -rs 4012) on Kaggle's Tweets.csv (md5
+# 2fa808ea99b32814ccd64d7097d935f2), run in a separate clone because that code is GPL-3.0;
+# only its output is read here. SciERC is excluded: its entity-marked splits were never
+# released (mrap_task4_crossdomain.md).
+LOCAL = {
+    "airline": ("/projects/algl/dai.hany/task4/data/airline/airline-train.csv",
+                "b0fa4865e8d442b5e2146715e7a84c10", "text", (0, 1, 2)),
 }
 MODELS = ("bert-base-uncased", "roberta-base", "distilbert-base-uncased",
           "emilyalsentzer/Bio_ClinicalBERT", "dmis-lab/biobert-v1.1",
@@ -33,6 +48,24 @@ def sample_indices(n_total: int, n: int, seed: int) -> np.ndarray:
     """Candidate-independent: a function of the task size, the sample size and the seed only."""
     rng = np.random.default_rng(seed)
     return np.sort(rng.choice(n_total, size=min(n, n_total), replace=False))
+
+
+def read_local(path: str, md5: str, col: str,
+               allowed: tuple[int, ...]) -> tuple[list[str], np.ndarray]:
+    """Texts and integer labels of a local CSV split; aborts on a different or malformed file."""
+    p = Path(path)
+    if not p.is_file():
+        sys.exit(f"ABORT: {p} is missing")
+    raw = p.read_bytes()
+    got = hashlib.md5(raw).hexdigest()
+    if got != md5:
+        sys.exit(f"ABORT: {p} md5 {got}, expected {md5}")
+    rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8"), newline="")))
+    texts = [r[col] for r in rows]
+    labels = np.asarray([int(r["label"]) for r in rows])
+    if not rows or any(not t for t in texts) or not set(labels.tolist()) <= set(allowed):
+        sys.exit(f"ABORT: {p} has no rows, an empty text or a label outside {allowed}")
+    return texts, labels
 
 
 def slug(model: str) -> str:
@@ -57,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
 
     import torch
     import transformers
-    from datasets import load_dataset
+    from datasets import Dataset, load_dataset
     from transformers import AutoModel, AutoTokenizer
 
     out = out_path(a.out_dir, a.task, a.model, a.seed)
@@ -65,8 +98,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"skip (exists): {out}")
         return 0
     hub, cfg, (col_a, col_b) = TASKS[a.task]
-    ds = load_dataset(hub, cfg, split="train")
-    labels = np.asarray(ds["label"])
+    source = {"hub": hub, "config": cfg}
+    if hub == "local":
+        path, md5, col, allowed = LOCAL[a.task]
+        texts, labels = read_local(path, md5, col, allowed)
+        ds = Dataset.from_dict({col: texts, "label": labels.tolist()})
+        source.update(data_file=path, data_md5=md5)
+    else:
+        ds = load_dataset(hub, cfg, split="train")
+        labels = np.asarray(ds["label"])
     if (labels < 0).any():
         sys.exit(f"ABORT: {a.task} train split has unlabeled rows")
     idx = sample_indices(len(ds), a.n, a.seed)
@@ -96,7 +136,7 @@ def main(argv: list[str] | None = None) -> int:
     meta = {"model": a.model, "task": a.task, "seed": a.seed, "n": int(idx.size),
             "n_train": len(ds), "max_length": a.max_length, "extract_s": secs,
             "peak_gpu_mb": peak, "transformers": transformers.__version__,
-            "torch": torch.__version__, "hub": hub, "config": cfg}
+            "torch": torch.__version__, **source}
     out.with_suffix(".json").write_text(json.dumps(meta, indent=2))
     print(f"ok: {out} n={idx.size} dim={cls_parts[0].shape[1]} extract_s={secs:.1f}")
     return 0

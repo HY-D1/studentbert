@@ -13,6 +13,8 @@ from __future__ import annotations
 #   PYTHONPATH=. python analysis/task4_evaluate.py \
 #       --scores /projects/algl/dai.hany/task4/task4_scores.jsonl \
 #       --out /projects/algl/dai.hany/task4/task4_eval
+# With --tasks agnews mnli qnli rte it reproduces the 2026-09-28 evaluation exactly after
+# Airline is scored into the same file.
 
 import argparse
 import csv
@@ -84,6 +86,16 @@ def load_scores(path: str) -> dict:
     return out
 
 
+def select_tasks(scores: dict, tasks: list[str] | None) -> dict:
+    """Only the named tasks, so a later run can reproduce an earlier, smaller evaluation exactly."""
+    if not tasks:
+        return scores
+    missing = set(tasks) - {t for _e, t, _p in scores}
+    if missing:
+        sys.exit(f"ABORT: no scores for task(s) {sorted(missing)}")
+    return {k: v for k, v in scores.items() if k[1] in tasks}
+
+
 def evaluate(scores: dict, gold: dict) -> tuple[list[dict], list[dict]]:
     rows, repro = [], []
     for (est, task, pooling), by_seed in sorted(scores.items()):
@@ -134,8 +146,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--scores", required=True)
     ap.add_argument("--gold", default=str(GOLD))
     ap.add_argument("--out", required=True, help="prefix for _cells.tsv, _summary.tsv, _report.md")
+    ap.add_argument("--tasks", nargs="*", help="evaluate only these tasks (default: all scored)")
     a = ap.parse_args(argv)
-    rows, repro = evaluate(load_scores(a.scores), load_gold(Path(a.gold)))
+    rows, repro = evaluate(select_tasks(load_scores(a.scores), a.tasks), load_gold(Path(a.gold)))
     if not rows:
         sys.exit("ABORT: no scores match a published task and pooling")
     summary = summarize(rows)

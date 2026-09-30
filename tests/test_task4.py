@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import contextlib
+import csv
+import hashlib
 import importlib.util
 import io
 import json
@@ -148,6 +150,68 @@ def test_missing_model_aborts():
             assert "of 7 models" in str(exc)
         else:
             raise AssertionError("missing model did not abort")
+
+
+def test_local_split_reads_quoted_text_and_checks_md5_and_labels():
+    with tempfile.TemporaryDirectory() as t:
+        p = Path(t) / "x-train.csv"
+        with open(p, "w", encoding="utf8", newline="") as fh:
+            w = csv.writer(fh, quoting=csv.QUOTE_ALL)
+            w.writerow(["text", "label"])
+            w.writerows([['a, "quoted"\nline', "0"], ["@united thanks", "2"], ["ok", "1"]])
+        md5 = hashlib.md5(p.read_bytes()).hexdigest()
+        texts, labels = ex.read_local(str(p), md5, "text", (0, 1, 2))
+        assert texts == ['a, "quoted"\nline', "@united thanks", "ok"], texts
+        assert labels.tolist() == [0, 2, 1]
+        for bad_md5, allowed in (("0" * 32, (0, 1, 2)), (md5, (0, 1))):
+            try:
+                ex.read_local(str(p), bad_md5, "text", allowed)
+            except SystemExit as exc:
+                assert "ABORT" in str(exc)
+            else:
+                raise AssertionError("a wrong md5 or a label outside the set did not abort")
+
+
+def test_airline_is_a_local_task_with_a_pinned_split_and_scierc_is_absent():
+    assert ex.TASKS["airline"][0] == "local" and set(ex.LOCAL) == {"airline"}
+    path, md5, col, allowed = ex.LOCAL["airline"]
+    assert path.endswith("/airline-train.csv") and len(md5) == 32 and allowed == (0, 1, 2)
+    assert col == ex.TASKS["airline"][2][0] and "scierc" not in ex.TASKS
+
+
+def test_task_filter_keeps_only_named_tasks_and_aborts_on_unscored():
+    s = scores_from([1, 2, 3, 4, 5, 6, 7])
+    s[("hscore", "airline", "cls")] = s[("hscore", "rte", "cls")]
+    assert {k[1] for k in ev.select_tasks(s, ["rte"])} == {"rte"}
+    assert ev.select_tasks(s, None) is s and ev.select_tasks(s, []) is s
+    try:
+        ev.select_tasks(s, ["qnli"])
+    except SystemExit as exc:
+        assert "qnli" in str(exc)
+    else:
+        raise AssertionError("an unscored task did not abort")
+
+
+def test_ceiling_extra_section_leaves_the_default_report_unchanged():
+    ce = _load("t4_ceiling", "analysis/task4_ceiling.py")
+    with tempfile.TemporaryDirectory() as t:
+        with contextlib.redirect_stdout(io.StringIO()):
+            ce.main(["--out", f"{t}/a"])
+            ce.main(["--out", f"{t}/b", "--also_run", "airline"])
+        a = Path(f"{t}/a_report.md").read_text()
+        b = Path(f"{t}/b_report.md").read_text()
+        head, sep, tail = b.partition("## Tasks run in Task 4 plus airline")
+        assert sep and "plus airline" not in a
+        rest = tail.split("## All six published tasks", 1)[1]
+        assert head + "## All six published tasks" + rest == a
+        for bad in (["rte"], ["nosuchtask"]):
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    ce.main(["--out", f"{t}/c", "--also_run", *bad])
+            except SystemExit as exc:
+                assert "ABORT" in str(exc)
+            else:
+                raise AssertionError(f"--also_run {bad} did not abort")
 
 
 def main() -> int:

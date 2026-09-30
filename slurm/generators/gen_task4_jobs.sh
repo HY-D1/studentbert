@@ -7,6 +7,9 @@
 #
 #   bash slurm/generators/gen_task4_jobs.sh
 #   ls queue_task4_extract/ queue_task4_score/
+# The Airline extension (2026-09-30; SciERC excluded) builds its jobs with
+#   TASKS=airline QX=queue_task4_airline_x QS=queue_task4_airline_s bash \
+#       slurm/generators/gen_task4_jobs.sh
 
 set -euo pipefail
 ROOT=/projects/algl/dai.hany
@@ -15,7 +18,7 @@ OUT=$ROOT/task4
 T4PY=$ROOT/envs/t4/bin/python
 SBPY=$ROOT/envs/sb/bin/python
 MODELS="bert-base-uncased roberta-base distilbert-base-uncased emilyalsentzer/Bio_ClinicalBERT dmis-lab/biobert-v1.1 cardiffnlp/twitter-roberta-base allenai/scibert_scivocab_uncased"
-TASKS="agnews mnli qnli rte"
+TASKS=${TASKS:-"agnews mnli qnli rte"}
 SEEDS="42 1 2"
 QX=${QX:-queue_task4_extract}
 QS=${QS:-queue_task4_score}

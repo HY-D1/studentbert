@@ -14,6 +14,8 @@ from __future__ import annotations
 # half away from zero, only for display.
 #
 #   PYTHONPATH=. python analysis/task4_ceiling.py --out /projects/algl/dai.hany/task4/task4_ceiling
+# --also_run airline adds a section for the tasks run so far plus Airline (2026-09-30); without
+# it the report is byte-identical to the 2026-09-29 one, so review 7.5's targets stay checkable.
 
 import argparse
 import csv
@@ -92,15 +94,23 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--gold", default=str(GOLD))
     ap.add_argument("--out", required=True, help="prefix for _cells.tsv and _report.md")
+    ap.add_argument("--also_run", nargs="*", default=[], help="later tasks, extra section")
     a = ap.parse_args(argv)
-    rows = cells(load_gold(Path(a.gold)))
+    gold = load_gold(Path(a.gold))
+    extra = tuple(a.also_run)
+    if set(extra) - {t for t, _p in gold} or set(extra) & set(RUN_TASKS):
+        sys.exit(f"ABORT: --also_run {list(extra)} must name published tasks not in {RUN_TASKS}")
+    rows = cells(gold)
     with open(f"{a.out}_cells.tsv", "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=list(rows[0]), delimiter="\t", lineterminator="\n")
         w.writeheader()
         w.writerows(rows)
     L = ["# Task 4 ceiling check against the published gold (Bassignana et al. 2022)", ""]
-    for title, tasks in (("Tasks run in Task 4 (AGNews, MNLI, QNLI, RTE)", RUN_TASKS),
-                         ("All six published tasks", None)):
+    sections = [("Tasks run in Task 4 (AGNews, MNLI, QNLI, RTE)", RUN_TASKS)]
+    if extra:
+        sections.append((f"Tasks run in Task 4 plus {', '.join(extra)}", RUN_TASKS + extra))
+    sections.append(("All six published tasks", None))
+    for title, tasks in sections:
         s = summarize(rows, tasks)
         cols = list(s[0])
         L += [f"## {title}", "", "| " + " | ".join(cols) + " |", "|" + "---|" * len(cols)]
