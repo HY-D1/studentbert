@@ -610,8 +610,9 @@ unstable._
 H-score picks the target's own encoder in 15 of 21 rankings, LogME in 14 and the few-shot proxy in
 12. That is right on EdNet and ASSISTments 2009, where in-domain is the best source (on ASSISTments
 2009 Junyi and scratch are tied with it), not an error on Bridge 2006, where in-domain is tied with
-Junyi, the best, and wrong for all three estimators on ASSISTments 2017 (EdNet best) and Algebra
-2006 (Junyi best). Ruled out as causes by the LogME diagnostics (scripts/diagnose_logme.py, three
+Junyi, the best, and wrong for all three estimators on ASSISTments 2017 (EdNet best, also across
+evaluation learners, 12.12) and Algebra 2006 (Junyi best). Ruled out as causes by the LogME
+diagnostics (scripts/diagnose_logme.py, three
 original targets): the trained skill table, since re-scoring the in-domain encoder with its skill
 table at the random start leaves the ASSISTments 2017 pick unchanged on 3 of 3 seeds; and layer
 choice, with rank correlation by layer L0 +0.20, L1 -0.40, L2 -0.40, L3 +0.04, L4 +0.24, L5 +0.62,
@@ -956,6 +957,52 @@ _Read: once learners are resampled, neither split separates Junyi from the in-do
 test interval includes zero, and the gap between the splits is within learner sampling. The Algebra
 2006 difference of 12.1 holds across fine-tuning seeds, whose intervals the gold uses, but not
 across evaluation learners, which the gold does not resample._
+### 12.12 Learner-level bootstrap of the other two regret-bearing pairs (ASSISTments 2017 in-domain against EdNet, Algebra 2005 EdNet against Junyi, 6 seeds; scripts/split_bootstrap_kt.py), and H-score's regret by evidence status
+
+The 12.11 design on the two other pairs where H-score is charged regret on a small target. On
+ASSISTments 2017, a is the in-domain encoder and b is EdNet; on Algebra 2005, a is EdNet, H-score's
+pick on its one wrong seed, and b is Junyi. The 24 saved best checkpoints reproduce their recorded
+test AUC within 5.7e-08; 2,000 learner resamples (seed 0), the same for every checkpoint; the
+statistic is the mean over seeds of b minus a. Each checkpoint was selected on the validation
+learners, so the test interval is the clean one.
+
+Files (md5): split_bootstrap_assist2017_summary.tsv 854f586525daaa32b90af656c357912b,
+split_bootstrap_assist2017_checks.json 6fb893cae0c03e73d3b51664e0cde348,
+split_bootstrap_algebra2005_summary.tsv 5570b3f70342d562607f4995f0a99b3c,
+split_bootstrap_algebra2005_checks.json 761628948e0c744f4e65fa32b4c1e401, signals_main.tsv
+a3f4c0d80490904618a69ede169f5858.
+
+| target | b minus a | split | learners | positions | difference | 95% interval | P(>0) | seeds positive |
+|---|---|---|---|---|---|---|---|---|
+| assist2017 | EdNet minus in-domain | val | 170 | 60757 | +0.0035 | [+0.0010, +0.0061] | 0.9945 | 6/6 |
+| assist2017 | EdNet minus in-domain | test | 172 | 63066 | +0.0030 | [+0.0003, +0.0057] | 0.9870 | 6/6 |
+| assist2017 | EdNet minus in-domain | test minus val |  |  | -0.0005 | [-0.0043, +0.0032] | 0.3900 |  |
+| algebra2005 | Junyi minus EdNet | val | 56 | 20936 | +0.0103 | [+0.0066, +0.0141] | 1.0000 | 6/6 |
+| algebra2005 | Junyi minus EdNet | test | 58 | 22238 | +0.0103 | [+0.0075, +0.0132] | 1.0000 | 6/6 |
+| algebra2005 | Junyi minus EdNet | test minus val |  |  | +0.0000 | [-0.0047, +0.0047] | 0.4910 |  |
+
+H-score's mean regret over the 21 rankings of 12.3 (0.0012) by target: mean regret over its 3 seeds
+as benchmark_final/signals_main.tsv writes it, and that value over 7.
+
+| target | H-score pick, seeds | mean regret | share of the 21-ranking mean | evidence |
+|---|---|---|---|---|
+| assist2017 | assist2017, 3/3 | 0.002971 | 0.0004 | robust: across fine-tuning seeds (12.1) and evaluation learners on both splits (this section) |
+| algebra2005 | junyi, 2/3 | 0.003445 | 0.0005 | gold robust across learners (this section); the miss is one estimator seed of 3 |
+| algebra2006 | algebra2006, 3/3 | 0.001727 | 0.0002 | not separable across evaluation learners (12.11) |
+| bridge2006 | bridge2006, 3/3 | 0.000527 | 0.0001 | the pick is tied with the best (12.1) |
+| assist2009 | assist2009, 3/3 | 0.000000 | 0.0000 | no regret |
+| ednet | ednet, 3/3 | 0.000000 | 0.0000 | no regret |
+| junyi | ednet, 3/3 | 0.000000 | 0.0000 | no regret |
+| all 7 | | | 0.0012 | |
+
+_Read: on ASSISTments 2017 EdNet beats the in-domain encoder across evaluation learners on both
+splits, +0.0035 [+0.0010, +0.0061] on validation and +0.0030 [+0.0003, +0.0057] on test, 6 of 6
+seeds each, and the test gap is above the 0.001 margin, so the two are not top-equivalent at learner
+level either; the re-scored differences equal 12.8 seed by seed. On Algebra 2005 Junyi beats EdNet
+on both splits, +0.0103 [+0.0066, +0.0141] and +0.0103 [+0.0075, +0.0132], so H-score's one wrong
+seed there is an estimator error (EdNet, last of 7 there in 12.1), not gold noise. Of H-score's
+0.0012, 0.0004 comes from ASSISTments 2017, 0.0005 from the Algebra 2005 seed, 0.0002 from Algebra
+2006, which the evaluation learners do not separate, and 0.0001 from the Bridge 2006 tie._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
