@@ -615,8 +615,8 @@ Junyi, the best, and wrong for all three estimators on ASSISTments 2017 (EdNet b
 original targets): the trained skill table, since re-scoring the in-domain encoder with its skill
 table at the random start leaves the ASSISTments 2017 pick unchanged on 3 of 3 seeds; and layer
 choice, with rank correlation by layer L0 +0.20, L1 -0.40, L2 -0.40, L3 +0.04, L4 +0.24, L5 +0.62,
-L6 +0.42, where L5 still picks in-domain on ASSISTments 2017. Neither diagnostic was run on Algebra
-2006. Per-skill LogME fails at every layer.
+L6 +0.42, where L5 still picks in-domain on ASSISTments 2017. On Algebra 2006 the same diagnostics
+point the other way (12.9). Per-skill LogME fails at every layer.
 
 ### 12.5 Budget hypothesis for that failure (not supported)
 
@@ -717,9 +717,10 @@ Picks on the two failure targets and on Bridge 2006 (seeds 42, 1, 2; regret agai
 _Read: pretraining exposure explains the in-domain preference on ASSISTments 2017 and not on
 Algebra 2006. On ASSISTments 2017 both estimators prefer the in-domain encoder on 3 of 3 seeds of
 the matched train draw and on 1 of 3 with validation learners, where the other two seeds pick
-EdNet, the best source. On Algebra 2006 the preference holds on every seed of every sample, its
-margin grows on unseen learners, and Junyi is the only top-equivalent source (12.1), so that
-failure is neither exposure nor gold noise. On Bridge 2006 the estimators disagree (exposure for
+EdNet, the best source. On Algebra 2006 the preference holds on every seed of every sample and its
+margin grows on unseen learners, so it is not exposure; Junyi is the only top-equivalent source
+across fine-tuning seeds (12.1) but not across evaluation learners (12.8, 12.11). On
+Bridge 2006 the estimators disagree (exposure for
 H-score, representation for LogME), but every pick there is tied with the best. Scoring
 validation learners is not a fix: on the five smaller targets a validation split holds an eighth
 as many learners as the train split, and in aggregate both estimators lose rank correlation and
@@ -804,10 +805,157 @@ seed SDs, while its correct Junyi pick has a margin of 0.352872. With the own en
 H-score picks Junyi on Algebra 2006 on every seed; the largest-source rule orders the foreign
 sources better than H-score but H-score picks the winner more often; the dataset-similarity rules
 are weak. The best-average rule picks Junyi on every target in the pretrained view: it is right on
-Algebra 2006, has the highest rank correlation in the foreign-source view, and trails H-score in the
+Algebra 2006's test learners (12.11), has the highest rank correlation in the foreign-source
+view, and trails H-score in the
 pretrained view. H-score and the rule lose regret on different targets, and only ASSISTments 2017
 defeats both. The foreign-view maximum of H-score, its shrunk form and LogME comes from one ranking,
 ASSISTments 2017 at seed 42, where all three pick Bridge 2006._
+### 12.8 Fine-tuning trajectories and the validation check (the two failure targets, N=3000, 6 seeds; analysis/finetune_trajectories.py)
+
+Validation AUC per epoch from the fine-tune logs (4 dp, as scripts/finetune_edubert.py prints it);
+best validation AUC from the W&B export at full precision, each value checked against its log; test
+AUC is the benchmark value. The winner is the best source by mean test AUC (EdNet on ASSISTments
+2017, Junyi on Algebra 2006).
+
+Files (md5): trajectories_valtest.tsv 9088a58c14422e0a415d7e276dacf65c, trajectories_epochs.tsv
+b493726aeac64d6f2f53c86a93954af7.
+
+| target | winner minus own encoder | mean | seeds positive | per seed |
+|---|---|---|---|---|
+| assist2017 | best validation AUC | +0.0035 | 6/6 | +0.0008 +0.0033 +0.0037 +0.0069 +0.0015 +0.0048 |
+| assist2017 | test AUC | +0.0030 | 6/6 | +0.0025 +0.0015 +0.0022 +0.0047 +0.0021 +0.0049 |
+| algebra2006 | best validation AUC | +0.0001 | 3/6 | -0.0014 -0.0001 +0.0006 +0.0007 -0.0012 +0.0020 |
+| algebra2006 | test AUC | +0.0017 | 6/6 | +0.0009 +0.0004 +0.0002 +0.0032 +0.0029 +0.0028 |
+
+| target | epoch | leader | winner minus own | seeds winner ahead |
+|---|---|---|---|---|
+| assist2017 | 1 | assist2017 | -0.0103 | 1/6 |
+| assist2017 | 2 | ednet | +0.0039 | 5/6 |
+| assist2017 | 3 | ednet | +0.0137 | 6/6 |
+| assist2017 | 5 | ednet | +0.0077 | 6/6 |
+| assist2017 | 10 | ednet | +0.0029 | 6/6 |
+| assist2017 | 15 | ednet | +0.0015 | 5/6 |
+| assist2017 | 20 | ednet | +0.0022 | 5/6 |
+| algebra2006 | 1 | algebra2006 | -0.0113 | 0/6 |
+| algebra2006 | 2 | algebra2006 | -0.0002 | 2/6 |
+| algebra2006 | 3 | junyi | +0.0024 | 6/6 |
+| algebra2006 | 5 | junyi | +0.0023 | 6/6 |
+| algebra2006 | 10 | algebra2006 | -0.0001 | 1/6 |
+| algebra2006 | 15 | algebra2006 | -0.0014 | 2/6 |
+| algebra2006 | 20 | algebra2006 | -0.0021 | 1/6 |
+
+_Read: at epoch 1 of fine-tuning the own encoder leads on both targets, as the frozen scores say.
+EdNet leads ASSISTments 2017 from epoch 2 on, and its validation and test learners agree (6 of 6
+seeds on both). On Algebra 2006 Junyi leads the validation learners at epochs 3 to 9 and the own
+encoder from epoch 10 on; at the best checkpoints the validation learners tie the two (+0.0001, 3/6
+seeds) while the test learners favour Junyi (+0.0017, 6/6)._
+
+### 12.9 Layer and skill-table diagnostic on Algebra 2006 (3 seeds, scratch and 7 encoders; scripts/diagnose_logme.py with H-score, analysis/layer_diag_report.py)
+
+Each ranking of the 7 sources is judged against the fine-tuned gold as in 12.3. 'Skill table reset'
+re-scores the in-domain encoder with its skill table at the fine-tune's random start, the table
+every foreign encoder is scored with; nothing else changes. The final layer reproduces the 7 x 7
+scores (within 6.64e-09 for H-score and 2.94e-09 for LogME).
+
+Files (md5): layer_diag_algebra2006_report.md b40fdea796ce83f5ac146661ea7eafee,
+layer_diag_algebra2006_cells.tsv e11f95f387d6eca99d6becf78e36df1b.
+
+H-score:
+
+| layer | variant | picks (seeds 1 2 42) | top-1 | tied with best | mean regret | mean rho |
+|---|---|---|---|---|---|---|
+| L0 | trained skill table | algebra2006, assist2009, bridge2006 | 0/3 | 0/3 | 0.0048 | -0.0595 |
+| L0 | skill table reset | ednet, assist2009, bridge2006 | 0/3 | 0/3 | 0.0065 | -0.2500 |
+| L1 | trained skill table | algebra2005, algebra2005, algebra2005 | 0/3 | 0/3 | 0.0102 | +0.0833 |
+| L1 | skill table reset | algebra2005, algebra2005, algebra2005 | 0/3 | 0/3 | 0.0102 | +0.0714 |
+| L2 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.5357 |
+| L2 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.4405 |
+| L3 | trained skill table | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.7143 |
+| L3 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.5952 |
+| L4 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.7619 |
+| L4 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.6310 |
+| L5 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.7381 |
+| L5 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.6071 |
+| L6 | trained skill table | algebra2006, algebra2006, algebra2006 | 0/3 | 0/3 | 0.0017 | +0.7262 |
+| L6 | skill table reset | junyi, junyi, algebra2006 | 2/3 | 2/3 | 0.0006 | +0.5952 |
+
+LogME:
+
+| layer | variant | picks (seeds 1 2 42) | top-1 | tied with best | mean regret | mean rho |
+|---|---|---|---|---|---|---|
+| L0 | trained skill table | algebra2006, bridge2006, bridge2006 | 0/3 | 0/3 | 0.0042 | +0.0952 |
+| L0 | skill table reset | bridge2006, bridge2006, bridge2006 | 0/3 | 0/3 | 0.0055 | -0.0476 |
+| L1 | trained skill table | algebra2005, algebra2005, algebra2005 | 0/3 | 0/3 | 0.0102 | +0.0238 |
+| L1 | skill table reset | algebra2005, algebra2005, algebra2005 | 0/3 | 0/3 | 0.0102 | +0.0238 |
+| L2 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.4048 |
+| L2 | skill table reset | junyi, algebra2005, junyi | 2/3 | 2/3 | 0.0034 | +0.3095 |
+| L3 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.6310 |
+| L3 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.5357 |
+| L4 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.7381 |
+| L4 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.6429 |
+| L5 | trained skill table | algebra2006, algebra2006, junyi | 1/3 | 1/3 | 0.0012 | +0.7143 |
+| L5 | skill table reset | junyi, junyi, junyi | 3/3 | 3/3 | 0.0000 | +0.5952 |
+| L6 | trained skill table | algebra2006, algebra2006, algebra2006 | 0/3 | 0/3 | 0.0017 | +0.6548 |
+| L6 | skill table reset | junyi, assist2017, algebra2006 | 1/3 | 1/3 | 0.0030 | +0.5238 |
+
+_Read: on Algebra 2006, unlike ASSISTments 2017 (12.4), the trained skill table carries much of the
+in-domain preference. With it reset, H-score's final layer picks Junyi on 2 of 3 seeds and LogME's
+on 1 of 3, and at layers L2 to L5 H-score picks Junyi on every seed, as LogME does from L3. With the
+trained table only H-score's L3 picks Junyi on every seed, and the final layer never does. The
+frozen view grants a trained skill table to the in-domain encoder only; fine-tuning trains one for
+every candidate._
+
+### 12.10 Frozen gold: logistic readouts on the estimators' features, scored on test learners (all 7 targets, 3 seeds; scripts/frozen_gold_kt.py, analysis/frozen_gold_report.py)
+
+A logistic readout of the estimators' own causal features (the same learner draw, position cap,
+vocabulary loading and random start), fit on the train draw and scored on a fixed draw of test
+learners, gives each candidate's frozen performance. The frozen oracle ranks the candidates by it
+and is judged against the fine-tuned gold as in 12.3. The main readout is shared across skills with
+an L2 penalty of 1e-4; the report also holds a 1e-2 penalty and a next-skill-bias readout. The
+frozen-gold features match the estimators' within 4.3e-09.
+
+Files (md5): frozen_gold_cells.tsv 46008bbac2b0e3fba6b62b7f52359d73, frozen_gold_report.md
+10a1661f378626db33ebe8d537fd0f47.
+
+| target | frozen best | own-encoder rank | tuned best | oracle rho | oracle top-1 | oracle regret | H-score rho, frozen / tuned | LogME rho, frozen / tuned |
+|---|---|---|---|---|---|---|---|---|
+| algebra2005 | src:junyi | 4 | src:junyi | +0.0714 | True | 0.0000 | +0.6548 / +0.3810 | +0.4881 / +0.3571 |
+| algebra2006 | src:algebra2006 | 1 | src:junyi | +0.6429 | False | 0.0017 | +0.9524 / +0.7262 | +0.9405 / +0.6548 |
+| assist2009 | src:assist2009 | 1 | src:assist2009 | +0.6071 | True | 0.0000 | +0.7738 / +0.4762 | +0.7738 / +0.4524 |
+| assist2017 | src:assist2017 | 1 | src:ednet | +0.4286 | False | 0.0030 | +0.8214 / +0.1429 | +0.8214 / +0.1429 |
+| bridge2006 | src:junyi | 2 | src:junyi | +0.7500 | True | 0.0000 | +0.7738 / +0.7976 | +0.7738 / +0.7976 |
+| ednet | src:ednet | 1 | src:ednet | +0.4286 | True | 0.0000 | +0.8333 / +0.4524 | +0.8095 / +0.4762 |
+| junyi | src:ednet | 3 | src:ednet | +0.9286 | True | 0.0000 | +0.8095 / +0.6786 | +0.5119 / +0.2738 |
+| mean over 7 | | | | +0.5510 | 5/7 | 0.0007 | +0.8027 / +0.5221 | +0.7313 / +0.4507 |
+
+_Read: knowing frozen performance exactly picks the fine-tuned winner on 5 of 7 targets (rank
+correlation +0.5510, mean regret 0.0007, against 0.0012 for H-score) and misses exactly on
+ASSISTments 2017 and Algebra 2006, where frozen performance on test learners prefers the own
+encoder. H-score and LogME track frozen performance (+0.8027, +0.7313) far better than fine-tuned
+performance (+0.5221, +0.4507, the 12.3 values reproduced). The estimators measure frozen
+performance well; frozen performance is an imperfect guide to fine-tuned performance._
+
+### 12.11 Learner-level bootstrap of the Algebra 2006 validation and test splits (in-domain against Junyi, 6 seeds; scripts/split_bootstrap_kt.py)
+
+The 12 saved best checkpoints are re-scored on both splits as the fine-tune scores its test set;
+every one reproduces its recorded test AUC within 1.7e-08. Learners are resampled 2,000 times (seed
+0), the same resample for every checkpoint; the statistic is the mean over seeds of Junyi's AUC
+minus the in-domain encoder's. The two splits hold disjoint learners and are resampled
+independently.
+
+Files (md5): split_bootstrap_algebra2006_summary.tsv 65d86026e7623b8887487935c7a5fcdd,
+split_bootstrap_algebra2006_checks.json f07e604fc0bea2225f144f66dbde0e76.
+
+| split | learners | positions | Junyi minus in-domain | 95% interval | P(>0) | seeds positive |
+|---|---|---|---|---|---|---|
+| val | 131 | 61866 | +0.0001 | [-0.0019, +0.0022] | 0.5255 | 3/6 |
+| test | 131 | 58800 | +0.0017 | [-0.0001, +0.0035] | 0.9705 | 6/6 |
+| test minus val |  |  | +0.0016 | [-0.0010, +0.0044] | 0.8835 |  |
+
+_Read: once learners are resampled, neither split separates Junyi from the in-domain encoder: the
+test interval includes zero, and the gap between the splits is within learner sampling. The Algebra
+2006 difference of 12.1 holds across fine-tuning seeds, whose intervals the gold uses, but not
+across evaluation learners, which the gold does not resample._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
