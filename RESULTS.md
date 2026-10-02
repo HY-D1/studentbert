@@ -1057,8 +1057,9 @@ per encoder), scoring 10673657 (short partition). Gold: the paper's Table 2
 (configs/task4/bassignana2022_table2.tsv, checked against the paper's own correlations by
 analysis/task4_gold_check.py), frozen and fully fine-tuned means over 5 seeds. A choice ties with
 the best within 0.1 points or inside a two-sided 95% interval from the published SDs, a rule fixed
-before any score. The paper's Airline and SciERC tasks were not run; the extractor covers the four
-above. Published-table issues: the RTE mean-pooled rows reproduce the paper's Pearson only to 0.605
+before any score. The paper's Airline and SciERC tasks were not run in this pass; on 2026-09-30
+Airline was added and SciERC excluded (13.1). Published-table issues: the RTE mean-pooled rows
+reproduce the paper's Pearson only to 0.605
 and 0.581 against the printed 0.616 and 0.597, and the MNLI mean-pooled tuned SDs of the last four
 models repeat SciERC's.
 
@@ -1116,6 +1117,84 @@ fine-tuned performance here. The best-average rule has the lowest mean regret ag
 (1.71 points) but never picks the winner. Our LogME reproduces the published ranking strongly on
 AGNews and partly on the NLI tasks, and ranks tuned performance worse than the published LogME
 (+0.5659 on the same settings)._
+### 13.1 Airline added, SciERC excluded (2026-09-30; scripts/task4_extract.py at 7b1cfb7; /projects/algl/dai.hany/task4/)
+
+Data: Kaggle's Tweets.csv (crowdflower/twitter-airline-sentiment, md5
+2fa808ea99b32814ccd64d7097d935f2, 14,640 tweets), split by the authors' own converter
+(mainlp/logme-nlp, commit 0046c725, project/src/tasks/sentiment/convert.py -rs 4012, run in a
+separate clone because it is GPL-3.0; Slurm 10709670) into train 10,248 (md5
+b0fa4865e8d442b5e2146715e7a84c10), dev 1,464 (3d396e482e100a1274ccaecbc0d14d07) and test 2,928
+(88c93304b94179117fbadfc72fa5d3a9). The paper scores LogME on the train split and reports frozen and
+tuned performance on dev; its gold rows are already in the table above.
+
+Setting: the same seven hub encoders, none pretrained on the target data; budget 10,000 of the
+10,248 training tweets, a seeded sample that does not depend on the encoder; sample seeds 42, 1 and
+2; no training (frozen features; the tuned gold is the paper's fine-tuning); input the tweet text as
+the converter leaves it, last hidden layer, [CLS] and the mean over non-padding subwords including
+[CLS] and [SEP] (the authors average word vectors and skip special tokens), maximum length 256.
+Extraction: 7 gpu-partition jobs (logs t4x_*.log in the folder above), every feature file recording
+the split's md5; scoring Slurm 10716202 (126 new scores, all converged); evaluation 10716582.
+
+Reproduction of the results above: the scores file grew from 504 to 630 lines and its first 504
+lines hash to 52ed7805e369eb479f5ca45afcc1cb34, the 4-task file; rerun with --tasks agnews mnli qnli
+rte the evaluation reproduces all four of its outputs byte for byte (summary
+17d4dfd7116bd9d2a0a4642719210c8d), and the ceiling's default report reproduces too
+(dc37d1cc158b39359a646340948a52ba).
+
+Files (md5): task4_scores.jsonl 9dfe5d930681ec04d79cb52c149bbc4e, task4_eval_airline_summary.tsv
+753d37b09376ed5b573a0ccfaa34d8e2, task4_eval_airline_repro.tsv c525a004ba2d7777c3f9480feeb523f7,
+task4_eval_10_summary.tsv b5544568e4b1db985c0932156f8647fd, task4_ceiling_10_cells.tsv
+04675b03fdfb32317e3502589c06f1fe, task4_ceiling_10_report.md 74e28a41113bddbbca88b0376824124f.
+
+Airline, 2 poolings x 3 seeds (LogME reproduction: Spearman +1.0000 for [CLS] and +1.0000 for mean
+pooling):
+
+| estimator | gold | rho | tau-b | pairwise accuracy | top-1 | tied with best | regret mean / max | seed stability |
+|---|---|---|---|---|---|---|---|---|
+| hscore | frozen | +0.9464 | +0.8571 | 0.9472 | 6/6 | 6/6 | 0.00 / 0.00 | 1.0000 |
+| hscore | tuned | +0.8750 | +0.7619 | 0.9349 | 6/6 | 6/6 | 0.00 / 0.00 | 1.0000 |
+| hscore_shrunk | frozen | +0.9464 | +0.8571 | 0.9472 | 6/6 | 6/6 | 0.00 / 0.00 | 1.0000 |
+| hscore_shrunk | tuned | +0.8750 | +0.7619 | 0.9349 | 6/6 | 6/6 | 0.00 / 0.00 | 1.0000 |
+| logme | frozen | +0.9464 | +0.8571 | 0.9472 | 6/6 | 6/6 | 0.00 / 0.00 | 1.0000 |
+| logme | tuned | +0.8750 | +0.7619 | 0.9349 | 6/6 | 6/6 | 0.00 / 0.00 | 1.0000 |
+
+All five tasks run, 10 settings x 3 seeds (the 8-setting rows are the table above):
+
+| estimator | gold | rho | tau-b | pairwise accuracy | top-1 | tied with best | regret mean / max | seed stability |
+|---|---|---|---|---|---|---|---|---|
+| hscore | frozen | +0.8012 | +0.6603 | 0.8733 | 22/30 | 25/30 | 0.84 / 4.06 | 0.9556 |
+| hscore | tuned | +0.3429 | +0.2984 | 0.6615 | 10/30 | 10/30 | 2.70 / 6.90 | 0.9556 |
+| hscore_shrunk | frozen | +0.7988 | +0.6762 | 0.8644 | 21/30 | 27/30 | 0.69 / 4.06 | 0.9429 |
+| hscore_shrunk | tuned | +0.3464 | +0.3079 | 0.6825 | 8/30 | 11/30 | 3.07 / 6.90 | 0.9429 |
+| logme | frozen | +0.7845 | +0.6571 | 0.8548 | 20/30 | 23/30 | 0.75 / 4.06 | 0.9619 |
+| logme | tuned | +0.3405 | +0.3016 | 0.6725 | 13/30 | 16/30 | 2.46 / 5.87 | 0.9619 |
+
+Reference rankings from the published table on the same 10 settings (analysis/task4_ceiling.py
+--also_run airline):
+
+| ranking | gold | rho | tau-b | pairwise accuracy | top-1 | tied with best | regret mean / max |
+|---|---|---|---|---|---|---|---|
+| published_logme | frozen | +0.8156 | +0.7173 | 0.9031 | 5/10 | 7/10 | 1.11 / 4.61 |
+| loto_best_average | frozen | +0.3863 | +0.2954 | 0.6580 | 4/10 | 5/10 | 1.94 / 5.54 |
+| frozen_oracle | tuned | +0.5036 | +0.4095 | 0.7457 | 4/10 | 5/10 | 1.85 / 5.87 |
+| published_logme | tuned | +0.6277 | +0.5066 | 0.7971 | 4/10 | 5/10 | 2.27 / 6.16 |
+| loto_best_average | tuned | +0.5137 | +0.4459 | 0.7253 | 2/10 | 4/10 | 1.37 / 3.84 |
+
+SciERC is excluded. The authors' repository has no SciERC converter (project/src/tasks/relclass
+holds only run scripts), so its entity-marked splits are not available, and the paper's LogME reads
+the markers as plain text while its classifiers add them as special tokens. Under the tie rule
+above, SciBERT, the domain-matched encoder, is also top-equivalent to the tuned best (BioBERT) in
+both poolings, so SciERC could not show a domain-matched failure.
+
+_Read: on Airline the domain-matched encoder is the right pick in both regimes and every estimator
+makes it: Twitter-RoBERTa is the sole frozen best and the tuned best, tied with RoBERTa, and
+H-score, its shrunk form and LogME pick it in all 6 rankings with zero regret and seed stability 1.
+Frozen and tuned rankings agree there (frozen oracle rho +0.9643 against tuned gold in both
+poolings), so adding Airline raises every estimator's rank correlation and lowers its mean regret:
+H-score against tuned gold reaches rho +0.3429 and top-1 10/30 (LogME +0.3405, 13/30), and the
+frozen oracle picks the tuned winner in 4/10 settings (2/8 above). The best-average rule keeps the
+lowest mean tuned regret (1.37 points) and picks the winner only on the two Airline settings. The
+failure review's fixed targets are defined on the 8 settings above._
 
 _End of consolidated results._
 
