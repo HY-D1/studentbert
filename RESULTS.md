@@ -566,9 +566,97 @@ continues to 150,000, and keeps rising more slowly to the full corpus; no platea
 appears in the measured range. The target side (section 3) differs: there the
 benefit shrinks as target data grows._
 
+CORRECTION (2026-10-09, see 11.1). Two statements in the reading above do not hold once the number
+of optimizer updates is matched. "Corpus SIZE is therefore doing the work": at the 49,153 rung's
+3,850 updates, 15,000 learners transfer as well as 49,153, so the sign flip between 15,000 and
+49,153 is an update effect; a shortfall remains at 5,000. "(a) ... at matched size EdNet is if
+anything the weaker corpus per student": the Junyi encoder trained for 20 epochs (7,700 updates)
+against 10 for EdNet 49,153 (3,850), and at matched learners and updates the two tie. The interval
+[+0.0162,+0.0194] has no recorded method; by the method of 11.1 the 49,153 gain on assist2017 is
++0.0177 [+0.0172, +0.0185], draw spread 0.0018. Points (b) and (c) keep their numbers, but (b)'s
+losses are training losses at a fixed 10 epochs, so they also vary with the number of updates.
+
 DIGIT COLLISION: this Spearman -0.83 is a THIRD quantity at that magnitude,
 alongside the probe-vs-transfer rho +0.83 (section 6) and the scale/pps
 confound r -0.83 (section 5). Never mix them.
+### 11.1 Update-matched controls: number of updates against number of learners (2026-10-09; analysis/budget_control.py, slurm/generators/gen_budget_control.sh)
+
+Why. Every encoder in the table above trains for 10 epochs at batch 128, so the number of optimizer
+updates is ceil(learners / 128) x 10 and grows with the corpus, from 400 at 5,000 learners to 27,630
+at 353,597. The checkpoints record the source encoders' recipes (recipe_check_10871830.log): Junyi
+20 epochs, batch 128, lr 1e-3, warm-up 0.05 (best epoch 20, so 7,700 updates over 49,153 learners);
+EdNet full corpus and EdNet 49,153 (draw 42) 10 epochs, batch 128, warm-up 0.05 (best epoch 10);
+ASSISTments 2017 100 epochs, batch 64, warm-up 0.1 (best epoch 95). Each saved encoder is the one
+with the lowest training loss (scripts/pretrain_edubert.py), so the losses in the table above are
+training losses, not held-out losses.
+
+Design. Encoders edubert_ednet_pretrain_ednet_n{SIZE}e{EPOCHS}{,d1,d2}_encoder.pt with the
+section-11 recipe except the epoch count and the same draw seeds (42, 1, 2, so the same sampled
+learners): 49,153 x 20 epochs (7,700 updates, Junyi's), 15,000 x 33 (3,894) and 5,000 x 96 (3,840),
+the last two matched to the 49,153 rung's 3,850. Fine-tunes
+kt_<t>_fromednet_n{SIZE}e{EPOCHS}{,d1,d2}_bud_n3000_seed{1,2,3,4,5,42} on assist2017 and junyi,
+N=3000, 20 epochs, gpu:v100-sxm2: 108 runs, paired with the scratch controls above. Test AUC is the
+W&B full-precision value (wandb_budget_by_id.jsonl), each checked against its log's 4 dp value; the
+training losses come from the budget_pretrain_ednet_n{SIZE}e{EPOCHS}*_<job>.log files.
+
+Method, for this subsection and the per-size intervals of the 10-epoch ladder: a draw's gain is its
+6-seed mean of (run - scratch at that seed); a condition's gain is the mean over its draws; the 95%
+interval resamples the 6 seeds of the across-draw mean (20,000 resamples, random.Random(0),
+boot_mean_ci of analysis/build_transfer_benchmark.py); the draw spread (encoder-build variance) is
+reported beside it; differences pair the across-draw means by seed.
+
+Files (md5): budget_control_summary.tsv c1b14438e4d6a547af7952ebbc4b9fe4, budget_control_diffs.tsv
+722e1164514e934329a671a1f9ef06fd, budget_control_runs.tsv 27cb94677b1c1bc9f7adca203fb252c6,
+wandb_budget_by_id.jsonl b2166758dde5ec76272fb7e69155c5b1.
+
+| target | source learners | epochs | updates | gain [95% CI] | seeds + | draw spread | best training loss (d42 / d1 / d2) |
+|---|---|---|---|---|---|---|---|
+| assist2017 | 5,000 | 10 | 400 | -0.0018 [-0.0024, -0.0011] | 0/6 | 0.0013 | section 11 table |
+| assist2017 | 15,000 | 10 | 1,180 | +0.0002 [-0.0003, +0.0008] | 4/6 | 0.0010 | section 11 table |
+| assist2017 | 49,153 | 10 | 3,850 | +0.0177 [+0.0172, +0.0185] | 6/6 | 0.0018 | section 11 table |
+| assist2017 | 150,000 | 10 | 11,720 | +0.0241 [+0.0236, +0.0244] | 6/6 | 0.0012 | section 11 table |
+| assist2017 | 353,597 | 10 | 27,630 | +0.0259 [+0.0251, +0.0269] | 6/6 | 0.0017 | section 11 table |
+| assist2017 | 49,153 | 20 | 7,700 | +0.0216 [+0.0209, +0.0224] | 6/6 | 0.0005 | 2.9946 / 2.9960 / 2.9946 |
+| assist2017 | 15,000 | 33 | 3,894 | +0.0177 [+0.0175, +0.0179] | 6/6 | 0.0026 | 3.0984 / 3.0743 / 3.0798 |
+| assist2017 | 5,000 | 96 | 3,840 | +0.0148 [+0.0143, +0.0152] | 6/6 | 0.0035 | 2.9866 / 2.9907 / 3.0080 |
+| junyi | 5,000 | 10 | 400 | -0.0037 [-0.0045, -0.0028] | 0/6 | 0.0006 | section 11 table |
+| junyi | 15,000 | 10 | 1,180 | -0.0023 [-0.0030, -0.0016] | 0/6 | 0.0010 | section 11 table |
+| junyi | 49,153 | 10 | 3,850 | +0.0014 [+0.0007, +0.0021] | 6/6 | 0.0008 | section 11 table |
+| junyi | 150,000 | 10 | 11,720 | +0.0043 [+0.0033, +0.0052] | 6/6 | 0.0002 | section 11 table |
+| junyi | 353,597 | 10 | 27,630 | +0.0062 [+0.0055, +0.0070] | 6/6 | 0.0004 | section 11 table |
+| junyi | 49,153 | 20 | 7,700 | +0.0032 [+0.0024, +0.0040] | 6/6 | 0.0008 | 2.9946 / 2.9960 / 2.9946 |
+| junyi | 15,000 | 33 | 3,894 | +0.0008 [+0.0000, +0.0015] | 5/6 | 0.0002 | 3.0984 / 3.0743 / 3.0798 |
+| junyi | 5,000 | 96 | 3,840 | -0.0002 [-0.0010, +0.0004] | 4/6 | 0.0006 | 2.9866 / 2.9907 / 3.0080 |
+| assist2017 | 49,153 (Junyi encoder) | 20 | 7,700 | +0.0214 [+0.0197, +0.0232] | 6/6 | one encoder | not comparable (Junyi vocabulary) |
+
+| target | a minus b | difference [95% CI] | seeds + |
+|---|---|---|---|
+| assist2017 | matched 49153 20 minus ladder 49153 10 | +0.0039 [+0.0028, +0.0049] | 6/6 |
+| assist2017 | matched 15000 33 minus ladder 15000 10 | +0.0175 [+0.0170, +0.0181] | 6/6 |
+| assist2017 | matched 5000 96 minus ladder 5000 10 | +0.0165 [+0.0157, +0.0173] | 6/6 |
+| assist2017 | matched 15000 33 minus ladder 49153 10 | -0.0000 [-0.0007, +0.0006] | 3/6 |
+| assist2017 | matched 5000 96 minus ladder 49153 10 | -0.0030 [-0.0041, -0.0021] | 0/6 |
+| junyi | matched 49153 20 minus ladder 49153 10 | +0.0018 [+0.0013, +0.0023] | 6/6 |
+| junyi | matched 15000 33 minus ladder 15000 10 | +0.0031 [+0.0026, +0.0036] | 6/6 |
+| junyi | matched 5000 96 minus ladder 5000 10 | +0.0035 [+0.0028, +0.0042] | 6/6 |
+| junyi | matched 15000 33 minus ladder 49153 10 | -0.0005 [-0.0011, +0.0000] | 2/6 |
+| junyi | matched 5000 96 minus ladder 49153 10 | -0.0015 [-0.0022, -0.0009] | 0/6 |
+| assist2017 | junyi_source 49153 20 minus matched 49153 20 | -0.0002 [-0.0019, +0.0016] | 2/6 |
+| assist2017 | junyi_source 49153 20 minus ladder 49153 10 | +0.0037 [+0.0023, +0.0051] | 6/6 |
+
+_Read: with the number of updates matched to the 49,153 rung, 15,000 learners transfer as well as
+49,153 learners trained for 10 epochs: the difference is -0.0000 [-0.0007, +0.0006] on assist2017
+and -0.0005 [-0.0011, +0.0000] on junyi. At the same update count 5,000 learners fall short, -0.0030
+and -0.0015 with both intervals below zero. Doubling the updates at 49,153 learners adds +0.0039 and
++0.0018. At matched learners and updates the Junyi encoder and EdNet 49,153 tie on assist2017
+(-0.0002 [-0.0019, +0.0016]), while against the 10-epoch EdNet 49,153 Junyi leads by +0.0037. So the
+sign change between 15,000 and 49,153 in the ladder is an effect of the number of updates, and a
+data shortfall remains at 5,000 learners at this update count. Going from 150,000 to 353,597
+learners at 10 epochs adds +0.0018 on assist2017 and +0.0019 on junyi at full precision, and every
+353,597 draw exceeds every 150,000 draw on both targets; that step also multiplies the updates by
+2.4 (11,720 to 27,630), so it is not budget-matched either. Caveats: 96 epochs on 5,000 learners may
+overfit (only training loss is recorded); the matched-scale comparison has one target; the 5,000 x
+96 draw spread on assist2017 (0.0035) is the largest in this section._
 
 ## 12. Transfer benchmark and estimator evaluation (final build 2026-09-24, benchmark_final/, tools/tg1_final_build.sh)
 
