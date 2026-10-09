@@ -70,7 +70,7 @@ tag_of() {
   if [ "$3" = "42" ]; then echo "n$1e$2"; else echo "n$1e$2d$3"; fi
 }
 
-pcount=0; have=0; inprogress=0
+pcount=0; have=0; inprogress=0; queued=0
 for SPEC in $SPECS; do
   SIZE="${SPEC%%:*}"; EPOCHS="${SPEC##*:}"
   UPDATES=$(( (SIZE + 127) / 128 * EPOCHS ))
@@ -82,6 +82,11 @@ for SPEC in $SPECS; do
   for DRAW in $DRAWS; do
     TAG=$(tag_of "$SIZE" "$EPOCHS" "$DRAW")
     CK="../checkpoints/edubert_ednet_pretrain_ednet_${TAG}_encoder.pt"
+    if [ ! -f "$CODE/$CK" ] && [ -f "$PQDIR/done/budget_pretrain_ednet_${TAG}.sbatch" ]; then
+      echo "submitted earlier, not started yet: budget_pretrain_ednet_${TAG}"
+      queued=$((queued + 1))
+      continue
+    fi
     if [ -f "$CODE/$CK" ]; then
       if grep -l -q "best mlm_loss" budget_pretrain_ednet_${TAG}_*.log 2>/dev/null; then
         echo "have encoder, skipping: $CK"
@@ -109,7 +114,7 @@ for SPEC in $SPECS; do
   echo "spec ${SIZE} learners x ${EPOCHS} epochs = ${UPDATES} updates (walltime ${WALL})"
 done
 
-fcount=0; waiting=0
+fcount=0; waiting=0; fsub=0
 for SPEC in $SPECS; do
   SIZE="${SPEC%%:*}"; EPOCHS="${SPEC##*:}"
   for DRAW in $DRAWS; do
@@ -126,6 +131,10 @@ for SPEC in $SPECS; do
       esac
       for SEED in $SEEDS; do
         NAME="kt_${TOK}_fromednet_${TAG}_bud_n${N}_seed${SEED}"
+        if [ -f "$FQDIR/done/${NAME}.sbatch" ]; then
+          fsub=$((fsub + 1))
+          continue
+        fi
         {
           echo '#!/bin/bash'
           echo '#SBATCH --partition=gpu'
@@ -144,8 +153,12 @@ for SPEC in $SPECS; do
 done
 
 echo
-echo "encoders to run      : $pcount   (finished: $have, in progress: $inprogress)"
-echo "fine-tune jobs       : $fcount   (encoders not finished yet: $waiting)"
+echo "encoders to run      : $pcount   (finished: $have, in progress: $inprogress, "\
+"submitted earlier: $queued)"
+echo "fine-tune jobs       : $fcount   (encoders not finished yet: $waiting, "\
+"submitted earlier: $fsub)"
+echo "a job whose file is in a queue's done/ folder counts as submitted; to resubmit one"
+echo "that failed, delete its file from done/ and re-run this generator"
 echo "specs / draws        : $SPECS / $DRAWS"
 echo "targets / seeds / gpu: $TARGETS / $SEEDS / $GPUTYPE"
 if [ "$pcount" -gt 0 ]; then
