@@ -1131,6 +1131,125 @@ on both splits, +0.0103 [+0.0066, +0.0141] and +0.0103 [+0.0075, +0.0132], so H-
 seed there is an estimator error (EdNet, last of 7 there in 12.1), not gold noise. Of H-score's
 0.0012, 0.0004 comes from ASSISTments 2017, 0.0005 from the Algebra 2005 seed, 0.0002 from Algebra
 2006, which the evaluation learners do not separate, and 0.0001 from the Bridge 2006 tie._
+### 12.13 Reversal-aware signal pipeline, first version: pairs, leave-one-target-out reversal risk and a selective rule (2026-10-09; analysis/reversal_table.py, analysis/reversal_model.py, tools/reversal_pipeline.sh, jobs 10943035 and 10943165)
+
+Task: Prof. Hazra's reversal-aware signal pipeline (Project_idea.pdf, added 2026-10-06), with her
+decisions of 2026-10-08: candidate pairs as rows, every pair of a held-out target held out together,
+near-ties their own class, the benchmark tie rule for the main label, Algebra 2006 ambiguous in the
+robustness label, the 7 KT targets only.
+
+Design. One row per target, estimator seed (42, 1, 2) and pair of the 8 candidates (7 encoders and
+scratch), a being the candidate H-score ranks higher: 588 rows. Label from the Track B N=3000 gold,
+6 fine-tuning seeds: near_tie if the paired bootstrap interval of gold(a) - gold(b) includes zero or
+|d| <= 0.001 (the benchmark rule), otherwise stable or reversal: 314 stable, 162 near-tie, 112
+reversal; the robustness label marks the Algebra 2006 in-domain/Junyi pair ambiguous (3 rows).
+Features, none reading the held-out target's gold or any test split: frozen (H-score and LogME at
+the final layer, margins, ranks), early fine-tuning (validation AUC at epochs 1 to 3 of the
+fine-tune with the estimator's seed, slopes, ranks, gaps), history (each candidate as a foreign
+source on the other targets), layers (H-score at layer 3, layer agreement, skill-table reset).
+Model: L2-regularized logistic regression for P(reversal), fitted on stable and reversal pairs of
+the training targets, features standardized on the training fold, penalty chosen inside each fold by
+an inner leave-one-target-out. Recommendation: H-score's top pick, its risk the largest predicted
+risk over the pairs it heads, abstain above 0.5 (fixed before any result).
+
+Reproduction checks: H-score's pretrained regret is 0.0012 over 21 rankings with every per-target
+value equal to 12.3 and 12.12; the skill-table reset flips Algebra 2006 to Junyi on seeds 1 and 2
+(12.9); the ASSISTments 2017 in-domain encoder leads at epoch 1 and trails at epoch 3 (12.8). The
+two pipeline runs wrote identical logs.
+
+Files (md5): reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7, reversal_pairs_targets.tsv
+88746eb17c78250bd47a75d850ef8ec0, reversal_model_report.md d6684f62a402e4b7852e673bbde4d4e8,
+reversal_model_recs.tsv d7b874b710acc7a2d611e987917fc426, reversal_model_pairs.tsv
+aecb1dc3263881b08269010636c3be6a.
+
+Report as written by analysis/reversal_model.py (headings lowered one level):
+
+
+#### Main analysis (benchmark label)
+
+Pairs fitted: 314 stable, 112 reversal; near-tie pairs predicted only (162, mean predicted risk 0.3257). Penalty per held-out target: algebra2005 10.0, algebra2006 10.0, assist2009 100.0, assist2017 100.0, bridge2006 100.0, ednet 100.0, junyi 10.0.
+
+Pair-level AUC 0.8278, Brier 0.1406; per held-out target AUC: algebra2005 0.6833, algebra2006 0.8908, assist2009 0.7857, assist2017 0.8613, bridge2006 0.9344, ednet 1.0000, junyi 0.8864.
+
+| predicted risk | pairs | mean predicted | observed reversal rate |
+|---|---|---|---|
+| 0.0 to 0.2 | 239 | 0.0744 | 0.0795 |
+| 0.2 to 0.4 | 69 | 0.2827 | 0.2899 |
+| 0.4 to 0.6 | 45 | 0.4904 | 0.5111 |
+| 0.6 to 0.8 | 47 | 0.6998 | 0.6383 |
+| 0.8 to 1.0 | 26 | 0.9044 | 0.7692 |
+
+Recommendations judged: 21 (target x estimator seed).
+
+| rule | followed | mean regret of followed | reversals caught | false alarms | missed |
+|---|---|---|---|---|---|
+| always follow H-score | 21 | 0.0012 | 0 | 0 | 7 |
+| follow when risk <= 0.5 | 16 | 0.0015 | 1 | 4 | 6 |
+
+AURC (lower is better): model 0.0015, frozen margin 0.0017, random 0.0012, oracle 0.0002.
+
+#### Robustness (Algebra 2006 pair ambiguous)
+
+Pairs fitted: 314 stable, 109 reversal; near-tie pairs predicted only (162, mean predicted risk 0.3186). Penalty per held-out target: algebra2005 10.0, algebra2006 10.0, assist2009 100.0, assist2017 100.0, bridge2006 100.0, ednet 100.0, junyi 10.0.
+
+Pair-level AUC 0.8326, Brier 0.1381; per held-out target AUC: algebra2005 0.6991, algebra2006 0.9146, assist2009 0.8080, assist2017 0.8549, bridge2006 0.9385, ednet 1.0000, junyi 0.8794.
+
+| predicted risk | pairs | mean predicted | observed reversal rate |
+|---|---|---|---|
+| 0.0 to 0.2 | 243 | 0.0724 | 0.0782 |
+| 0.2 to 0.4 | 64 | 0.2886 | 0.2812 |
+| 0.4 to 0.6 | 45 | 0.4911 | 0.5111 |
+| 0.6 to 0.8 | 47 | 0.6953 | 0.6596 |
+| 0.8 to 1.0 | 24 | 0.9018 | 0.7500 |
+
+Recommendations judged: 18 (target x estimator seed).
+
+| rule | followed | mean regret of followed | reversals caught | false alarms | missed |
+|---|---|---|---|---|---|
+| always follow H-score | 18 | 0.0012 | 0 | 0 | 4 |
+| follow when risk <= 0.5 | 15 | 0.0014 | 0 | 3 | 4 |
+
+AURC (lower is better): model 0.0017, frozen margin 0.0018, random 0.0012, oracle 0.0002.
+
+#### Feature groups (main label)
+
+| features | pair AUC | Brier | AURC |
+|---|---|---|---|
+| all | 0.8278 | 0.1406 | 0.0015 |
+| frozen only | 0.7196 | 0.1796 | 0.0009 |
+| all but frozen | 0.8852 | 0.1134 | 0.0010 |
+| early only | 0.8848 | 0.1185 | 0.0012 |
+| all but early | 0.8025 | 0.1472 | 0.0013 |
+| history only | 0.7669 | 0.1602 | 0.0016 |
+| all but history | 0.8037 | 0.1469 | 0.0014 |
+| layers only | 0.4978 | 0.2026 | 0.0012 |
+| all but layers | 0.8543 | 0.1278 | 0.0014 |
+
+With 7 targets and 21 recommendations every calibration and selective estimate is coarse; read the counts, not only the rates.
+
+Files: reversal_model_pairs.tsv aecb1dc3263881b08269010636c3be6a, reversal_model_recs.tsv d7b874b710acc7a2d611e987917fc426
+
+| target | selected (seeds 42 / 1 / 2) | reversal probability | abstained | reversed |
+|---|---|---|---|---|
+| algebra2005 | ednet / junyi / junyi | 0.20 / 0.01 / 0.00 | 0/3 | 1/3 |
+| algebra2006 | algebra2006 / algebra2006 / algebra2006 | 0.55 / 0.08 / 0.22 | 1/3 | 3/3 |
+| assist2009 | assist2009 / assist2009 / assist2009 | 0.49 / 0.35 / 0.40 | 0/3 | 0/3 |
+| assist2017 | assist2017 / assist2017 / assist2017 | 0.21 / 0.19 / 0.18 | 0/3 | 3/3 |
+| bridge2006 | bridge2006 / bridge2006 / bridge2006 | 0.52 / 0.38 / 0.36 | 1/3 | 0/3 |
+| ednet | ednet / ednet / ednet | 0.23 / 0.21 / 0.19 | 0/3 | 0/3 |
+| junyi | ednet / ednet / ednet | 0.92 / 0.76 / 0.91 | 3/3 | 0/3 |
+
+_Read: reversals between candidate pairs are predictable out of target (pair AUC 0.8278; calibration
+close in the lower bins and overconfident in the top one, 0.9044 predicted against 0.7692 observed).
+The recommendation rule does not yet help: abstaining above 0.5 follows 16 of 21 recommendations
+with mean regret 0.0015, against 0.0012 for always following H-score, catching 1 reversal (Algebra
+2006, seed 42) with 4 false alarms; it follows all three ASSISTments 2017 recommendations, which
+reverse, and abstains on all three Junyi recommendations, whose EdNet pick is right. Its AURC
+(0.0015) is above random (0.0012), while the frozen features alone give 0.0009. Early fine-tuning is
+the strongest group for pairs (AUC 0.8848 alone) and the layer group carries no signal (0.4978
+alone). With 7 targets and 21 recommendations every estimate here is coarse. Nothing was tuned after
+these results were seen; changing the model to fit them would be research-history leakage in the
+sense of the project constraints._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
