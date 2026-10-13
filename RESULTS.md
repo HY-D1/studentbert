@@ -1250,6 +1250,160 @@ the strongest group for pairs (AUC 0.8848 alone) and the layer group carries no 
 alone). With 7 targets and 21 recommendations every estimate here is coarse. Nothing was tuned after
 these results were seen; changing the model to fit them would be research-history leakage in the
 sense of the project constraints._
+### 12.14 Reversal-aware signal pipeline, version 2: the H-score recommendation as the target (analysis/reversal_model_v2.py, design frozen in commit ccd1655 before its first run, job 11042633)
+
+Task: Prof. Hazra's feedback on 12.13. Rows are only the pairs headed by H-score's pick, 7
+alternatives per recommendation (147 rows; 123 stable, 13 near-tie, 11 reversal on the main label);
+the target is whether the alternative overtakes the pick after fine-tuning; the pairwise risks are
+combined by noisy-OR into a recommendation-level risk (the largest pairwise risk reported beside
+it); features are frozen, early fine-tuning and history, without the layer group (early fine-tuning
+alone as a variant); the all-pairs model of 12.13, and the same model with version 2's features, are
+the baselines. Leave-one-target-out throughout; the penalty and the threshold are chosen inside each
+fold from the training targets' out-of-fold predictions (the threshold by Youden's J), and a fixed
+0.5 is reported beside it. Primary, fixed before the run: the head-pair model with frozen, early and
+history features, noisy-OR risk and the fold-chosen threshold.
+
+Reproduction check: the 12.13 all-pairs model, scored by its own rule (largest pairwise risk,
+threshold 0.5), follows 16 of 21 recommendations, catches 1 of 7 reversals with 4 false alarms,
+selective regret 0.0015, as in 12.13.
+
+Files (md5): reversal_model_v2.py 47d206c63749bdc2eb0cee6fdda62d7b, reversal_model_v2_report.md
+f145e45fee795193ad885100af7295be, reversal_model_v2_recs.tsv 1f8d84f8a598452c4ba74404526b2438,
+reversal_model_v2_pairs.tsv 34fff18c059bab71fc1c6ce29ab3bd34.
+
+Report as written by analysis/reversal_model_v2.py (headings lowered one level):
+
+
+Primary (fixed before results): head: frozen + early + history, noisy-OR risk, fold-chosen threshold.
+
+#### Main label
+
+Recommendations judged: 21, of which 7 reversed. Always following H-score: mean regret 0.0012 (also the AURC of a random order); frozen margin AURC 0.0017.
+
+| model | risk | threshold | followed | caught | false alarms | selective regret | AURC | Brier |
+|---|---|---|---|---|---|---|---|---|
+| head: frozen + early + history | noisy-or | fold-chosen | 9/21 | 0/7 | 12 | 0.0027 | 0.0027 | 0.3294 |
+| head: frozen + early + history | noisy-or | fixed 0.5 | 15/21 | 0/7 | 6 | 0.0017 | 0.0027 | 0.3294 |
+| head: frozen + early + history | max | fold-chosen | 6/21 | 3/7 | 12 | 0.0026 | 0.0027 | 0.3059 |
+| head: frozen + early + history | max | fixed 0.5 | 21/21 | 0/7 | 0 | 0.0012 | 0.0027 | 0.3059 |
+| head: early only | noisy-or | fold-chosen | 14/21 | 0/7 | 7 | 0.0019 | 0.0028 | 0.3503 |
+| head: early only | noisy-or | fixed 0.5 | 13/21 | 0/7 | 8 | 0.0020 | 0.0028 | 0.3503 |
+| head: early only | max | fold-chosen | 19/21 | 0/7 | 2 | 0.0014 | 0.0031 | 0.3381 |
+| head: early only | max | fixed 0.5 | 20/21 | 0/7 | 1 | 0.0013 | 0.0031 | 0.3381 |
+| all pairs: version 1 (12.13) | noisy-or | fold-chosen | 3/21 | 6/7 | 12 | 0.0034 | 0.0016 | 0.4285 |
+| all pairs: version 1 (12.13) | noisy-or | fixed 0.5 | 7/21 | 4/7 | 10 | 0.0020 | 0.0016 | 0.4285 |
+| all pairs: version 1 (12.13) | max | fold-chosen | 2/21 | 7/7 | 12 | 0.0000 | 0.0015 | 0.3665 |
+| all pairs: version 1 (12.13) | max | fixed 0.5 | 16/21 | 1/7 | 4 | 0.0015 | 0.0015 | 0.3665 |
+| all pairs: version 2 features | noisy-or | fold-chosen | 3/21 | 6/7 | 12 | 0.0034 | 0.0016 | 0.3815 |
+| all pairs: version 2 features | noisy-or | fixed 0.5 | 9/21 | 3/7 | 9 | 0.0017 | 0.0016 | 0.3815 |
+| all pairs: version 2 features | max | fold-chosen | 2/21 | 7/7 | 12 | 0.0000 | 0.0014 | 0.3261 |
+| all pairs: version 2 features | max | fixed 0.5 | 16/21 | 0/7 | 5 | 0.0016 | 0.0014 | 0.3261 |
+
+Primary model, fold-chosen thresholds (noisy-OR): algebra2005 0.0699, algebra2006 1.0000, assist2009 0.2088, assist2017 1.0000, bridge2006 0.2150, ednet 0.2098, junyi 0.2238; penalties: algebra2005 1.0, algebra2006 100.0, assist2009 100.0, assist2017 100.0, bridge2006 100.0, ednet 100.0, junyi 100.0.
+
+| primary, noisy-OR risk | recommendations | mean predicted | observed reversal rate |
+|---|---|---|---|
+| 0.00 to 0.25 | 3 | 0.0076 | 0.3333 |
+| 0.25 to 0.50 | 12 | 0.4203 | 0.5000 |
+| 0.50 to 0.75 | 6 | 0.5828 | 0.0000 |
+| 0.75 to 1.00 | 0 | nan | nan |
+
+| target | seed | selected | noisy-OR risk | fold threshold | abstain | reversed |
+|---|---|---|---|---|---|---|
+| algebra2005 | 1 | src:junyi | 0.0028 | 0.0699 | 0 | 0 |
+| algebra2005 | 2 | src:junyi | 0.0188 | 0.0699 | 0 | 0 |
+| algebra2005 | 42 | src:ednet | 0.0011 | 0.0699 | 0 | 1 |
+| algebra2006 | 1 | src:algebra2006 | 0.2855 | 1.0000 | 0 | 1 |
+| algebra2006 | 2 | src:algebra2006 | 0.3339 | 1.0000 | 0 | 1 |
+| algebra2006 | 42 | src:algebra2006 | 0.3232 | 1.0000 | 0 | 1 |
+| assist2009 | 1 | src:assist2009 | 0.6407 | 0.2088 | 1 | 0 |
+| assist2009 | 2 | src:assist2009 | 0.6075 | 0.2088 | 1 | 0 |
+| assist2009 | 42 | src:assist2009 | 0.5734 | 0.2088 | 1 | 0 |
+| assist2017 | 1 | src:assist2017 | 0.4245 | 1.0000 | 0 | 1 |
+| assist2017 | 2 | src:assist2017 | 0.3940 | 1.0000 | 0 | 1 |
+| assist2017 | 42 | src:assist2017 | 0.3932 | 1.0000 | 0 | 1 |
+| bridge2006 | 1 | src:bridge2006 | 0.4673 | 0.2150 | 1 | 0 |
+| bridge2006 | 2 | src:bridge2006 | 0.4773 | 0.2150 | 1 | 0 |
+| bridge2006 | 42 | src:bridge2006 | 0.4731 | 0.2150 | 1 | 0 |
+| ednet | 1 | src:ednet | 0.4970 | 0.2098 | 1 | 0 |
+| ednet | 2 | src:ednet | 0.4756 | 0.2098 | 1 | 0 |
+| ednet | 42 | src:ednet | 0.4991 | 0.2098 | 1 | 0 |
+| junyi | 1 | src:ednet | 0.5180 | 0.2238 | 1 | 0 |
+| junyi | 2 | src:ednet | 0.5468 | 0.2238 | 1 | 0 |
+| junyi | 42 | src:ednet | 0.6106 | 0.2238 | 1 | 0 |
+
+#### Robustness label (Algebra 2006 pair ambiguous)
+
+Recommendations judged: 18, of which 4 reversed. Always following H-score: mean regret 0.0012 (also the AURC of a random order); frozen margin AURC 0.0018.
+
+| model | risk | threshold | followed | caught | false alarms | selective regret | AURC | Brier |
+|---|---|---|---|---|---|---|---|---|
+| head: frozen + early + history | noisy-or | fold-chosen | 18/18 | 0/4 | 0 | 0.0012 | 0.0024 | 0.4188 |
+| head: frozen + early + history | noisy-or | fixed 0.5 | 15/18 | 0/4 | 3 | 0.0014 | 0.0024 | 0.4188 |
+| head: frozen + early + history | max | fold-chosen | 18/18 | 0/4 | 0 | 0.0012 | 0.0024 | 0.3137 |
+| head: frozen + early + history | max | fixed 0.5 | 16/18 | 0/4 | 2 | 0.0013 | 0.0024 | 0.3137 |
+| head: early only | noisy-or | fold-chosen | 18/18 | 0/4 | 0 | 0.0012 | 0.0024 | 0.3249 |
+| head: early only | noisy-or | fixed 0.5 | 18/18 | 0/4 | 0 | 0.0012 | 0.0024 | 0.3249 |
+| head: early only | max | fold-chosen | 18/18 | 0/4 | 0 | 0.0012 | 0.0024 | 0.2270 |
+| head: early only | max | fixed 0.5 | 18/18 | 0/4 | 0 | 0.0012 | 0.0024 | 0.2270 |
+| all pairs: version 1 (12.13) | noisy-or | fold-chosen | 3/18 | 3/4 | 12 | 0.0034 | 0.0016 | 0.3844 |
+| all pairs: version 1 (12.13) | noisy-or | fixed 0.5 | 7/18 | 2/4 | 9 | 0.0019 | 0.0016 | 0.3844 |
+| all pairs: version 1 (12.13) | max | fold-chosen | 2/18 | 4/4 | 12 | 0.0000 | 0.0017 | 0.3220 |
+| all pairs: version 1 (12.13) | max | fixed 0.5 | 15/18 | 0/4 | 3 | 0.0014 | 0.0017 | 0.3220 |
+| all pairs: version 2 features | noisy-or | fold-chosen | 2/18 | 4/4 | 12 | 0.0000 | 0.0015 | 0.3307 |
+| all pairs: version 2 features | noisy-or | fixed 0.5 | 7/18 | 3/4 | 8 | 0.0015 | 0.0015 | 0.3307 |
+| all pairs: version 2 features | max | fold-chosen | 2/18 | 4/4 | 12 | 0.0000 | 0.0012 | 0.2788 |
+| all pairs: version 2 features | max | fixed 0.5 | 15/18 | 0/4 | 3 | 0.0014 | 0.0012 | 0.2788 |
+
+Primary model, fold-chosen thresholds (noisy-OR): algebra2005 1.0000, algebra2006 1.0000, assist2009 1.0000, assist2017 1.0000, bridge2006 1.0000, ednet 1.0000, junyi 1.0000; penalties: algebra2005 0.01, algebra2006 100.0, assist2009 100.0, assist2017 0.01, bridge2006 100.0, ednet 100.0, junyi 100.0.
+
+| primary, noisy-OR risk | recommendations | mean predicted | observed reversal rate |
+|---|---|---|---|
+| 0.00 to 0.25 | 4 | 0.0001 | 1.0000 |
+| 0.25 to 0.50 | 11 | 0.3939 | 0.0000 |
+| 0.50 to 0.75 | 1 | 0.5136 | 0.0000 |
+| 0.75 to 1.00 | 2 | 0.8721 | 0.0000 |
+
+| target | seed | selected | noisy-OR risk | fold threshold | abstain | reversed |
+|---|---|---|---|---|---|---|
+| algebra2005 | 1 | src:junyi | 0.7736 | 1.0000 | 0 | 0 |
+| algebra2005 | 2 | src:junyi | 0.9705 | 1.0000 | 0 | 0 |
+| algebra2005 | 42 | src:ednet | 0.0002 | 1.0000 | 0 | 1 |
+| algebra2006 | 1 | src:algebra2006 | 0.2855 | 1.0000 | 0 | 0 (ambiguous) |
+| algebra2006 | 2 | src:algebra2006 | 0.3339 | 1.0000 | 0 | 0 (ambiguous) |
+| algebra2006 | 42 | src:algebra2006 | 0.3232 | 1.0000 | 0 | 0 (ambiguous) |
+| assist2009 | 1 | src:assist2009 | 0.4512 | 1.0000 | 0 | 0 |
+| assist2009 | 2 | src:assist2009 | 0.4167 | 1.0000 | 0 | 0 |
+| assist2009 | 42 | src:assist2009 | 0.3910 | 1.0000 | 0 | 0 |
+| assist2017 | 1 | src:assist2017 | 0.0000 | 1.0000 | 0 | 1 |
+| assist2017 | 2 | src:assist2017 | 0.0000 | 1.0000 | 0 | 1 |
+| assist2017 | 42 | src:assist2017 | 0.0000 | 1.0000 | 0 | 1 |
+| bridge2006 | 1 | src:bridge2006 | 0.3127 | 1.0000 | 0 | 0 |
+| bridge2006 | 2 | src:bridge2006 | 0.3205 | 1.0000 | 0 | 0 |
+| bridge2006 | 42 | src:bridge2006 | 0.3138 | 1.0000 | 0 | 0 |
+| ednet | 1 | src:ednet | 0.4220 | 1.0000 | 0 | 0 |
+| ednet | 2 | src:ednet | 0.4053 | 1.0000 | 0 | 0 |
+| ednet | 42 | src:ednet | 0.4212 | 1.0000 | 0 | 0 |
+| junyi | 1 | src:ednet | 0.4310 | 1.0000 | 0 | 0 |
+| junyi | 2 | src:ednet | 0.4473 | 1.0000 | 0 | 0 |
+| junyi | 42 | src:ednet | 0.5136 | 1.0000 | 0 | 0 |
+
+With 7 targets and 21 recommendations every estimate here is coarse.
+
+Files: reversal_model_v2_recs.tsv 1f8d84f8a598452c4ba74404526b2438, reversal_model_v2_pairs.tsv 34fff18c059bab71fc1c6ce29ab3bd34
+
+_Read: aligning the target with the recommendation did not improve the decision. The primary rule
+follows 9 of 21 recommendations, catches 0 of 7 reversals and raises 12 false alarms; the
+recommendations it follows have mean regret 0.0027, against 0.0012 for always following H-score, and
+its AURC (0.0027) is above the 0.0012 of a random order. Its held-out risks run against the outcome:
+as a detector of reversed recommendations their AUC is 0.12 (7 reversed, 14 not). The penalty sits
+at the top of the grid in 6 of 7 folds, and the folds that hold out ASSISTments 2017 and Algebra
+2006 choose a threshold of 1.0 (follow everything), so those reversals are missed by construction.
+On the robustness label the primary rule follows all 18 recommendations, which is always following
+H-score. The reversed recommendations come from three events (ASSISTments 2017 on three seeds,
+Algebra 2006 on three, Algebra 2005 on one), so holding out a target removes its event entirely, and
+the remaining events do not carry a signal that transfers across targets. With 7 targets this is a
+sample-size limit as much as a modelling result. Nothing was tuned after the run._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
