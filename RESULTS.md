@@ -1404,6 +1404,85 @@ H-score. The reversed recommendations come from three events (ASSISTments 2017 o
 Algebra 2006 on three, Algebra 2005 on one), so holding out a target removes its event entirely, and
 the remaining events do not carry a signal that transfers across targets. With 7 targets this is a
 sample-size limit as much as a modelling result. Nothing was tuned after the run._
+### 12.15 Option 1: the recommendation-level test on the NLP benchmark (analysis/nlp_option1_eval.py, job 11261879; design docs/option1_nlp_design.md)
+
+Task: Prof. Hazra approved 210 early fine-tunes (7 encoders x 5 tasks x 2 poolings x 3 estimator
+seeds, 3 epochs each on the estimators' own 10,000-example samples, scripts/task4_early_ft.py),
+starting with a 5-run timing and protocol check, and asked for the fixed epoch-3 rule to be kept
+fixed for a test on new data. Labels are the head pairs of step A (published tuned gold, Task 4 tie
+rule): 30 recommendations, 20 reversed, from 4 of 5 tasks. Evaluation is leave-one-task-out, both
+poolings of a task held out together.
+
+Timeline of the design. The rule was fixed on 2026-10-13 (analysis/fixed_rule_eval.py), before any
+NLP early fine-tune existed. The design file was delivered before the 5-run check and committed in
+359b78d after the check and after the full set had been submitted, before any output of the full set
+was read; its first 4,266 bytes are the delivered version and its last section records this. The
+check ran one encoder per task, so it could not show whether H-score's pick led at epoch 3.
+
+Files (md5): option1_nlp_design.md 198ce6a6ecede9a26db35adf0cce6059, nlp_option1_eval.py
+76f268952cc363be25271e4df738b5d7, nlp_head_pairs.tsv d023dd9346eb1020afa11d1dacbaf579,
+nlp_head_recs.tsv e533ea40073f9ff4926af3194570008c, nlp_option1_report.md
+011c052c9166199daa417efe0a6cf173, nlp_option1_recs.tsv 8a146de30d1cc103d8df324f983d99cb.
+
+Report as written by analysis/nlp_option1_eval.py (headings lowered one level):
+
+
+Early fine-tunes: 210 runs, all present, 3 epochs, V100-SXM2, identical training and validation rows across encoders; 7.6 GPU-hours in total. Recommendations: 30 (5 tasks x 2 poolings x 3 seeds), 20 reversed.
+
+#### Primary comparison (epoch 3)
+
+| method | followed | caught | false alarms | selective regret (points) |
+|---|---|---|---|---|
+| always follow H-score | 30/30 | 0/20 | 0 | 2.6967 |
+| fixed epoch-3 rule | 8/30 | 18/20 | 4 | 0.5375 |
+| learned head-pair, fold-chosen threshold | 24/30 | 3/20 | 3 | 2.5083 |
+| learned head-pair, threshold 0.5 | 6/30 | 14/20 | 10 | 1.3850 |
+
+Best-average rule (never abstains): mean regret 1.3670 points over the 10 settings (reproduces RESULTS.md 13.1). AURC: learned 2.5323, frozen margin 3.7104, random 2.6967. Learned model Brier 0.4830.
+
+| learned risk (epoch 3) | recommendations | mean predicted | observed reversal rate |
+|---|---|---|---|
+| 0.00 to 0.25 | 5 | 0.0410 | 1.0000 |
+| 0.25 to 0.50 | 1 | 0.4552 | 1.0000 |
+| 0.50 to 0.75 | 0 | nan | nan |
+| 0.75 to 1.00 | 24 | 0.9560 | 0.5833 |
+
+#### Epochs 1 to 3: the minimum useful budget
+
+| epochs | GPU-minutes per recommendation | rule followed | rule caught | rule false alarms | rule selective regret | learned followed | learned caught | learned false alarms | learned selective regret | learned AURC |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 5.1 | 7/30 | 19/20 | 4 | 0.3071 | 24/30 | 3/20 | 3 | 2.5083 | 2.8069 |
+| 2 | 10.2 | 5/30 | 18/20 | 7 | 2.7600 | 24/30 | 3/20 | 3 | 2.5083 | 2.6976 |
+| 3 | 15.2 | 8/30 | 18/20 | 4 | 0.5375 | 24/30 | 3/20 | 3 | 2.5083 | 2.5323 |
+
+#### Per held-out task (epoch 3)
+
+| task | recommendations | reversed | rule abstains | rule caught | learned abstains | learned caught |
+|---|---|---|---|---|---|---|
+| agnews | 6 | 6 | 4 | 4 | 0 | 0 |
+| mnli | 6 | 5 | 5 | 5 | 0 | 0 |
+| qnli | 6 | 6 | 6 | 6 | 0 | 0 |
+| rte | 6 | 3 | 6 | 3 | 6 | 3 |
+| airline | 6 | 0 | 1 | 0 | 0 | 0 |
+
+Without Airline (24 recommendations): the epoch-3 rule follows 3, catches 18 of 20 with 3 false alarms, selective regret 1.4333, against 3.3708 for always following H-score.
+
+With 5 tasks and 30 recommendations every estimate here is coarse.
+
+Files: nlp_option1_recs.tsv 8a146de30d1cc103d8df324f983d99cb
+
+_Read: the fixed epoch-3 rule, set before these data existed, flags 18 of the 20 reversed
+recommendations and 4 of the 10 that hold (Airline once, RTE on all three first-token rankings); it
+follows 8 of 30, and those have mean regret 0.5375 points against 2.6967 for always following
+H-score. The two reversals it follows are AG News with mean pooling (seeds 1 and 42, regret 2.15
+points each). Its coverage is low: 22 of 30 recommendations fall back to full fine-tuning. The
+learned head-pair model does not beat the rule: at its fold-chosen thresholds it abstains only on
+RTE, so it catches 3 of 20, and the same decisions come out at every budget; its calibration is poor
+(5 recommendations given a risk near 0.04 were all reversed). On budget, the rule at epoch 1 flags
+19 of 20 with 4 false alarms at 5.1 GPU-minutes per recommendation, against 15.2 at epoch 3; epoch 2
+is worse (18 of 20, 7 false alarms), so these counts do not order the budgets reliably. The cost of
+fine-tuning all 7 encoders in full was not measured here, so the saving is not quantified. With 5
+tasks and 30 recommendations every estimate is coarse._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
