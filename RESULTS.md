@@ -1483,6 +1483,61 @@ RTE, so it catches 3 of 20, and the same decisions come out at every budget; its
 is worse (18 of 20, 7 false alarms), so these counts do not order the budgets reliably. The cost of
 fine-tuning all 7 encoders in full was not measured here, so the saving is not quantified. With 5
 tasks and 30 recommendations every estimate is coarse._
+### 12.16 Option 1 supplement: intervals, calibration, budget agreement and compute (analysis/nlp_option1_supplement.py, job 11263574; added after the 12.15 results, describing the same decisions)
+
+Files (md5): nlp_option1_supplement.py b6de6a5e5859dfe02fb9b5df9cdc182c, nlp_option1_recs.tsv
+8a146de30d1cc103d8df324f983d99cb, nlp_option1_supplement_report.md d404e124397cd141a82c431874bb0df7,
+nlp_option1_supplement.tsv 58b7229abe69d88bb0dea920e77e7c93.
+
+Report as written by analysis/nlp_option1_supplement.py:
+
+
+Added after the 12.15 results were seen; it describes the same decisions and changes no rule, threshold or model. Intervals: Wilson 95% for counts, task-cluster bootstrap for selective regret (5 tasks, so the intervals are wide).
+
+| method | epochs | caught [95% CI] | false alarms [95% CI] | followed | selective regret [95% CI] | GPU-minutes per recommendation |
+|---|---|---|---|---|---|---|
+| fixed rule | 1 | 19/20 [76%, 99%] | 4/10 [17%, 69%] | 7/30 | 0.31 [0.00, 2.15] | 5.1 |
+| fixed rule | 2 | 18/20 [70%, 97%] | 7/10 [40%, 89%] | 5/30 | 2.76 [0.00, 6.90] | 10.2 |
+| fixed rule | 3 | 18/20 [70%, 97%] | 4/10 [17%, 69%] | 8/30 | 0.54 [0.00, 2.15] | 15.2 |
+| learned head-pair | 1 | 3/20 [5%, 36%] | 3/10 [11%, 60%] | 24/30 | 2.51 [0.46, 4.49] | 5.1 |
+| learned head-pair | 2 | 3/20 [5%, 36%] | 3/10 [11%, 60%] | 24/30 | 2.51 [0.46, 4.49] | 10.2 |
+| learned head-pair | 3 | 3/20 [5%, 36%] | 3/10 [11%, 60%] | 24/30 | 2.51 [0.46, 4.49] | 15.2 |
+
+Always following H-score: regret 2.70 points [1.11, 4.15] over all 30 recommendations.
+
+Rule calibration (observed reversal rate):
+
+| epochs | among flagged | among followed |
+|---|---|---|
+| 1 | 19/23 (83%) | 1/7 (14%) |
+| 2 | 18/25 (72%) | 2/5 (40%) |
+| 3 | 18/22 (82%) | 2/8 (25%) |
+
+Rule decisions agree between epoch 1 and epoch 3 on 29 of 30 recommendations, between epoch 2 and epoch 3 on 23 of 30.
+
+Compute per recommendation (GPU-minutes, 7 encoders):
+
+| budget | GPU-minutes | share of one full-data epoch |
+|---|---|---|
+| early, 1 epoch on the 10,000-example sample | 5.1 | 7% |
+| early, 2 epochs on the 10,000-example sample | 10.2 | 14% |
+| early, 3 epochs on the 10,000-example sample | 15.2 | 21% |
+| full fine-tuning, one epoch over the full training split (lower bound) | 72.5 | 100% |
+
+Training-split sizes: agnews 120,000, mnli 392,702, qnli 104,743, rte 2,490, airline 10,248. The full-data figure scales the measured training time per example; the published fine-tunes ran several epochs with early stopping, so it understates their cost.
+
+Files: nlp_option1_supplement.tsv 58b7229abe69d88bb0dea920e77e7c93
+
+_Read: as a detector the fixed rule is strong on these data. At epoch 3 it flags 18 of 20 wrong
+recommendations (95% interval 70% to 97%); 82% of the recommendations it flags are wrong, against
+25% of those it follows; and those it follows have regret 0.54 points (task-cluster interval 0.00 to
+2.15) against 2.70 (1.11 to 4.15) for always following H-score. Its weaknesses are the false-alarm
+rate, 4 of 10 correct recommendations (17% to 69%), and coverage, 8 of 30. Epoch 1 makes the same
+decision as epoch 3 on 29 of 30 recommendations at a third of the cost (5.1 against 15.2 GPU-minutes
+per recommendation, 7% and 21% of one epoch of full fine-tuning over the full training splits, a
+lower bound because the authors' tuned setting allows up to 50 epochs with early stopping); epoch 2
+agrees on only 23, so the budgets are not ordered by the counts alone. The learned head-pair model
+catches 3 of 20 (5% to 36%) at every budget. Five tasks make every interval wide._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
