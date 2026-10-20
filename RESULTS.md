@@ -1538,6 +1538,171 @@ per recommendation, 7% and 21% of one epoch of full fine-tuning over the full tr
 lower bound because the authors' tuned setting allows up to 50 epochs with early stopping); epoch 2
 agrees on only 23, so the budgets are not ordered by the counts alone. The learned head-pair model
 catches 3 of 20 (5% to 36%) at every budget. Five tasks make every interval wide._
+### 12.17 Frozen state before phase 2, and the fixed rule on StudentBERT at one and three epochs
+
+Freeze. Sections 12.13 to 12.16 are frozen together with the write-up
+docs/pipeline_results_20261020.md and its checksum manifest, and the repository is tagged
+pipeline-results-20261020 (commit bcb20aa, 2026-10-20). Later results go into new sections. The rule
+carried into phase 2 is the same check after one epoch: flag H-score's recommendation when its pick
+is not the validation leader after one epoch of fine-tuning (docs/phase2_complete_rule_design.md and
+docs/phase2_amendment1.md).
+
+Files (md5): fixed_rule_eval.py 94fc5f277d758c6b64fc8ebd5e169de2, reversal_pairs.tsv
+8f57558d142869b3e34a35ad18d095f7, fixed_rule_report.md 9c9d0608a9c5f75e205b6f9e92aa34d3,
+fixed_rule_recs.tsv f2373c453120d3301a724410ccaa3706, fixed_rule_e1_report.md
+67e44aacb5ef638cad2a7b19c412c9fb, fixed_rule_e1_recs.tsv bae76c73c9558791b4e67c91d604f19f,
+pipeline_results_20261020.md 68f5ec603cd8e523974b621282e3d569, phase2_complete_rule_design.md
+254538daf4b91503fe1cfe767f32ce0f, phase2_amendment1.md ce8e827bfe9ffee6a074b498915c29cc.
+
+The fixed rule on StudentBERT at epoch 3 (analysis/fixed_rule_eval.py, as fixed on 2026-10-13):
+
+
+Rule: abstain when H-score's pick is not the validation leader at epoch 3 of the fine-tune with the estimator's seed; otherwise follow H-score. Nothing is fitted.
+
+#### Main label
+
+| rule | followed | caught | false alarms | selective regret |
+|---|---|---|---|---|
+| always follow H-score | 21/21 | 0/7 | 0 | 0.0012 |
+| fixed epoch-3 rule | 12/21 | 6/7 | 3 | 0.0009 |
+
+| target | seed | selected | epoch-3 leader | abstain | reversed |
+|---|---|---|---|---|---|
+| algebra2005 | 1 | src:junyi | 1 | 0 | 0 |
+| algebra2005 | 2 | src:junyi | 1 | 0 | 0 |
+| algebra2005 | 42 | src:ednet | 1 | 0 | 1 |
+| algebra2006 | 1 | src:algebra2006 | 0 | 1 | 1 |
+| algebra2006 | 2 | src:algebra2006 | 0 | 1 | 1 |
+| algebra2006 | 42 | src:algebra2006 | 0 | 1 | 1 |
+| assist2009 | 1 | src:assist2009 | 1 | 0 | 0 |
+| assist2009 | 2 | src:assist2009 | 1 | 0 | 0 |
+| assist2009 | 42 | src:assist2009 | 0 | 1 | 0 |
+| assist2017 | 1 | src:assist2017 | 0 | 1 | 1 |
+| assist2017 | 2 | src:assist2017 | 0 | 1 | 1 |
+| assist2017 | 42 | src:assist2017 | 0 | 1 | 1 |
+| bridge2006 | 1 | src:bridge2006 | 0 | 1 | 0 |
+| bridge2006 | 2 | src:bridge2006 | 1 | 0 | 0 |
+| bridge2006 | 42 | src:bridge2006 | 0 | 1 | 0 |
+| ednet | 1 | src:ednet | 1 | 0 | 0 |
+| ednet | 2 | src:ednet | 1 | 0 | 0 |
+| ednet | 42 | src:ednet | 1 | 0 | 0 |
+| junyi | 1 | src:ednet | 1 | 0 | 0 |
+| junyi | 2 | src:ednet | 1 | 0 | 0 |
+| junyi | 42 | src:ednet | 1 | 0 | 0 |
+
+#### Robustness label (Algebra 2006 pair ambiguous)
+
+| rule | followed | caught | false alarms | selective regret |
+|---|---|---|---|---|
+| always follow H-score | 18/18 | 0/4 | 0 | 0.0012 |
+| fixed epoch-3 rule | 12/18 | 3/4 | 3 | 0.0009 |
+
+| target | seed | selected | epoch-3 leader | abstain | reversed |
+|---|---|---|---|---|---|
+| algebra2005 | 1 | src:junyi | 1 | 0 | 0 |
+| algebra2005 | 2 | src:junyi | 1 | 0 | 0 |
+| algebra2005 | 42 | src:ednet | 1 | 0 | 1 |
+| algebra2006 | 1 | src:algebra2006 | 0 | 1 | 0 (ambiguous) |
+| algebra2006 | 2 | src:algebra2006 | 0 | 1 | 0 (ambiguous) |
+| algebra2006 | 42 | src:algebra2006 | 0 | 1 | 0 (ambiguous) |
+| assist2009 | 1 | src:assist2009 | 1 | 0 | 0 |
+| assist2009 | 2 | src:assist2009 | 1 | 0 | 0 |
+| assist2009 | 42 | src:assist2009 | 0 | 1 | 0 |
+| assist2017 | 1 | src:assist2017 | 0 | 1 | 1 |
+| assist2017 | 2 | src:assist2017 | 0 | 1 | 1 |
+| assist2017 | 42 | src:assist2017 | 0 | 1 | 1 |
+| bridge2006 | 1 | src:bridge2006 | 0 | 1 | 0 |
+| bridge2006 | 2 | src:bridge2006 | 1 | 0 | 0 |
+| bridge2006 | 42 | src:bridge2006 | 0 | 1 | 0 |
+| ednet | 1 | src:ednet | 1 | 0 | 0 |
+| ednet | 2 | src:ednet | 1 | 0 | 0 |
+| ednet | 42 | src:ednet | 1 | 0 | 0 |
+| junyi | 1 | src:ednet | 1 | 0 | 0 |
+| junyi | 2 | src:ednet | 1 | 0 | 0 |
+| junyi | 42 | src:ednet | 1 | 0 | 0 |
+
+Retrospective: the rule was suggested by diagnostic D8 (RESULTS.md 12.8) on these same targets, so this is development evidence, not a held-out test.
+
+Files: fixed_rule_recs.tsv f2373c453120d3301a724410ccaa3706
+
+The same rule at epoch 1 (analysis/fixed_rule_eval.py --epoch 1):
+
+
+Rule: abstain when H-score's pick is not the validation leader at epoch 1 of the fine-tune with the estimator's seed; otherwise follow H-score. Nothing is fitted.
+
+#### Main label
+
+| rule | followed | caught | false alarms | selective regret |
+|---|---|---|---|---|
+| always follow H-score | 21/21 | 0/7 | 0 | 0.0012 |
+| fixed epoch-1 rule | 17/21 | 1/7 | 3 | 0.0009 |
+
+| target | seed | selected | epoch-1 leader | abstain | reversed |
+|---|---|---|---|---|---|
+| algebra2005 | 1 | src:junyi | 0 | 1 | 0 |
+| algebra2005 | 2 | src:junyi | 1 | 0 | 0 |
+| algebra2005 | 42 | src:ednet | 0 | 1 | 1 |
+| algebra2006 | 1 | src:algebra2006 | 1 | 0 | 1 |
+| algebra2006 | 2 | src:algebra2006 | 1 | 0 | 1 |
+| algebra2006 | 42 | src:algebra2006 | 1 | 0 | 1 |
+| assist2009 | 1 | src:assist2009 | 0 | 1 | 0 |
+| assist2009 | 2 | src:assist2009 | 1 | 0 | 0 |
+| assist2009 | 42 | src:assist2009 | 1 | 0 | 0 |
+| assist2017 | 1 | src:assist2017 | 1 | 0 | 1 |
+| assist2017 | 2 | src:assist2017 | 1 | 0 | 1 |
+| assist2017 | 42 | src:assist2017 | 1 | 0 | 1 |
+| bridge2006 | 1 | src:bridge2006 | 1 | 0 | 0 |
+| bridge2006 | 2 | src:bridge2006 | 1 | 0 | 0 |
+| bridge2006 | 42 | src:bridge2006 | 1 | 0 | 0 |
+| ednet | 1 | src:ednet | 1 | 0 | 0 |
+| ednet | 2 | src:ednet | 1 | 0 | 0 |
+| ednet | 42 | src:ednet | 1 | 0 | 0 |
+| junyi | 1 | src:ednet | 1 | 0 | 0 |
+| junyi | 2 | src:ednet | 1 | 0 | 0 |
+| junyi | 42 | src:ednet | 0 | 1 | 0 |
+
+#### Robustness label (Algebra 2006 pair ambiguous)
+
+| rule | followed | caught | false alarms | selective regret |
+|---|---|---|---|---|
+| always follow H-score | 18/18 | 0/4 | 0 | 0.0012 |
+| fixed epoch-1 rule | 14/18 | 1/4 | 3 | 0.0007 |
+
+| target | seed | selected | epoch-1 leader | abstain | reversed |
+|---|---|---|---|---|---|
+| algebra2005 | 1 | src:junyi | 0 | 1 | 0 |
+| algebra2005 | 2 | src:junyi | 1 | 0 | 0 |
+| algebra2005 | 42 | src:ednet | 0 | 1 | 1 |
+| algebra2006 | 1 | src:algebra2006 | 1 | 0 | 0 (ambiguous) |
+| algebra2006 | 2 | src:algebra2006 | 1 | 0 | 0 (ambiguous) |
+| algebra2006 | 42 | src:algebra2006 | 1 | 0 | 0 (ambiguous) |
+| assist2009 | 1 | src:assist2009 | 0 | 1 | 0 |
+| assist2009 | 2 | src:assist2009 | 1 | 0 | 0 |
+| assist2009 | 42 | src:assist2009 | 1 | 0 | 0 |
+| assist2017 | 1 | src:assist2017 | 1 | 0 | 1 |
+| assist2017 | 2 | src:assist2017 | 1 | 0 | 1 |
+| assist2017 | 42 | src:assist2017 | 1 | 0 | 1 |
+| bridge2006 | 1 | src:bridge2006 | 1 | 0 | 0 |
+| bridge2006 | 2 | src:bridge2006 | 1 | 0 | 0 |
+| bridge2006 | 42 | src:bridge2006 | 1 | 0 | 0 |
+| ednet | 1 | src:ednet | 1 | 0 | 0 |
+| ednet | 2 | src:ednet | 1 | 0 | 0 |
+| ednet | 42 | src:ednet | 1 | 0 | 0 |
+| junyi | 1 | src:ednet | 1 | 0 | 0 |
+| junyi | 2 | src:ednet | 1 | 0 | 0 |
+| junyi | 42 | src:ednet | 0 | 1 | 0 |
+
+Retrospective: the rule was suggested by diagnostic D8 (RESULTS.md 12.8) on these same targets, so this is development evidence, not a held-out test.
+
+Files: fixed_rule_e1_recs.tsv bae76c73c9558791b4e67c91d604f19f
+
+_Read: both rows are retrospective, because the rule was suggested by diagnostic D8 on these
+targets. At epoch 3 the rule catches 6 of 7 reversed StudentBERT recommendations with 3 false
+alarms; at epoch 1 it catches 1 of 7 (Algebra 2005, seed 42), also with 3 false alarms, because the
+in-domain picks of ASSISTments 2017 and Algebra 2006 lead after one epoch on every seed and are
+overtaken later. On the NLP benchmark one epoch matches three (12.16: 19 of 20 caught at epoch 1, 18
+of 20 at epoch 3). So the one-epoch budget is supported on NLP but not on StudentBERT, and the
+budget may depend on the domain._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 

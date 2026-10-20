@@ -10,6 +10,9 @@ StudentBERT, because the rule was suggested by diagnostic D8 (RESULTS.md 12.8) o
 on the NLP benchmark, whose early trajectories do not exist yet, it will be a baseline fixed before
 the data. Scored with the recommendation-level metrics of analysis/reversal_model_v2.py.
 
+--epoch 1 (added 2026-10-20) applies the same check after one epoch, the budget carried into
+phase 2; it is retrospective evidence on StudentBERT too. The default, epoch 3, is unchanged.
+
   PYTHONPATH=. python analysis/fixed_rule_eval.py --pairs benchmark_final/reversal_pairs.tsv \
       --out benchmark_final/fixed_rule
 """
@@ -22,22 +25,26 @@ from analysis import reversal_model as rm
 from analysis import reversal_model_v2 as v2
 
 
-def rule_risk(rows: list[dict]) -> dict:
-    """1.0 for every head pair of a recommendation whose pick is not the epoch-3 leader, else 0."""
-    return {rm.key(r): 0.0 if r["rank_e3_a"] == "1" else 1.0 for r in rows if v2.is_head(r)}
+def rule_risk(rows: list[dict], epoch: int = 3) -> dict:
+    """1.0 for every head pair of a recommendation whose pick is not the epoch-k leader, else 0."""
+    col = f"rank_e{epoch}_a"
+    return {rm.key(r): 0.0 if r[col] == "1" else 1.0 for r in rows if v2.is_head(r)}
 
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pairs", required=True)
     ap.add_argument("--out", required=True, help="prefix for the _recs and _report files")
+    ap.add_argument("--epoch", type=int, default=3, choices=(1, 3),
+                    help="budget of the check (the pair table records ranks at epochs 1 and 3)")
     a = ap.parse_args(argv)
     rows = rm.load(a.pairs)
     head = [r for r in rows if v2.is_head(r)]
-    risk = rule_risk(rows)
+    risk = rule_risk(rows, a.epoch)
+    k = a.epoch
     out = Path(a.out)
     L = ["# Fixed early fine-tuning rule on StudentBERT (retrospective evidence)", "",
-         "Rule: abstain when H-score's pick is not the validation leader at epoch 3 of the "
+         f"Rule: abstain when H-score's pick is not the validation leader at epoch {k} of the "
          "fine-tune with the estimator's seed; otherwise follow H-score. Nothing is fitted.", ""]
     allrecs = []
     for lab, title in (("label_main", "Main label"),
@@ -52,10 +59,10 @@ def main(argv: list[str] | None = None) -> None:
               "|---|---|---|---|---|",
               f"| always follow H-score | {len(use)}/{len(use)} | 0/{e['reversed']} | 0 | "
               f"{always:.4f} |",
-              f"| fixed epoch-3 rule | {s['followed']}/{len(use)} | "
+              f"| fixed epoch-{k} rule | {s['followed']}/{len(use)} | "
               f"{s['caught']}/{e['reversed']} | "
               f"{s['false_alarms']} | {s['selective_regret']:.4f} |", "",
-              "| target | seed | selected | epoch-3 leader | abstain | reversed |",
+              f"| target | seed | selected | epoch-{k} leader | abstain | reversed |",
               "|---|---|---|---|---|---|"]
         for r in recs:
             ab = int(r["risk_noisy_or"] > 0.5)
