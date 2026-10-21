@@ -1703,6 +1703,180 @@ in-domain picks of ASSISTments 2017 and Algebra 2006 lead after one epoch on eve
 overtaken later. On the NLP benchmark one epoch matches three (12.16: 19 of 20 caught at epoch 1, 18
 of 20 at epoch 3). So the one-epoch budget is supported on NLP but not on StudentBERT, and the
 budget may depend on the domain._
+### 12.18 Phase 2: the full framework on fresh seeds (analysis/phase2_eval.py, job 11271624; design docs/phase2_complete_rule_design.md and docs/phase2_amendment1.md, both committed before the fresh fine-tunes were read)
+
+Task: Prof. Hazra's phase 2 list. Fresh estimator seeds 3, 4 and 5 (new samples on AG News, MNLI and
+QNLI; Airline's samples overlap almost entirely with the old ones and RTE's are identical, so only
+their fine-tuning randomness is new): new frozen features and scores, 30 fresh H-score
+recommendations (18 overtaken after fine-tuning, from 4 of 5 tasks) and 210 early fine-tunes of 3
+epochs. The full framework keeps H-score's pick unless the epoch-k leader's validation accuracy
+exceeds it by more than 1.96 x sqrt(2 p (1 - p) / n); with a strict check it would equal the early
+leader alone, which is reported as the ablation without H-score. Primary, fixed before the run: the
+full framework at epoch 1 against H-score alone on mean regret. Four jobs ran twice after scheduler
+errors on explorer-02; each of the 210 outputs is one complete run, checked by the evaluation.
+
+Files (md5): phase2_complete_rule_design.md 254538daf4b91503fe1cfe767f32ce0f, phase2_amendment1.md
+ce8e827bfe9ffee6a074b498915c29cc, phase2_eval.py d0ecd67479378b4d3dcbf3457253f5dc,
+phase2_supplement.py bf1756e7072fd077aad769a4f452b50c, p2_head_report.md
+62702fa6156404a02f6d5f34cf856d1d, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1,
+p2_head_recs.tsv a776f71b11a673d815dc6f486e4eb668, p2_eval_report.md
+205f72d95e20cf2208a51428175a2e86, p2_eval_choices.tsv 21df978b07059d31198046609f88e1d0,
+p2_supplement_report.md fb051bca22405d4d505d06b46f2b695d.
+
+Report as written by analysis/phase2_eval.py:
+
+
+30 fresh recommendations (seeds 3, 4, 5), 18 with H-score's pick overtaken. Early fine-tunes: 210 runs, all present, 3 epochs, V100-SXM2, identical rows across encoders; 7.6 GPU-hours. Regret in published fine-tuned points.
+
+#### All five tasks
+
+| method | top-1 | tied with best | mean regret [95% CI] | reversal recovery | false corrections | harmless switches | wins/ties/losses vs H-score |
+|---|---|---|---|---|---|---|---|
+| H-score alone | 12/30 | 12/30 | 2.37 [0.97, 3.56] | 0/18 [0%, 18%] | 0/12 [0%, 24%] | 0 | 0/30/0 |
+| LogME alone | 15/30 | 18/30 | 2.08 [0.68, 3.47] | 7/18 [20%, 61%] | 1/12 [1%, 35%] | 3 | 7/19/4 |
+| early leader, epoch 1 | 12/30 | 19/30 | 1.79 [0.55, 3.27] | 7/18 [20%, 61%] | 0/12 [0%, 24%] | 6 | 9/10/11 |
+| early leader, epoch 2 | 12/30 | 18/30 | 1.74 [0.44, 3.90] | 6/18 [16%, 56%] | 0/12 [0%, 24%] | 5 | 12/8/10 |
+| early leader, epoch 3 | 12/30 | 19/30 | 1.12 [0.45, 2.07] | 9/18 [29%, 71%] | 2/12 [5%, 45%] | 6 | 14/6/10 |
+| full framework, epoch 1 | 12/30 | 16/30 | 1.95 [0.52, 3.45] | 4/18 [9%, 45%] | 0/12 [0%, 24%] | 3 | 5/22/3 |
+| full framework, epoch 2 | 12/30 | 15/30 | 1.96 [0.54, 3.65] | 3/18 [6%, 39%] | 0/12 [0%, 24%] | 3 | 5/22/3 |
+| full framework, epoch 3 | 15/30 | 18/30 | 1.42 [0.33, 3.02] | 6/18 [16%, 56%] | 0/12 [0%, 24%] | 3 | 9/18/3 |
+| best-average rule | 6/30 | 12/30 | 1.37 [0.51, 2.33] | 1/18 [1%, 26%] | 1/12 [1%, 35%] | 5 | 12/12/6 |
+
+| abstention rule | followed (coverage) | reversed among flagged | reversed among followed | selective regret [95% CI] |
+|---|---|---|---|---|
+| H-score + abstention, epoch 1 | 10/30 | 14/20 | 4/10 | 0.55 [0.00, 1.38] |
+| H-score + abstention, epoch 2 | 8/30 | 17/22 | 1/8 | 0.27 [0.00, 1.61] |
+| H-score + abstention, epoch 3 | 6/30 | 16/24 | 2/6 | 0.72 [0.00, 2.15] |
+
+#### AG News, MNLI and QNLI (new samples)
+
+| method | top-1 | tied with best | mean regret [95% CI] | reversal recovery | false corrections | harmless switches | wins/ties/losses vs H-score |
+|---|---|---|---|---|---|---|---|
+| H-score alone | 3/18 | 3/18 | 2.81 [1.38, 3.88] | 0/15 [0%, 20%] | 0/3 [0%, 56%] | 0 | 0/18/0 |
+| LogME alone | 6/18 | 6/18 | 2.81 [0.72, 3.88] | 4/15 [11%, 52%] | 1/3 [6%, 79%] | 0 | 4/13/1 |
+| early leader, epoch 1 | 6/18 | 9/18 | 1.43 [0.81, 2.55] | 6/15 [20%, 64%] | 0/3 [0%, 56%] | 2 | 7/5/6 |
+| early leader, epoch 2 | 6/18 | 8/18 | 0.88 [0.66, 1.03] | 5/15 [15%, 58%] | 0/3 [0%, 56%] | 1 | 11/3/4 |
+| early leader, epoch 3 | 7/18 | 10/18 | 0.73 [0.36, 1.22] | 8/15 [30%, 75%] | 1/3 [6%, 79%] | 2 | 11/2/5 |
+| full framework, epoch 1 | 4/18 | 6/18 | 1.72 [0.62, 3.16] | 3/15 [7%, 45%] | 0/3 [0%, 56%] | 1 | 4/13/1 |
+| full framework, epoch 2 | 5/18 | 6/18 | 1.51 [0.66, 2.49] | 3/15 [7%, 45%] | 0/3 [0%, 56%] | 1 | 5/12/1 |
+| full framework, epoch 3 | 8/18 | 9/18 | 0.87 [0.42, 1.38] | 6/15 [20%, 64%] | 0/3 [0%, 56%] | 1 | 8/9/1 |
+| best-average rule | 0/18 | 3/18 | 1.24 [1.08, 1.38] | 1/15 [1%, 30%] | 1/3 [6%, 79%] | 2 | 9/6/3 |
+
+| abstention rule | followed (coverage) | reversed among flagged | reversed among followed | selective regret [95% CI] |
+|---|---|---|---|---|
+| H-score + abstention, epoch 1 | 5/18 | 11/13 | 4/5 | 1.11 [0.00, 1.38] |
+| H-score + abstention, epoch 2 | 3/18 | 14/15 | 1/3 | 0.72 [0.00, 2.15] |
+| H-score + abstention, epoch 3 | 2/18 | 13/16 | 2/2 | 2.15 [2.15, 2.15] |
+
+#### Stability across the 3 fresh seeds
+
+| method | settings with the same choice on all seeds | mean spread of regret (SD) |
+|---|---|---|
+| H-score alone | 8/10 | 0.46 |
+| LogME alone | 8/10 | 0.37 |
+| early leader, epoch 1 | 3/10 | 1.02 |
+| early leader, epoch 2 | 2/10 | 0.96 |
+| early leader, epoch 3 | 0/10 | 0.91 |
+| full framework, epoch 1 | 5/10 | 0.96 |
+| full framework, epoch 2 | 6/10 | 0.59 |
+| full framework, epoch 3 | 5/10 | 0.77 |
+| best-average rule | 10/10 | 0.00 |
+
+#### Compute
+
+| budget | GPU-minutes per recommendation |
+|---|---|
+| 1 epoch | 5.1 |
+| 2 epochs | 10.2 |
+| 3 epochs | 15.2 |
+
+#### Failures of the full framework (epoch 1): choice not tied with the best
+
+| task | pooling | seed | H-score's pick | epoch-1 leader | epoch-1 gap | delta | choice | regret |
+|---|---|---|---|---|---|---|---|---|
+| agnews | cls | 3 | cardiffnlp/twitter-roberta-base | cardiffnlp/twitter-roberta-base | 0.0000 | 0.0176 | cardiffnlp/twitter-roberta-base | 0.62 |
+| agnews | cls | 4 | cardiffnlp/twitter-roberta-base | cardiffnlp/twitter-roberta-base | 0.0000 | 0.0171 | cardiffnlp/twitter-roberta-base | 0.62 |
+| agnews | cls | 5 | cardiffnlp/twitter-roberta-base | distilbert-base-uncased | 0.0015 | 0.0176 | cardiffnlp/twitter-roberta-base | 0.62 |
+| agnews | mean | 3 | roberta-base | distilbert-base-uncased | 0.0150 | 0.0182 | roberta-base | 2.15 |
+| agnews | mean | 4 | roberta-base | roberta-base | 0.0000 | 0.0176 | roberta-base | 2.15 |
+| agnews | mean | 5 | roberta-base | roberta-base | 0.0000 | 0.0167 | roberta-base | 2.15 |
+| mnli | cls | 3 | dmis-lab/biobert-v1.1 | cardiffnlp/twitter-roberta-base | 0.0510 | 0.0281 | cardiffnlp/twitter-roberta-base | 1.39 |
+| qnli | cls | 3 | dmis-lab/biobert-v1.1 | bert-base-uncased | 0.0040 | 0.0215 | dmis-lab/biobert-v1.1 | 3.66 |
+| qnli | cls | 4 | dmis-lab/biobert-v1.1 | bert-base-uncased | 0.0065 | 0.0218 | dmis-lab/biobert-v1.1 | 3.66 |
+| qnli | cls | 5 | dmis-lab/biobert-v1.1 | bert-base-uncased | 0.0095 | 0.0219 | dmis-lab/biobert-v1.1 | 3.66 |
+| qnli | mean | 3 | dmis-lab/biobert-v1.1 | roberta-base | 0.0185 | 0.0211 | dmis-lab/biobert-v1.1 | 3.98 |
+| qnli | mean | 4 | dmis-lab/biobert-v1.1 | bert-base-uncased | 0.0105 | 0.0222 | dmis-lab/biobert-v1.1 | 3.98 |
+| rte | mean | 3 | bert-base-uncased | dmis-lab/biobert-v1.1 | 0.0397 | 0.0812 | bert-base-uncased | 6.90 |
+| rte | mean | 4 | bert-base-uncased | cardiffnlp/twitter-roberta-base | 0.0181 | 0.0831 | bert-base-uncased | 6.90 |
+
+Switches of the full framework (epoch 1) between encoders the published results cannot separate: 3.
+
+With 5 tasks and 30 recommendations every estimate here is coarse.
+
+Files: p2_eval_choices.tsv 21df978b07059d31198046609f88e1d0
+
+Supplement, added after the results (analysis/phase2_supplement.py; part B is retrospective):
+
+
+#### A. NLP fresh seeds: descriptive additions
+
+| method | maximum regret | minus H-score, all tasks [95% CI] | minus H-score, AG News, MNLI, QNLI [95% CI] |
+|---|---|---|---|
+| H-score alone | 6.90 | | |
+| LogME alone | 5.87 | -0.30 [-0.99, +0.27] | -0.00 [-0.67, +0.66] |
+| early leader, epoch 1 | 9.01 | -0.58 [-1.94, +0.49] | -1.38 [-3.07, -0.46] |
+| early leader, epoch 2 | 9.01 | -0.64 [-2.34, +1.07] | -1.93 [-3.22, -0.44] |
+| early leader, epoch 3 | 6.91 | -1.26 [-2.55, +0.01] | -2.08 [-3.26, -0.17] |
+| full framework, epoch 1 | 6.91 | -0.42 [-1.96, +0.69] | -1.09 [-3.26, +0.00] |
+| full framework, epoch 2 | 6.91 | -0.42 [-1.93, +0.95] | -1.30 [-3.22, +0.00] |
+| full framework, epoch 3 | 6.91 | -0.95 [-2.54, +0.42] | -1.93 [-3.46, +0.00] |
+| best-average rule | 3.84 | -1.01 [-1.98, -0.07] | -1.56 [-2.61, +0.00] |
+
+| warning signal | reversals caught | false alarms |
+|---|---|---|
+| epoch 1 | 14/18 [55%, 91%] | 6/12 [25%, 75%] |
+| epoch 2 | 17/18 [74%, 99%] | 5/12 [19%, 68%] |
+| epoch 3 | 16/18 [67%, 97%] | 8/12 [39%, 86%] |
+
+#### B. StudentBERT, retrospective (21 recommendations, 7 with H-score's pick overtaken)
+
+| method | top-1 | tied with best | mean regret (AUC) [95% CI] | reversal recovery | false corrections | stable across seeds |
+|---|---|---|---|---|---|---|
+| H-score alone | 11/21 | 14/21 | 0.0012 [0.0003, 0.0023] | 0/7 [0%, 35%] | 0/14 [0%, 22%] | 6/7 |
+| LogME alone | 10/21 | 13/21 | 0.0017 [0.0006, 0.0027] | 0/7 [0%, 35%] | 1/14 [1%, 31%] | 5/7 |
+| early leader, epoch 1 | 8/21 | 12/21 | 0.0031 [0.0007, 0.0070] | 0/7 [0%, 35%] | 2/14 [4%, 40%] | 4/7 |
+| early leader, epoch 2 | 13/21 | 16/21 | 0.0010 [0.0002, 0.0025] | 5/7 [36%, 92%] | 3/14 [8%, 48%] | 5/7 |
+| early leader, epoch 3 | 18/21 | 19/21 | 0.0006 [0.0000, 0.0016] | 6/7 [49%, 97%] | 1/14 [1%, 31%] | 4/7 |
+| full framework, epoch 1 | 8/21 | 12/21 | 0.0031 [0.0007, 0.0070] | 0/7 [0%, 35%] | 2/14 [4%, 40%] | 4/7 |
+| full framework, epoch 2 | 13/21 | 16/21 | 0.0011 [0.0002, 0.0026] | 4/7 [25%, 84%] | 2/14 [4%, 40%] | 5/7 |
+| full framework, epoch 3 | 17/21 | 19/21 | 0.0006 [0.0001, 0.0016] | 6/7 [49%, 97%] | 1/14 [1%, 31%] | 4/7 |
+
+| abstention rule | followed | reversed among flagged | reversed among followed |
+|---|---|---|---|
+| H-score + abstention, epoch 1 | 17/21 | 1/4 | 6/17 |
+| H-score + abstention, epoch 2 | 12/21 | 6/9 | 1/12 |
+| H-score + abstention, epoch 3 | 12/21 | 6/9 | 1/12 |
+
+Every interval here is coarse: 5 NLP tasks and 7 StudentBERT targets.
+
+_Read: the pre-declared primary comparison is inconclusive. The full framework at epoch 1 lowers
+mean regret from 2.37 to 1.95 points (5 wins, 22 ties, 3 losses against H-score), but the paired
+difference, -0.42, has a task-cluster interval from -1.96 to +0.69. It recovers 4 of 18 overtaken
+recommendations and makes no false correction; the early leader alone recovers 7 of 18, also without
+false corrections, with regret 1.79, so at one epoch H-score adds stability (5 of 10 settings choose
+the same encoder on every seed, against 3) but not lower regret. More early fine-tuning helps
+correction: at epoch 3 the early leader reaches 1.12 (difference -1.26, interval -2.55 to +0.01) and
+the full framework 1.42. The best-average rule, which uses the published fine-tuned results of the
+other tasks, has 1.37 and is the only method whose difference from H-score excludes zero (-1.01,
+-1.98 to -0.07). The warning signal replicates less cleanly on fresh seeds: 14 of 18 overtaken
+recommendations caught at epoch 1 with 6 of 12 false alarms (originally 19 of 20 and 4 of 10), 17 of
+18 with 5 at epoch 2. The full framework's remaining failures at epoch 1 are AG News (6), where
+H-score's pick leads after one epoch in 4 cases and is overtaken later; QNLI (5) and RTE (2), where
+the leader's advantage is inside the validation noise (RTE has 277 validation rows); and one wrong
+switch on MNLI. On StudentBERT (retrospective) one epoch makes things worse (regret 0.0031 against
+0.0012, no reversal recovered), while three epochs recover 6 of 7 at regret 0.0006. In both domains,
+then, one epoch is not enough to correct H-score, and the evidence does not yet support a complete
+selection framework at that budget. Five tasks and seven targets make every interval wide._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
