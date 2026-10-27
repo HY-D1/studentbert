@@ -23,7 +23,11 @@ epoch:
   overtaken after full fine-tuning, with a cluster bootstrap over tasks or targets (20,000
   resamples, random.Random(0)) and the AUPRC of a random score (the share overtaken);
   the same two for the frozen signal, the negated margin between H-score's pick and its runner-up
-  (standardized within the ranking), as the comparison without any fine-tuning.
+  (standardized within the ranking), as the comparison without any fine-tuning;
+  a comparison at matched coverage, also added after the results: the mean regret of the
+  recommendations the rule follows, against the same number of recommendations chosen by the
+  frozen margin (the largest margins), so that the two signals are compared on the decision they
+  support rather than on detection alone.
 
 Data: StudentBERT (21 recommendations, retrospective) from benchmark_final/reversal_pairs.tsv; the
 NLP benchmark on three seed sets (prospective; two fresh-seed replications), 30 recommendations
@@ -130,6 +134,7 @@ def studentbert(path: str) -> list[dict]:
     for (t, s), rs in sorted(by.items()):
         rec = {"group": t, "id": f"{t} seed {s}",
                "y": int(any(r["label_main"] == "reversal" for r in rs)),
+               "regret": float(rs[0]["target_regret_pretrained"]),
                "frozen": -float([r for r in rs if r["frozen_rank_b"] == "2"][0]["margin_hscore_z"])}
         for k in EPOCHS:
             rec[f"s{k}"] = max(float(r[f"val_e{k}_b"]) for r in rs) - float(rs[0][f"val_e{k}_a"])
@@ -150,6 +155,8 @@ def nlp(prefix: str, root: str, seeds: tuple[int, ...]) -> list[dict]:
             sys.exit(f"ABORT: {p} does not match its report")
         listed[name] = list(csv.DictReader(p.read_text().splitlines(), delimiter="\t"))
     rev = {(r["task"], r["pooling"], r["seed"]): r["reversed"] == "1" for r in listed["recs"]}
+    regret = {(r["task"], r["pooling"], r["seed"]): float(r["regret_points"])
+              for r in listed["recs"]}
     by = defaultdict(list)
     for r in listed["pairs"]:
         by[(r["task"], r["pooling"], r["seed"])].append(r)
@@ -163,7 +170,7 @@ def nlp(prefix: str, root: str, seeds: tuple[int, ...]) -> list[dict]:
         runner = max((m for m in hs if m != pick), key=lambda m: hs[m])
         sd = st.pstdev(hs.values()) or 1.0
         rec = {"group": t, "id": f"{t} {pool} seed {s}", "y": int(rev[(t, pool, s)]),
-               "frozen": -(hs[pick] - hs[runner]) / sd}
+               "regret": regret[(t, pool, s)], "frozen": -(hs[pick] - hs[runner]) / sd}
         acc = {}
         for m in hs:
             f = Path(root) / t / f"{m.replace('/', '__')}_{pool}_s{s}.json"
@@ -224,6 +231,27 @@ def evaluate(name: str, recs: list[dict], ties: list[str] | None = None
     return lines, rows
 
 
+def coverage(name: str, recs: list[dict]) -> tuple[list[str], list[dict]]:
+    """The rule's followed set against the same number chosen by the frozen margin."""
+    lines, rows = [], []
+    always = st.mean(r["regret"] for r in recs)
+    by_margin = sorted(recs, key=lambda r: (r["frozen"], r["id"]))
+    for k in EPOCHS:
+        flag = (lambda r: r[f"n{k}"]) if name == "42,1,2" else (lambda r: r[f"s{k}"] > 0)
+        fol = [r for r in recs if not flag(r)]
+        top = by_margin[:len(fol)]
+        rr = st.mean(r["regret"] for r in fol) if fol else float("nan")
+        fr = st.mean(r["regret"] for r in top) if top else float("nan")
+        rows.append({"data": name, "epoch": k, "followed": len(fol), "always_regret": always,
+                     "rule_regret": rr, "rule_overtaken": sum(r["y"] for r in fol),
+                     "margin_regret": fr, "margin_overtaken": sum(r["y"] for r in top)})
+        d = 4 if name == "StudentBERT" else 2
+        lines.append(f"| {NAMES.get(name, name)} | epoch {k} | {len(fol)}/{len(recs)} | "
+                     f"{always:.{d}f} | {rr:.{d}f} ({sum(r['y'] for r in fol)}) | "
+                     f"{fr:.{d}f} ({sum(r['y'] for r in top)}) |")
+    return lines, rows
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--pairs", required=True)
@@ -267,6 +295,27 @@ def main(argv: list[str] | None = None) -> None:
         for r in rows:
             w.writerow({k: (repr(v) if isinstance(v, float) else v) for k, v in r.items()})
     L += ["", f"Files: {tp.name} {hashlib.md5(tp.read_bytes()).hexdigest()}"]
+    C = ["", "## The same signals at matched coverage", "",
+         "Mean regret of the recommendations followed (overtaken among them in brackets): those "
+         "the rule lets through, and the same number with the largest frozen margins. Regret in "
+         "AUC on StudentBERT and in points on NLP; the original NLP test uses its own tie "
+         "handling, as above.", "",
+         "| data | epoch | followed | always follow | rule follows | frozen margin, same number |",
+         "|---|---|---|---|---|---|"]
+    crows = []
+    for name, recs in sets.items():
+        if name.startswith("NLP, all"):
+            continue
+        lines, r = coverage(name, recs)
+        C += lines
+        crows += r
+    cp = out.with_name(out.name + "_coverage.tsv")
+    with cp.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=list(crows[0]), delimiter="\t", lineterminator="\n")
+        w.writeheader()
+        for r in crows:
+            w.writerow({k: (repr(v) if isinstance(v, float) else v) for k, v in r.items()})
+    L += C + ["", f"Files: {cp.name} {hashlib.md5(cp.read_bytes()).hexdigest()}"]
     rp = out.with_name(out.name + "_report.md")
     rp.write_text("\n".join(L) + "\n")
     print(f"wrote {tp.name} and {rp.name} md5 {hashlib.md5(rp.read_bytes()).hexdigest()}")

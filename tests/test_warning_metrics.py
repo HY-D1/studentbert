@@ -110,8 +110,19 @@ def test_ties() -> None:
     assert "flagged by the original rule only" in ties[0] and "overtaken" in ties[0]
 
 
+def test_coverage() -> None:
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        prefix = fixture(root, (9, 10, 11))
+        recs = wm.nlp(prefix, str(root / "ft"), (9, 10, 11))
+        lines, rows = wm.coverage("9,10,11", recs)
+        assert rows[0]["followed"] == 24 and rows[0]["rule_regret"] == 0.0
+        assert rows[0]["rule_overtaken"] == 0 and abs(rows[0]["always_regret"] - 0.2) < 1e-12
+
+
 def main() -> None:
-    tests = [test_auroc_and_ap, test_nlp_fixture, test_seed_and_count_checks_stop, test_ties]
+    tests = [test_auroc_and_ap, test_nlp_fixture, test_seed_and_count_checks_stop, test_ties,
+             test_coverage]
     failed = 0
     for t in tests:
         try:
