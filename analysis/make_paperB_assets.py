@@ -19,16 +19,24 @@ numbers it uses does. Output files carry a provenance comment. Tables so far:
   tables/nlp.tex        Table 5, the estimators on the NLP benchmark of Bassignana et al. (2022),
                         10 settings, with the frozen oracle and the best-average rule (RESULTS.md
                         13.1)
+  tables/warning.tex    Table 6, the warning rule on StudentBERT (retrospective) and on the NLP
+                        benchmark (the prospective test and two fresh-seed replications) at
+                        epochs 1 to 3 (RESULTS.md 12.15, 12.17, 12.18 and 12.19)
+  Table 3 also gets Kendall tau-b, pairwise accuracy and seed stability with --summary, from
+  benchmark_final/estimators_summary.tsv (md5 a82f6da1 in RESULTS.md 12.7), after its other
+  columns are checked against RESULTS.md 12.3.
   figures/trajectories.pdf  Figure 1, the winner minus the own encoder during fine-tuning on the
                         two failure targets (RESULTS.md 12.8); written with --figures (needs
                         matplotlib)
 
   python analysis/make_paperB_assets.py --results RESULTS.md \
-      --recipes configs/paperB_encoder_recipes.log --figures --out paperB_assets
+      --recipes configs/paperB_encoder_recipes.log \
+      --summary benchmark_final/estimators_summary.tsv --figures --out paperB_assets
 """
 
 import argparse
 import ast
+import csv
 import hashlib
 import sys
 from pathlib import Path
@@ -41,15 +49,21 @@ SECTIONS = {"0.1": ("### 0.1 Dataset characterization", "\n---\n",
             "12.8": ("### 12.8 Fine-tuning trajectories", "\n### 12.9",
                      "ff7bebbb8f1ba1770b41c6bb71dd7fba"),
             "12.10": ("### 12.10 Frozen gold", "\n### 12.11", "af544688f9830440f355bd8136d9cce1"),
+            "12.15": ("### 12.15 Option 1", "### 12.16", "a30942c60bbb418813e7b2e53c1fe022"),
+            "12.17": ("### 12.17 Frozen state", "### 12.18", "8eae065b957bd2524b473bb8f6557d7a"),
+            "12.18": ("### 12.18 Phase 2", "### 12.19", "b592641247dec5199fd3444364ff5f64"),
+            "12.19": ("### 12.19 Phase 3", "## 13. Cross-domain check",
+                      "80424d9df51432eb5f669db193c159cb"),
             "13.1": ("### 13.1 Airline added", "\n_End of consolidated results._",
                      "147f9cf9b1cdba7b2b37108993a3a64d")}
 SLUG = {"assist2017": "ASSISTments 2017", "ednet": "EdNet KT1", "junyi": "Junyi Academy",
         "algebra2005": "Algebra 2005", "bridge2006": "Bridge to Algebra 2006",
         "assist2009": "ASSISTments 2009", "algebra2006": "Algebra 2006"}
+SUMMARY_MD5 = "a82f6da1cd995a4d13fd4c6a825969a6"
 ESTIMATORS = {"hscore_kt_causal": "H-score", "logme_kt_causal": "LogME",
-              "largest source": "Largest-source rule",
-              "fewshot_ft_fit200_e5": "Short fine-tuning (200)",
-              "fewshot_ft_fit50_e5": "Short fine-tuning (50)",
+              "largest source": "Largest source",
+              "fewshot_ft_fit200_e5": "Short FT (200)",
+              "fewshot_ft_fit50_e5": "Short FT (50)",
               "logme_kt_causal_per_skill": "LogME, per skill",
               "nleep_k4_kt_causal": "NLEEP, $K=4$", "nleep_k8_kt_causal": "NLEEP, $K=8$",
               "nleep_k16_kt_causal": "NLEEP, $K=16$"}
@@ -144,15 +158,40 @@ def sources(results: str) -> str:
         "\\bottomrule", "\\end{tabularx}", "\\end{table}", ""])
 
 
-def estimators(results: str) -> str:
+def load_summary(path: str) -> dict:
+    p = Path(path)
+    got = hashlib.md5(p.read_bytes()).hexdigest()
+    if got != SUMMARY_MD5:
+        sys.exit(f"ABORT: {p} md5 {got}, expected {SUMMARY_MD5} (RESULTS.md 12.7)")
+    rows_ = csv.DictReader(p.read_text().splitlines(), delimiter="\t")
+    return {r["estimator"]: r for r in rows_ if r["track"] == "B" and r["view"] == "pretrained"}
+
+
+def estimators(results: str, summary: dict | None = None) -> str:
     text = section(results, "12.3")
     body = []
     for c in rows(text):
         if c[0] not in ESTIMATORS or len(c) != 8:
             sys.exit(f"ABORT: unexpected 12.3 row {c}")
         mean, mx = [x.strip() for x in c[5].split("/")]
+        extra = ""
+        if summary is not None:
+            if c[0] == "largest source":
+                extra = " & -- & -- & --"
+            else:
+                s = summary[c[0]]
+                same = (f"{float(s['rho']):+.4f}" == c[2]
+                        and f"{s['top1']}/{s['rankings']}" == c[3]
+                        and f"{s['equivalent']}/{s['rankings']}" == c[4]
+                        and f"{float(s['mean_regret']):.4f}" == mean
+                        and f"{float(s['max_regret']):.4f}" == mx and s["negative_choices"] == c[6])
+                if not same:
+                    sys.exit(f"ABORT: the summary disagrees with RESULTS.md 12.3 for {c[0]}")
+                extra = (f" & {tex_num(f'{float(s['tau']):+.3f}')} & "
+                         f"{float(s['pair_acc_decisive']):.3f} & "
+                         f"{float(s['seed_stability_tau']):.3f}")
         body.append(f"{ESTIMATORS[c[0]]} & {tex_num(c[2])} & {c[3]} & {c[4]} & {mean} & {mx} & "
-                    f"{c[6]} & {c[7]} \\\\")
+                    f"{c[6]} & {c[7]}{extra} \\\\")
     if len(body) != 9:
         sys.exit(f"ABORT: {len(body)} estimator rows in 12.3, expected 9")
     note = "hscore_shrunk makes the same pick as hscore in all 21 rankings"
@@ -163,15 +202,26 @@ def estimators(results: str) -> str:
         "\\begin{table}[t]", "\\centering",
         "\\caption{Transferability estimators and practical baselines against the fine-tuned gold "
         "(7 targets $\\times$ 3 estimator seeds; the largest-source rule gives one ranking per "
-        "target). Short fine-tuning: five epochs on 200 or 50 target learners. $\\rho$: mean "
+        "target). Largest source: the largest-source rule. Short FT: five epochs of fine-tuning "
+        "on 200 or 50 target learners. $\\rho$: mean "
         "Spearman correlation. Top-1 and tied: the top-ranked candidate is "
-        "the best one, or tied with it. Regret in test AUC. Negative: picks that transfer "
+        "the best one, or tied with it. Regret in test AUC. "
+        + ("Neg." if summary else "Negative") + ": picks that transfer "
         "negatively. Own: picks of the target's own encoder. The shrunk H-score makes the same "
-        "pick as H-score in all 21 rankings.}",
-        "\\label{tab:estimators}", "\\small", "\\setlength{\\tabcolsep}{4pt}",
-        "\\begin{tabular}{lrrrrrrr}", "\\toprule",
-        "Method & $\\rho$ & Top-1 & Tied & \\multicolumn{2}{c}{Regret} & Negative & Own \\\\",
-        "\\cmidrule(lr){5-6}", " & & & & mean & max & & \\\\", "\\midrule",
+        "pick as H-score in all 21 rankings." + (
+            " $\\tau_b$: mean Kendall correlation. Pair.: accuracy on the "
+            "candidate pairs the gold separates. Stab.: mean $\\tau_b$ between the rankings at "
+            "different "
+            "estimator seeds; the largest-source rule has one ranking per target." if summary
+            else "") + "}",
+        "\\label{tab:estimators}", "\\small" if summary is None else "\\footnotesize",
+        "\\setlength{\\tabcolsep}{4pt}" if summary is None else "\\setlength{\\tabcolsep}{2.2pt}",
+        "\\begin{tabular}{lrrrrrrr" + ("rrr" if summary else "") + "}", "\\toprule",
+        "Method & $\\rho$ & Top-1 & Tied & \\multicolumn{2}{c}{Regret} & "
+        + ("Neg. & Own & $\\tau_b$ & Pair. & Stab." if summary else "Negative & Own")
+        + " \\\\",
+        "\\cmidrule(lr){5-6}", " & & & & mean & max & &" + (" & & &" if summary else "")
+        + " \\\\", "\\midrule",
         *body, "\\bottomrule", "\\end{tabular}", "\\end{table}", ""])
 
 
@@ -286,6 +336,74 @@ def nlp(results: str) -> str:
         "\\end{tabular}", "\\end{table}", ""])
 
 
+def warning(results: str) -> str:
+    def grab(key: str, pattern: str) -> list[str]:
+        import re
+        m = re.search(pattern, section(results, key), re.M)
+        if not m:
+            sys.exit(f"ABORT: RESULTS.md {key} has no line matching {pattern}")
+        return list(m.groups())
+
+    out = []
+    # StudentBERT: 12.17 (epochs 1 and 3, with selective regret) and 12.18 part B (epoch 2)
+    rule = r"\| (\d+)/21 \| (\d+)/7 \| (\d+) \| (\d\.\d{4}) \|$"
+    sb = {1: grab("12.17", r"^\| fixed epoch-1 rule " + rule),
+          3: grab("12.17", r"^\| fixed epoch-3 rule " + rule)}
+    e2 = grab("12.18", r"^\| H-score \+ abstention, epoch 2 \| (\d+)/21 \| (\d+)/(\d+) \| "
+                       r"(\d+)/(\d+) \|$")
+    sb[2] = [e2[0], e2[1], str(int(e2[2]) - int(e2[1])), "--"]
+    head = "\\multicolumn{6}{@{}p{0.97\\linewidth}}{\\emph{"
+    out.append(head + "StudentBERT, retrospective: 21 recommendations, 7 "
+               "overtaken; always following H-score 0.0012 AUC}} \\\\")
+    for k in (1, 2, 3):
+        fol, caught, fa, reg = sb[k]
+        out.append(f"\\quad epoch {k} & {caught}/7 & {fa}/14 & {fol}/21 & {reg} & -- \\\\")
+    # NLP, original seeds: 12.15 epochs table
+    out.append(head + "NLP, prospective (seeds 42, 1, 2): 30 recommendations, "
+               "20 overtaken; always following H-score 2.70 points}} \\\\")
+    for k in (1, 2, 3):
+        g = grab("12.15", rf"^\| {k} \| (\d+\.\d) \| (\d+)/30 \| (\d+)/20 \| (\d+) \| "
+                          r"(\d\.\d{4}) \|")
+        out.append(f"\\quad epoch {k} & {g[2]}/20 & {g[3]}/10 & {g[1]}/30 & {float(g[4]):.2f} & "
+                   f"{g[0]} \\\\")
+    # fresh seeds: the abstention rows of 12.18 and 12.19 (the all-task tables come first)
+    for key, seeds, always in (("12.18", "3, 4, 5", "2.37"), ("12.19", "6, 7, 8", "2.70")):
+        found = []
+        for k in (1, 2, 3):
+            g = grab(key, rf"^\| H-score \+ abstention, epoch {k} \| (\d+)/30 \| (\d+)/(\d+) \| "
+                          r"(\d+)/(\d+) \| (\d\.\d{2}) \[")
+            found.append(g)
+        n_rev = int(found[0][1]) + int(found[0][3])
+        if any(int(g[1]) + int(g[3]) != n_rev for g in found):
+            sys.exit(f"ABORT: {key} abstention rows disagree on the number overtaken")
+        out.append(head + f"NLP, fresh seeds {seeds}: 30 "
+                   f"recommendations, {n_rev} overtaken; always following H-score {always} "
+                   f"points}}}} \\\\")
+        for k, g in zip((1, 2, 3), found):
+            fa = int(g[2]) - int(g[1])
+            cost = grab(key, rf"^\| {k} epochs? \| (\d+\.\d) \|$")[0]
+            out.append(f"\\quad epoch {k} & {g[1]}/{n_rev} & {fa}/{30 - n_rev} & {g[0]}/30 & "
+                       f"{g[5]} & {cost} \\\\")
+    for key, line in (("12.18", "| H-score alone | 12/30 | 12/30 | 2.37 ["),
+                      ("12.19", "| H-score alone | 10/30 | 10/30 | 2.70 [")):
+        if line not in section(results, key):
+            sys.exit(f"ABORT: H-score's regret line is not in RESULTS.md {key}")
+    return "\n".join([
+        "% Generated by analysis/make_paperB_assets.py from RESULTS.md 12.15, 12.17, 12.18 and "
+        "12.19;", "% do not edit by hand.",
+        "\\begin{table}[t]", "\\centering",
+        "\\caption{The warning rule: flag H-score's recommendation when its choice is not the "
+        "validation leader after $k$ epochs of fine-tuning every candidate. Caught: overtaken "
+        "recommendations flagged. False alarms: other recommendations flagged. Followed: "
+        "recommendations not flagged, and their mean regret (AUC on StudentBERT, points of the "
+        "task metric on NLP). Cost: GPU-minutes per recommendation for the short fine-tunes of "
+        "the seven encoders.}",
+        "\\label{tab:warning}", "\\small", "\\setlength{\\tabcolsep}{4pt}",
+        "\\begin{tabular}{lrrrrr}", "\\toprule",
+        "Budget & Caught & False alarms & Followed & Regret, followed & Cost \\\\", "\\midrule",
+        *out, "\\bottomrule", "\\end{tabular}", "\\end{table}", ""])
+
+
 def trajectories(results: str, path: Path) -> None:
     import matplotlib
 
@@ -321,14 +439,15 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--results", required=True)
     ap.add_argument("--recipes", default=None, help="the checkpoint-configuration log")
     ap.add_argument("--figures", action="store_true", help="also draw the figures (matplotlib)")
+    ap.add_argument("--summary", default=None, help="benchmark_final/estimators_summary.tsv")
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     results = Path(a.results).read_text(encoding="utf-8")
     out = Path(a.out) / "tables"
     out.mkdir(parents=True, exist_ok=True)
     made = {"datasets.tex": datasets(results), "sources.tex": sources(results),
-            "estimators.tex": estimators(results), "frozen.tex": frozen(results),
-            "nlp.tex": nlp(results)}
+            "estimators.tex": estimators(results, load_summary(a.summary) if a.summary else None),
+            "frozen.tex": frozen(results), "nlp.tex": nlp(results), "warning.tex": warning(results)}
     if a.recipes:
         made["recipes.tex"] = recipes(Path(a.recipes).read_text(encoding="utf-8"))
     for name, text in made.items():
