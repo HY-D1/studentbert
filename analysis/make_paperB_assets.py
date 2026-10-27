@@ -187,8 +187,8 @@ def estimators(results: str, summary: dict | None = None) -> str:
                         and f"{float(s['max_regret']):.4f}" == mx and s["negative_choices"] == c[6])
                 if not same:
                     sys.exit(f"ABORT: the summary disagrees with RESULTS.md 12.3 for {c[0]}")
-                extra = (f" & {tex_num(f'{float(s['tau']):+.3f}')} & "
-                         f"{float(s['pair_acc_decisive']):.3f} & "
+                tau = f"{float(s['tau']):+.3f}"
+                extra = (f" & {tex_num(tau)} & {float(s['pair_acc_decisive']):.3f} & "
                          f"{float(s['seed_stability_tau']):.3f}")
         body.append(f"{ESTIMATORS[c[0]]} & {tex_num(c[2])} & {c[3]} & {c[4]} & {mean} & {mx} & "
                     f"{c[6]} & {c[7]}{extra} \\\\")
