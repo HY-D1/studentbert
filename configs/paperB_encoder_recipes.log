@@ -1,0 +1,7 @@
+edubert_algebra2005_pretrain_full_encoder.pt {'epochs': 50, 'batch_size': 64, 'lr': 0.001, 'warmup_frac': 0.1, 'objective': 'full', 'mask_ratio': 0.15}
+edubert_algebra2006_pretrain_full_encoder.pt {'epochs': 50, 'batch_size': 64, 'lr': 0.001, 'warmup_frac': 0.1, 'objective': 'full', 'mask_ratio': 0.15}
+edubert_assist2009_pretrain_full_encoder.pt {'epochs': 50, 'batch_size': 64, 'lr': 0.001, 'warmup_frac': 0.1, 'objective': 'full', 'mask_ratio': 0.15}
+edubert_assist2017_pretrain_full_encoder.pt {'epochs': 100, 'batch_size': 64, 'lr': 0.001, 'warmup_frac': 0.1, 'objective': None, 'mask_ratio': 0.15}
+edubert_bridge2006_pretrain_full_encoder.pt {'epochs': 50, 'batch_size': 64, 'lr': 0.001, 'warmup_frac': 0.1, 'objective': 'full', 'mask_ratio': 0.15}
+edubert_ednet_pretrain_full_encoder.pt {'epochs': 10, 'batch_size': 128, 'lr': 0.001, 'warmup_frac': 0.05, 'objective': None, 'mask_ratio': 0.15}
+edubert_junyi_pretrain_full_encoder.pt {'epochs': 20, 'batch_size': 128, 'lr': 0.001, 'warmup_frac': 0.05, 'objective': None, 'mask_ratio': 0.15}
