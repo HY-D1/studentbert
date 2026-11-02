@@ -2028,6 +2028,104 @@ rule (-1.33) and LogME (-0.53) also improve on H-score here. The warning signal 
 overtaken recommendations flagged at epoch 1, 19 at epoch 2 and 18 at epoch 3, with 5, 4 and 3 false
 alarms out of 10. Pooled with phase 2, the framework at epoch 3 gives -1.02 (-2.68 to +0.21). Five
 tasks make every interval wide._
+### 12.20 The warning signal as a detector, and at matched coverage (analysis/warning_metrics.py, commit 632d8df, job 11421958)
+
+Task: Prof. Hazra (2026-10-27) asked for a more formal evaluation of the warning signal, with
+precision and recall and AUROC and AUPRC across epochs. The analysis was defined and run after every
+warning result in 12.15 to 12.19 had been seen; it changes no rule and no decision. Graded score:
+the best alternative's validation score after k epochs minus that of H-score's pick, so the fixed
+rule flags exactly when it is above zero. Comparison without fine-tuning: H-score's standardized
+margin over its runner-up, negated. The matched-coverage comparison follows the rule's own number of
+recommendations and takes the same number with the largest frozen margins.
+
+Ties: the original NLP evaluation (analysis/nlp_option1_eval.py) ranked by validation accuracy and
+then by encoder name; the replications (analysis/phase2_eval.py) and StudentBERT break a tie in
+H-score's favour. The script checks each set against its own implementation, and its counts
+reproduce 12.15 to 12.19. Only one tie changes a reported count: AG News, first-token pooling, seed
+1, epoch 3, where the original rule's 18 of 20 becomes 17 of 20 under the replications' tie
+handling.
+
+Files (md5): warning_metrics.py fb52474862374e4eadc13f2890ac21cb, test_warning_metrics.py
+f715ef05c0d5651fed07363034cb3560, warning_metrics_report.md bd6d07d9a0ea2c604bed8a0030167f8c,
+warning_metrics.tsv e0f40b73114194830b854e155a47c4b7, warning_metrics_coverage.tsv
+4865675cb63b56d50ed18ccb719bb505, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7.
+
+Report as written by analysis/warning_metrics.py (headings lowered two levels):
+
+
+Added after the warning results were seen; no rule or decision changes. Score: the best alternative's validation score after k epochs minus that of H-score's pick; the rule flags when it is above zero. Precision and recall at that threshold reproduce RESULTS.md 12.15 to 12.19. AUROC and AUPRC: threshold-free, with a cluster bootstrap over tasks (NLP) or targets (StudentBERT). Frozen margin: H-score's standardized margin over its runner-up, negated, which needs no fine-tuning.
+
+| data | signal | precision (flagged) | recall (overtaken) | AUROC [95% CI] | AUPRC [95% CI] |
+|---|---|---|---|---|---|
+| StudentBERT (retrospective) | epoch 1 | 1/4 (0.25) | 1/7 (0.14) | 0.53 [0.22, 1.00] | 0.45 [0.16, 1.00] |
+| StudentBERT (retrospective) | epoch 2 | 6/9 (0.67) | 6/7 (0.86) | 0.84 [0.46, 1.00] | 0.60 [0.33, 1.00] |
+| StudentBERT (retrospective) | epoch 3 | 6/9 (0.67) | 6/7 (0.86) | 0.83 [0.00, 1.00] | 0.85 [0.05, 1.00] |
+| StudentBERT (retrospective) | frozen margin | -- | -- | 0.56 [0.05, 0.91] | 0.47 [0.05, 0.90] |
+| NLP, seeds 42, 1, 2 (prospective) | epoch 1 | 19/23 (0.83) | 19/20 (0.95) | 0.69 [0.00, 1.00] | 0.71 [0.45, 1.00] |
+| NLP, seeds 42, 1, 2 (prospective) | epoch 2 | 18/25 (0.72) | 18/20 (0.90) | 0.54 [0.00, 1.00] | 0.66 [0.33, 1.00] |
+| NLP, seeds 42, 1, 2 (prospective) | epoch 3 | 17/21 (0.81) | 17/20 (0.85) | 0.66 [0.00, 1.00] | 0.70 [0.44, 1.00] |
+| NLP, seeds 42, 1, 2 (prospective) | frozen margin | -- | -- | 0.66 [0.23, 0.90] | 0.84 [0.37, 0.99] |
+| NLP, seeds 3, 4, 5 | epoch 1 | 14/20 (0.70) | 14/18 (0.78) | 0.62 [0.17, 0.95] | 0.64 [0.47, 0.97] |
+| NLP, seeds 3, 4, 5 | epoch 2 | 17/22 (0.77) | 17/18 (0.94) | 0.66 [0.19, 0.95] | 0.65 [0.47, 0.96] |
+| NLP, seeds 3, 4, 5 | epoch 3 | 16/24 (0.67) | 16/18 (0.89) | 0.60 [0.33, 0.88] | 0.63 [0.44, 0.89] |
+| NLP, seeds 3, 4, 5 | frozen margin | -- | -- | 0.56 [0.15, 0.82] | 0.67 [0.30, 0.95] |
+| NLP, seeds 6, 7, 8 | epoch 1 | 17/22 (0.77) | 17/20 (0.85) | 0.60 [0.03, 1.00] | 0.69 [0.45, 1.00] |
+| NLP, seeds 6, 7, 8 | epoch 2 | 19/23 (0.83) | 19/20 (0.95) | 0.77 [0.36, 1.00] | 0.78 [0.57, 1.00] |
+| NLP, seeds 6, 7, 8 | epoch 3 | 18/21 (0.86) | 18/20 (0.90) | 0.81 [0.39, 1.00] | 0.82 [0.62, 1.00] |
+| NLP, seeds 6, 7, 8 | frozen margin | -- | -- | 0.71 [0.29, 0.93] | 0.88 [0.44, 0.99] |
+| NLP, all three seed sets | epoch 1 | 50/65 (0.77) | 50/58 (0.86) | 0.64 [0.11, 0.94] | 0.67 [0.43, 0.95] |
+| NLP, all three seed sets | epoch 2 | 54/70 (0.77) | 54/58 (0.93) | 0.65 [0.17, 0.94] | 0.67 [0.41, 0.95] |
+| NLP, all three seed sets | epoch 3 | 51/66 (0.77) | 51/58 (0.88) | 0.68 [0.26, 0.93] | 0.69 [0.45, 0.94] |
+| NLP, all three seed sets | frozen margin | -- | -- | 0.65 [0.20, 0.88] | 0.78 [0.34, 0.97] |
+
+AUPRC of a random score: the share overtaken, StudentBERT (retrospective) 0.33, NLP, seeds 42, 1, 2 (prospective) 0.67, NLP, seeds 3, 4, 5 0.60, NLP, seeds 6, 7, 8 0.67, NLP, all three seed sets 0.64.
+
+With 7 targets and 5 tasks the intervals are wide; the pooled NLP row reuses the same 5 tasks three times, so its interval resamples tasks, not seed sets.
+
+Precision and recall above break ties in H-score's favour (s_k > 0) for every set. Exact ties at the top, where an alternative's validation score equals that of H-score's pick:
+- StudentBERT (retrospective), epoch 3: assist2009 seed 2 (not overtaken; flagged by neither rule)
+- NLP, seeds 42, 1, 2 (prospective), epoch 2: airline mean seed 2 (not overtaken; flagged by neither rule)
+- NLP, seeds 42, 1, 2 (prospective), epoch 3: agnews cls seed 1 (overtaken; flagged by the original rule only)
+- NLP, seeds 3, 4, 5, epoch 1: airline cls seed 3 (not overtaken; flagged by neither rule)
+- NLP, seeds 6, 7, 8, epoch 1: airline cls seed 6 (not overtaken; flagged by neither rule)
+- NLP, seeds 6, 7, 8, epoch 1: qnli cls seed 8 (overtaken; flagged by the original rule only)
+
+Files: warning_metrics.tsv e0f40b73114194830b854e155a47c4b7
+
+#### The same signals at matched coverage
+
+Mean regret of the recommendations followed (overtaken among them in brackets): those the rule lets through, and the same number with the largest frozen margins. Regret in AUC on StudentBERT and in points on NLP; the original NLP test uses its own tie handling, as above.
+
+| data | epoch | followed | always follow | rule follows | frozen margin, same number |
+|---|---|---|---|---|---|
+| StudentBERT (retrospective) | epoch 1 | 17/21 | 0.0012 | 0.0009 (6) | 0.0014 (6) |
+| StudentBERT (retrospective) | epoch 2 | 12/21 | 0.0012 | 0.0003 (1) | 0.0014 (3) |
+| StudentBERT (retrospective) | epoch 3 | 12/21 | 0.0012 | 0.0009 (1) | 0.0014 (3) |
+| NLP, seeds 42, 1, 2 (prospective) | epoch 1 | 7/30 | 2.70 | 0.31 (1) | 3.80 (4) |
+| NLP, seeds 42, 1, 2 (prospective) | epoch 2 | 5/30 | 2.70 | 2.76 (2) | 5.31 (4) |
+| NLP, seeds 42, 1, 2 (prospective) | epoch 3 | 8/30 | 2.70 | 0.54 (2) | 3.32 (4) |
+| NLP, seeds 3, 4, 5 | epoch 1 | 10/30 | 2.37 | 0.55 (4) | 3.24 (5) |
+| NLP, seeds 3, 4, 5 | epoch 2 | 8/30 | 2.37 | 0.27 (1) | 4.05 (5) |
+| NLP, seeds 3, 4, 5 | epoch 3 | 6/30 | 2.37 | 0.72 (2) | 3.45 (3) |
+| NLP, seeds 6, 7, 8 | epoch 1 | 8/30 | 2.70 | 1.22 (3) | 3.08 (4) |
+| NLP, seeds 6, 7, 8 | epoch 2 | 7/30 | 2.70 | 0.31 (1) | 2.96 (3) |
+| NLP, seeds 6, 7, 8 | epoch 3 | 9/30 | 2.70 | 0.31 (2) | 3.39 (5) |
+
+Files: warning_metrics_coverage.tsv 4865675cb63b56d50ed18ccb719bb505
+
+_Read: as a threshold-free detector of overtaken recommendations, the early signal is moderate on
+NLP (pooled AUROC 0.64 to 0.68, every interval including 0.5) and no better than the frozen margin
+(0.65; AUPRC 0.78 against 0.67 to 0.69). Its precision at the rule's threshold, 0.67 to 0.86, sits
+only modestly above the share overtaken, 0.60 to 0.67. On StudentBERT it separates well after two
+and three epochs (AUROC 0.84 and 0.83 against 0.56), but only three targets have an overtaken
+recommendation, so the intervals are uninformative, and this evidence is retrospective. At matched
+coverage the two signals differ sharply: after three epochs the recommendations the rule follows
+have mean regret 0.31 to 0.72 points on the three NLP seed sets, against 3.32 to 3.45 for the same
+number with the largest frozen margins, more than following every recommendation (2.37 to 2.70); on
+StudentBERT 0.0009 AUC against 0.0014. The exception is the prospective set after two epochs (2.76
+points, two overtaken among five followed). The early signal is therefore not a sharper detector
+than the frozen margin on NLP, but the recommendations it lets through are the ones whose errors are
+cheap._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
