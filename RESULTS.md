@@ -2126,6 +2126,64 @@ StudentBERT 0.0009 AUC against 0.0014. The exception is the prospective set afte
 points, two overtaken among five followed). The early signal is therefore not a sharper detector
 than the frozen margin on NLP, but the recommendations it lets through are the ones whose errors are
 cheap._
+### 12.21 PARC as an additional transferability baseline (analysis/parc_report.py; design docs/parc_design.md, commit 6d841b9)
+
+Task: Prof. Hazra (2026-10-27) asked to include PARC (Bolya, Mittapalli and Hoffman, NeurIPS 2021)
+as an additional baseline. Settings, fixed in the design file and committed with the code before any
+PARC job ran: a probe of 500 examples with at least two per class, PCA to 32 dimensions fitted on
+the probe, distances one minus the Pearson correlation of the features and of the one-hot labels,
+and the Spearman correlation of the two upper triangles; no depth heuristic. Features: the same
+frozen causal features as the other StudentBERT estimators (7 GPU jobs, 168 scores), and the saved
+NLP features of 13.1 (210 scores). Evaluation: the existing evaluators, unchanged, whose other rows
+reproduce 12.7 and 13.1 exactly.
+
+Files (md5): parc_design.md 359effa3f201685de2cfcd48dbcb5bc8, parc.py
+7a0cc68bd4b9392c70070b31190badc5, score_parc.py 4bcfccd6a14b6add6b9a4af26d6c0293,
+task4_score_parc.py ff529ab75b1e1bb0a19ce2bbbe23f33d, parc_report.py
+2aeaf5ec71a244dccb7418d04cd0e331, parc_report.md 9168d99796667a3cb8f05c512604027c,
+parc_estimators_summary.tsv d2a05f591c19c208778469ba542179ff, task4_parc_summary.tsv
+9f83da2b69115ea0d0d6d6d406ba102b, task4_parc_scores.jsonl 5ebda1c51835cba7eca0b45a4b33e6a6,
+tg1_parc_kt_algebra2005.jsonl 79d7a17779247908f5f60aca72bcae6f, tg1_parc_kt_algebra2006.jsonl
+042568523fa3b24cd7826d8399c9eb8c, tg1_parc_kt_assist2009.jsonl e7b98c82b1ee1af19fcce299be4d5869,
+tg1_parc_kt_assist2017.jsonl 50338441f0699dacd1f61279e957844e, tg1_parc_kt_bridge2006.jsonl
+ba9a9deea80a50e2fe2a17a687b731c8, tg1_parc_kt_ednet.jsonl 10fef3f7fcb6ee9e6dbe0930c5d42eb5,
+tg1_parc_kt_junyi.jsonl b08e7ac34a877e28e760b2c77b083c17.
+
+Report as written by analysis/parc_report.py (headings lowered two levels):
+
+
+Settings fixed in docs/parc_design.md before any score: probe of 500 with at least two per class, PCA to 32, no depth heuristic. Evaluated with the existing evaluators.
+
+#### StudentBERT (7 targets x 3 estimator seeds)
+
+| view | rankings | rho | tau | decisive pairs | top-1 | tied with best | mean regret | max regret | negative picks | seed stability |
+|---|---|---|---|---|---|---|---|---|---|---|
+| pretrained | 21 | -0.2347 | -0.1973 | 0.3801 | 1/21 | 1/21 | 0.0067 | 0.0103 | 5 | 0.3651 |
+| practical | 21 | -0.2596 | -0.2075 | 0.3520 | 1/21 | 1/21 | 0.0092 | 0.0369 | 3 | 0.3878 |
+
+Own-encoder picks: 2/21. PARC's top pretrained candidate per target at seeds 42, 1 and 2: algebra2005 ednet, bridge2006, assist2017; algebra2006 algebra2005, ednet, ednet; assist2009 ednet, assist2017, assist2017; assist2017 own, own, ednet; bridge2006 ednet, algebra2005, ednet; ednet bridge2006, bridge2006, algebra2005; junyi algebra2005, algebra2005, assist2017.
+
+Check: the other 28 rows of the same evaluation equal benchmark_final/estimators_summary.tsv (RESULTS.md 12.7) exactly.
+
+#### NLP benchmark (10 settings x 3 seeds)
+
+| gold | rankings | rho | tau | pairwise | top-1 | tied with best | mean regret | max regret | seed stability |
+|---|---|---|---|---|---|---|---|---|---|
+| frozen | 30 | +0.2821 | +0.1968 | 0.6360 | 10/30 | 14/30 | 1.65 | 5.00 | 0.6317 |
+| tuned | 30 | -0.0131 | -0.0063 | 0.5107 | 8/30 | 10/30 | 3.87 | 10.00 | 0.6317 |
+
+Check: the same evaluator on the 13.1 score file reproduces all 6 estimator rows of RESULTS.md 13.1.
+
+_Read: PARC, in the version fixed before scoring, is weak on both benchmarks. On StudentBERT its
+rankings run against the fine-tuned gold (rho -0.23; top choice the best in 1 of 21 rankings; 5
+negatively transferring picks; mean regret 0.0067 AUC, against H-score's +0.52, 11 of 21 and
+0.0012), and it picks the target's own encoder in only 2 of 21 rankings, so it does not share the
+own-encoder preference of H-score and LogME. On the NLP benchmark it agrees only weakly with frozen
+performance (+0.28) and not with fine-tuned performance (-0.01; the fine-tuned best in 8 of 30
+rankings; mean regret 3.87 points against H-score's 2.70). Its rankings also change more across
+seeds (stability 0.37 on StudentBERT and 0.63 on NLP). Bolya et al. report PARC at its best with a
+depth ensemble on a benchmark of diverse architectures; these numbers characterize the core method
+without that ensemble, as fixed in the design._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
