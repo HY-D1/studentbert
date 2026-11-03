@@ -25,6 +25,9 @@ numbers it uses does. Output files carry a provenance comment. Tables so far:
   Table 3 also gets Kendall tau-b, pairwise accuracy and seed stability with --summary, from
   benchmark_final/estimators_summary.tsv (md5 a82f6da1 in RESULTS.md 12.7), after its other
   columns are checked against RESULTS.md 12.3.
+  tables/detector.tex   Table 7, the warning signal as a detector after three epochs and at
+                        matched coverage, against the frozen margin (RESULTS.md 12.20)
+  PARC rows (RESULTS.md 12.21) are added to Tables 3 and 5.
   figures/trajectories.pdf  Figure 1, the winner minus the own encoder during fine-tuning on the
                         two failure targets (RESULTS.md 12.8); written with --figures (needs
                         matplotlib)
@@ -52,8 +55,11 @@ SECTIONS = {"0.1": ("### 0.1 Dataset characterization", "\n---\n",
             "12.15": ("### 12.15 Option 1", "### 12.16", "a30942c60bbb418813e7b2e53c1fe022"),
             "12.17": ("### 12.17 Frozen state", "### 12.18", "8eae065b957bd2524b473bb8f6557d7a"),
             "12.18": ("### 12.18 Phase 2", "### 12.19", "b592641247dec5199fd3444364ff5f64"),
-            "12.19": ("### 12.19 Phase 3", "## 13. Cross-domain check",
-                      "80424d9df51432eb5f669db193c159cb"),
+            "12.19": ("### 12.19 Phase 3", "### 12.20", "0765011ab405c3a9a7dfd0eecd69f5fb"),
+            "12.20": ("### 12.20 The warning signal", "### 12.21",
+                      "5aa1046402a2904e5165dc5fc800ebce"),
+            "12.21": ("### 12.21 PARC", "## 13. Cross-domain check",
+                      "49263902baf1fda0df63a2ef8a0e6fab"),
             "13.1": ("### 13.1 Airline added", "\n_End of consolidated results._",
                      "147f9cf9b1cdba7b2b37108993a3a64d")}
 SLUG = {"assist2017": "ASSISTments 2017", "ednet": "EdNet KT1", "junyi": "Junyi Academy",
@@ -167,6 +173,18 @@ def load_summary(path: str) -> dict:
     return {r["estimator"]: r for r in rows_ if r["track"] == "B" and r["view"] == "pretrained"}
 
 
+def parc_rows(results: str) -> tuple[list[str], str, dict]:
+    """The pretrained-view StudentBERT row, the own-encoder count and the NLP rows of 12.21."""
+    import re
+    text = section(results, "12.21")
+    kt = [c for c in rows(text) if c[0] == "pretrained" and len(c) == 11]
+    own = re.search(r"Own-encoder picks: (\d+)/21\.", text)
+    nlp_ = {c[0]: c for c in rows(text) if c[0] in ("frozen", "tuned") and len(c) == 10}
+    if len(kt) != 1 or own is None or sorted(nlp_) != ["frozen", "tuned"]:
+        sys.exit("ABORT: RESULTS.md 12.21 does not hold the PARC rows")
+    return kt[0], own.group(1), nlp_
+
+
 def estimators(results: str, summary: dict | None = None) -> str:
     text = section(results, "12.3")
     body = []
@@ -194,6 +212,13 @@ def estimators(results: str, summary: dict | None = None) -> str:
                     f"{c[6]} & {c[7]}{extra} \\\\")
     if len(body) != 9:
         sys.exit(f"ABORT: {len(body)} estimator rows in 12.3, expected 9")
+    c, own, _ = parc_rows(results)
+    extra = ""
+    if summary is not None:
+        extra = (f" & {tex_num(f'{float(c[3]):+.3f}')} & {float(c[4]):.3f} & "
+                 f"{float(c[10]):.3f}")
+    body.append(f"PARC & {tex_num(c[2])} & {c[5]} & {c[6]} & {c[7]} & {c[8]} & {c[9]} & "
+                f"{own}{extra} \\\\")
     note = "hscore_shrunk makes the same pick as hscore in all 21 rankings"
     if note not in " ".join(text.split()):
         sys.exit("ABORT: the 12.3 note on the shrunk H-score moved")
@@ -208,7 +233,7 @@ def estimators(results: str, summary: dict | None = None) -> str:
         "the best one, or tied with it. Regret in test AUC. "
         + ("Neg." if summary else "Negative") + ": picks that transfer "
         "negatively. Own: picks of the target's own encoder. The shrunk H-score makes the same "
-        "pick as H-score in all 21 rankings." + (
+        "pick as H-score in all 21 rankings. PARC: added later as a further baseline (12.21)." + (
             " $\\tau_b$: mean Kendall correlation. Pair.: accuracy on the "
             "candidate pairs the gold separates. Stab.: mean $\\tau_b$ between the rankings at "
             "different "
@@ -309,6 +334,11 @@ def nlp(results: str) -> str:
                     f"{c[5]} & {c[6]} & {mean} & {mx} & {c[8]} \\\\")
     if len(body) != 6:
         sys.exit(f"ABORT: {len(body)} estimator rows in 13.1, expected 6")
+    _, _, prc = parc_rows(results)
+    for g in ("frozen", "tuned"):
+        c = prc[g]
+        body.append(f"PARC & {g} & {tex_num(c[2])} & {tex_num(c[3])} & {c[4]} & {c[5]} & "
+                    f"{c[6]} & {c[7]} & {c[8]} & {c[9]} \\\\")
     body.append("\\midrule")
     refs = 0
     for c in rows(text[b:text.index("SciERC is excluded", b)]):
@@ -404,6 +434,53 @@ def warning(results: str) -> str:
         *out, "\\bottomrule", "\\end{tabular}", "\\end{table}", ""])
 
 
+def detector(results: str) -> str:
+    import re
+    text = section(results, "12.20")
+    det, cov = {}, {}
+    for c in rows(text):
+        if len(c) == 6 and c[1] in ("epoch 3", "frozen margin") and "[" in c[4]:
+            det[(c[0], c[1])] = c
+        elif len(c) == 6 and c[1] == "epoch 3" and "/" in c[2] and "(" in c[4]:
+            cov[c[0]] = c
+    share = dict(re.findall(r"(StudentBERT \(retrospective\)|NLP, seeds [0-9, ]+?(?: "
+                            r"\(prospective\))?|NLP, all three seed sets) (0\.\d\d)",
+                            " ".join(text.split())))
+    names = ["StudentBERT (retrospective)", "NLP, seeds 42, 1, 2 (prospective)",
+             "NLP, seeds 3, 4, 5", "NLP, seeds 6, 7, 8", "NLP, all three seed sets"]
+    label = {names[0]: "StudentBERT", names[1]: "NLP 42, 1, 2", names[2]: "NLP 3, 4, 5",
+             names[3]: "NLP 6, 7, 8", names[4]: "NLP pooled"}
+    body = []
+    for n in names:
+        e, f = det.get((n, "epoch 3")), det.get((n, "frozen margin"))
+        if e is None or f is None or n not in share:
+            sys.exit(f"ABORT: RESULTS.md 12.20 lacks the rows for {n}")
+        cv = cov.get(n)
+        reg = (f"{cv[4].split()[0]} & {cv[5].split()[0]}" if cv else "-- & --")
+        body.append(f"{label[n]} & {share[n]} & {e[4]} & {e[5].split()[0]} & {f[4]} & "
+                    f"{f[5].split()[0]} & {reg} \\\\")
+    if len(cov) != 4:
+        sys.exit(f"ABORT: {len(cov)} matched-coverage rows at epoch 3 in 12.20, expected 4")
+    return "\n".join([
+        "% Generated by analysis/make_paperB_assets.py from RESULTS.md 12.20; do not edit by hand.",
+        "\\begin{table}[t]", "\\centering",
+        "\\caption{The warning signal as a detector of overtaken recommendations after three "
+        "epochs, against H-score's frozen margin, and at matched coverage. Base: the share "
+        "of recommendations overtaken after full fine-tuning, which is also the AUPRC of a random "
+        "score. StudentBERT is retrospective; NLP lists the three seed sets and their pool. "
+        "AUROC with a 95\\% interval from a bootstrap over tasks or targets. Regret: "
+        "mean regret of the recommendations the rule follows and of the same number "
+        "with the largest frozen margins (AUC on StudentBERT, points on NLP). Epochs 1 and 2 are "
+        "in the record.}",
+        "\\label{tab:detector}", "\\footnotesize", "\\setlength{\\tabcolsep}{2.5pt}",
+        "\\begin{tabular}{lrrrrrrr}", "\\toprule",
+        " & & \\multicolumn{2}{c}{Early signal} & \\multicolumn{2}{c}{Frozen margin} & "
+        "\\multicolumn{2}{c}{Regret} \\\\",
+        "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\\cmidrule(lr){7-8}",
+        "Data & Base & AUROC & AUPRC & AUROC & AUPRC & rule & margin \\\\", "\\midrule",
+        *body, "\\bottomrule", "\\end{tabular}", "\\end{table}", ""])
+
+
 def trajectories(results: str, path: Path) -> None:
     import matplotlib
 
@@ -447,7 +524,8 @@ def main(argv: list[str] | None = None) -> None:
     out.mkdir(parents=True, exist_ok=True)
     made = {"datasets.tex": datasets(results), "sources.tex": sources(results),
             "estimators.tex": estimators(results, load_summary(a.summary) if a.summary else None),
-            "frozen.tex": frozen(results), "nlp.tex": nlp(results), "warning.tex": warning(results)}
+            "frozen.tex": frozen(results), "nlp.tex": nlp(results), "warning.tex": warning(results),
+            "detector.tex": detector(results)}
     if a.recipes:
         made["recipes.tex"] = recipes(Path(a.recipes).read_text(encoding="utf-8"))
     for name, text in made.items():
