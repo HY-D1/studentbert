@@ -2184,6 +2184,44 @@ rankings; mean regret 3.87 points against H-score's 2.70). Its rankings also cha
 seeds (stability 0.37 on StudentBERT and 0.63 on NLP). Bolya et al. report PARC at its best with a
 depth ensemble on a benchmark of diverse architectures; these numbers characterize the core method
 without that ensemble, as fixed in the design._
+### 12.22 Measured cost of fully fine-tuning every StudentBERT candidate (analysis/kt_finetune_cost.py, commit 4c8e75c, job 11631444)
+
+Task: Prof. Hazra (Nov 2026) asked for the measured cost of fully fine-tuning all candidates on one
+KT target, toward a regret-versus-compute analysis. Source: the runs behind the Track B gold in
+executions.tsv (task kt, valid for the primary analysis, 20 epochs, 3,000 target learners or the
+whole training split). Every target, candidate and seed was run twice (campaigns TG1 and N3000P); a
+rerun is not part of a method's cost, so each counts once, at the median elapsed time of its copies.
+Elapsed is the scheduler's wall-clock time for a one-GPU job, including start-up, data loading and
+evaluation, so it is an upper bound on training time.
+
+Files (md5): kt_finetune_cost.py f0470c7cd0b60990e8955bb9439d846d, executions.tsv
+92a3e5250b50727f911fe6f09d4b225b, kt_finetune_cost_report.md 19400b9033fa169bb7f78d1269d624f2,
+kt_finetune_cost.tsv 8d48cdbf826faab22a1cccce4fd81d89.
+
+Report as written by analysis/kt_finetune_cost.py (heading lowered two levels):
+
+
+Source: executions.tsv (md5 92a3e5250b50727f911fe6f09d4b225b). One run per target, candidate and seed (20 epochs, 3,000 target learners or the whole training split), at the median elapsed time of its copies; wall-clock of a one-GPU job.
+
+| target | fine-tunes | all candidates x 6 seeds (GPU-h) | one seed, all 8 candidates (GPU-h) | minutes per fine-tune | GPU | copies per run |
+|---|---|---|---|---|---|---|
+| algebra2005 | 48 | 0.71 | 0.12 | 0.8 to 1.0 | v100-sxm2 | 2 |
+| algebra2006 | 48 | 1.34 | 0.22 | 1.5 to 1.8 | v100-sxm2 | 2 |
+| assist2009 | 48 | 2.70 | 0.45 | 3.2 to 3.7 | v100-sxm2 | 2 |
+| assist2017 | 48 | 1.53 | 0.26 | 1.8 to 2.3 | v100-sxm2 | 2 |
+| bridge2006 | 48 | 1.13 | 0.19 | 1.3 to 1.6 | v100-sxm2 | 2 |
+| ednet | 48 | 19.83 | 3.30 | 23.3 to 35.9 | v100-sxm2 | 2 |
+| junyi | 48 | 5.56 | 0.93 | 6.5 to 9.5 | v100-sxm2 | 2 |
+
+Whole grid (7 targets x 8 candidates x 6 seeds): 32.8 GPU-hours.
+
+Files: kt_finetune_cost.tsv 8d48cdbf826faab22a1cccce4fd81d89
+
+_Read: fully fine-tuning all 8 candidates once, at one seed, costs 0.12 to 0.45 GPU-hours on the
+five smaller targets, 0.93 on Junyi Academy and 3.30 on EdNet, all on V100-SXM2; the whole 7 by 8 by
+6 grid took 32.8 GPU-hours. Candidates cost about the same within a target, so the target's size
+sets the cost. With 20 epochs of similar length, one epoch is roughly a twentieth of a full
+fine-tune, an approximation until per-epoch times are recorded._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
