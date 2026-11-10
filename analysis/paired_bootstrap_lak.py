@@ -26,7 +26,6 @@ import csv
 import math
 import os
 import random
-from collections import defaultdict
 
 
 def load(path):

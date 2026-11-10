@@ -174,7 +174,6 @@ def main():
                 say(WARN, f"2.1 {tgt}: table row not found in RESULTS.md")
                 break
             cells = row[0]
-            hit = [c for c in cells if c not in ("-",) and "(" in c or c.replace(".", "").isdigit()]
             md_val = None
             for c in cells[1:]:
                 v = first_num(c)

@@ -47,7 +47,7 @@ def load_splits(path):
 
 
 def load_rows(npz_path):
-    log(f"    opening npz ...")
+    log("    opening npz ...")
     z = np.load(npz_path, allow_pickle=True)
     log(f"    npz keys: {sorted(z.files)}")
     keys = set(z.files)
@@ -236,7 +236,7 @@ def main():
         L.append("## Manifests\n\n- NOT written: reconstruction did not match the "
                  "published counts; check the sampling in analysis/sample_stats_report.py")
 
-    log(f"[6/6] writing report and manifests ...")
+    log("[6/6] writing report and manifests ...")
     with open(a.out, "w") as f:
         f.write("\n".join(L) + "\n")
     print("\n".join(L[-12:]))

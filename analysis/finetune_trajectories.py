@@ -20,7 +20,6 @@ import csv
 import json
 import re
 import sys
-from collections import defaultdict
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
