@@ -2265,6 +2265,110 @@ _Read: rule A keeps 20 to 24 models on every micro task, 12 to 24 on mini and 6 
 where many runs end before 50 epochs; all 24 models have a complete run on 4 micro and 11 mini tasks
 and on no extended task. Candidate sets therefore differ by task, and every Quick-Tune regret is
 judged within its task's own set._
+### 12.24 Trajectory and compute analysis: StudentBERT and Quick-Tune (analysis/trajectory_analysis.py, commit 1790a07, job 11762159)
+
+Task: Prof. Hazra (Nov 2026) asked for the pre-specified trajectory and compute analysis on
+StudentBERT and Quick-Tune. Definitions: docs/trajectory_design.md and
+docs/trajectory_amendment1.md, committed with the script before the run; the script reproduced the
+warning-rule and early-leader results of 12.17, 12.18 and 12.20 at epochs 1 to 3 before reporting.
+The analysis is descriptive: the StudentBERT outcomes were seen before, and the script was test-run
+on the StudentBERT scores with stand-in costs while it was written. Quick-Tune uses rule A (12.23),
+so its models are not compared under identical hyperparameters.
+
+Files (md5): trajectory_design.md 9da80165f872ca8e572a0782afe474eb, trajectory_amendment1.md
+9fb6a874c0d025e0678735381a26f5ce, trajectory_analysis.py 4e524cb49c5da4fead0aea6ffa0417ac,
+trajectory_analysis_report.md 0e04cb3dccee6bf136ac3ee8a376c763, trajectory_analysis.tsv
+b6fb4d2fb7d63ce1b2aa8ee7f57e5a85, trajectories.tsv e93329cbc69ae8a3af843c544d43793b,
+reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7.
+
+Report as written by analysis/trajectory_analysis.py (headings lowered two levels):
+
+
+Pre-specified in docs/trajectory_design.md and docs/trajectory_amendment1.md; descriptive (StudentBERT results were seen before). Inputs: trajectories.tsv e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7. Compute: StudentBERT per-epoch costs are measured run times spread evenly over epochs; Quick-Tune costs are the recorded per-epoch times. Quick-Tune models are not compared under identical hyperparameters (rule A).
+
+#### StudentBERT (21 recommendations, retrospective)
+
+| budget (epochs) | compute per decision (GPU-h) | early leader regret | followed by the rule | regret of followed | overtaken among followed |
+|---|---|---|---|---|---|
+| 0 (H-score alone) | 0 | 0.0012 | 21/21 | 0.0012 | 7 |
+| 1 | 0.039 | 0.0031 | 17/21 | 0.0009 | 6 |
+| 2 | 0.078 | 0.0010 | 12/21 | 0.0003 | 1 |
+| 3 | 0.118 | 0.0006 | 12/21 | 0.0009 | 1 |
+| 5 | 0.196 | 0.0006 | 10/21 | 0.0010 | 1 |
+| 10 | 0.392 | 0.0021 | 5/21 | 0.0007 | 2 |
+| 20 | 0.784 | 0.0017 | 10/21 | 0.0009 | 4 |
+
+- overtaken (7): the decision settles at epochs [7, 14, 20]; never within 20 epochs: 4. Compute at settling, as a share of fine-tuning all 8 candidates for 20 epochs: median 0.70, range 0.35 to 1.00.
+- not overtaken (14): the decision settles at epochs [3, 7, 10, 11, 12, 14]; never within 20 epochs: 8. Compute at settling, as a share of fine-tuning all 8 candidates for 20 epochs: median 0.52, range 0.15 to 0.70.
+
+Settling per recommendation (target, seed, overtaken, epoch): algebra2005 1 no 3; algebra2005 2 no 7; algebra2005 42 yes 7; algebra2006 1 yes never; algebra2006 2 yes never; algebra2006 42 yes never; assist2009 1 no never; assist2009 2 no never; assist2009 42 no never; assist2017 1 yes never; assist2017 2 yes 20; assist2017 42 yes 14; bridge2006 1 no 14; bridge2006 2 no never; bridge2006 42 no never; ednet 1 no 10; ednet 2 no 11; ednet 42 no 12; junyi 1 no never; junyi 2 no never; junyi 42 no never.
+
+#### Quick-Tune micro (30 tasks, 20 to 24 models per task; rule A)
+
+| budget (epochs) | compute per decision (GPU-h) | early leader regret (points) | early leader tied with the best |
+|---|---|---|---|
+| 1 | 0.13 | 20.69 | 4/30 |
+| 2 | 0.26 | 17.11 | 10/30 |
+| 3 | 0.38 | 9.74 | 11/30 |
+| 5 | 0.64 | 5.58 | 17/30 |
+| 10 | 1.28 | 4.22 | 18/30 |
+| 20 | 2.57 | 1.57 | 21/30 |
+| 30 | 3.90 | 0.46 | 22/30 |
+| 40 | 5.26 | 0.02 | 29/30 |
+| 50 | 6.62 | 0.00 | 30/30 |
+
+- Winner detection: settles by epoch 1 on 1, by 3 on 4, by 5 on 5, by 10 on 10 and by 20 on 13 of 30 tasks; median settling epoch 26; compute at settling as a share of running all candidates for 50 epochs: median 0.49.
+
+#### Quick-Tune mini (30 tasks, 12 to 24 models per task; rule A)
+
+| budget (epochs) | compute per decision (GPU-h) | early leader regret (points) | early leader tied with the best |
+|---|---|---|---|
+| 1 | 0.39 | 18.06 | 5/30 |
+| 2 | 0.78 | 14.80 | 8/30 |
+| 3 | 1.18 | 8.25 | 13/30 |
+| 5 | 1.96 | 6.96 | 14/30 |
+| 10 | 3.93 | 1.69 | 19/30 |
+| 20 | 7.86 | 1.31 | 24/30 |
+| 30 | 11.92 | 0.25 | 27/30 |
+| 40 | 16.13 | 0.07 | 29/30 |
+| 50 | 20.33 | 0.00 | 30/30 |
+
+- Winner detection: settles by epoch 1 on 2, by 3 on 6, by 5 on 8, by 10 on 15 and by 20 on 18 of 30 tasks; median settling epoch 12; compute at settling as a share of running all candidates for 50 epochs: median 0.25.
+
+#### Quick-Tune extended (26 tasks, 6 to 23 models per task; rule A)
+
+| budget (epochs) | compute per decision (GPU-h) | early leader regret (points) | early leader tied with the best |
+|---|---|---|---|
+| 1 | 1.57 | 9.56 | 7/26 |
+| 2 | 3.14 | 13.61 | 11/26 |
+| 3 | 4.71 | 13.89 | 11/26 |
+| 5 | 7.85 | 5.53 | 11/26 |
+| 10 | 15.69 | 1.59 | 18/26 |
+| 20 | 31.38 | 0.56 | 20/26 |
+| 30 | 47.06 | 0.27 | 22/26 |
+| 40 | 62.73 | 0.20 | 24/26 |
+| 50 | 78.39 | 0.00 | 26/26 |
+
+- Winner detection: settles by epoch 1 on 4, by 3 on 9, by 5 on 9, by 10 on 14 and by 20 on 19 of 26 tasks; median settling epoch 10; compute at settling as a share of running all candidates for 50 epochs: median 0.20.
+
+Files: trajectory_analysis.tsv b6fb4d2fb7d63ce1b2aa8ee7f57e5a85
+
+_Read: on StudentBERT (retrospective; costs are run times spread evenly over epochs), fine-tuning
+all 8 candidates at one seed costs 0.039 GPU-hours per epoch and 0.78 for all 20. After 2 or 3
+epochs, 10 to 15% of that, the warning rule follows 12 of 21 recommendations with mean regret 0.0003
+and 0.0009 AUC, and after 3 to 5 epochs the early leader halves H-score's regret (0.0006 against
+0.0012). A longer budget does not help: the early leader's regret rises to 0.0021 after 10 epochs
+and 0.0017 after 20, worse than H-score alone, which suggests that one seed's validation ranking
+late in training is a noisy guide to the six-seed test gold. The strict detection rule accordingly
+settles on only 3 of the 7 overtaken recommendations within 20 epochs; on Algebra 2006 and one
+ASSISTments 2017 seed the own encoder regains the validation lead late. On Quick-Tune, early leaders
+are poor: their mean regret is 21, 18 and 10 points after one epoch on micro, mini and extended, 5.5
+to 7.0 after five, and 0.6 to 1.6 after twenty. The eventual winner is the stable early leader by
+epoch 10 on 10 of 30 micro, 15 of 30 mini and 14 of 26 extended tasks, at a median of 49%, 25% and
+20% of the compute of running every candidate for 50 epochs. The epoch-50 score defines the final
+ranking, so regret there is zero by construction. H-score's choice does not yet exist on Quick-Tune,
+so these numbers describe how fast the eventual winner emerges, not when an H-score reversal becomes
+detectable._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
