@@ -13,7 +13,8 @@ from pathlib import Path
 
 import numpy as np
 
-spec = importlib.util.spec_from_file_location("t4p", Path("scripts/task4_score_parc.py"))
+REPO = Path(__file__).resolve().parents[1]
+spec = importlib.util.spec_from_file_location("t4p", REPO / "scripts/task4_score_parc.py")
 t4p = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(t4p)
 

@@ -6,9 +6,10 @@
 #   user    <- 'Anon Student Id'
 #   skill   <- first KC from 'KC(Default)' (multi-KC rows split on ~~, take first)
 #   correct <- 'Correct First Attempt' (already 0/1)
-#   time    <- ordering by 'First Transaction Time' (fallback 'Step Start Time')
-#   taken   <- 'Step Duration (sec)' -> time_bin 1-5
-# Rows with empty KC or missing correct/duration are dropped. Students <10 dropped.
+#   time    <- ordering by 'First Transaction Time' (--col_order); unparseable times are
+#              forward-filled, and if no time parses at all, file row order is used
+#   taken   <- 'Step Duration (sec)' -> time_bin 1-5 (missing duration -> 0 s, not dropped)
+# Rows with empty KC or missing user/correct are dropped. Students <10 dropped.
 #
 # Usage:
 #   python preprocess_algebra2005.py --txt ../raw/algebra2005/algebra_2005_2006_train.txt \

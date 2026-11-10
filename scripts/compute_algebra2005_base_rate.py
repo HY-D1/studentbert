@@ -37,7 +37,7 @@ def main(path):
     if total == 0:
         print("no valid rows parsed"); return
     base_rate = correct_sum / total
-    print(f"\n=== ALGEBRA2005 BASE RATE ===")
+    print("\n=== ALGEBRA2005 BASE RATE ===")
     print(f"total interactions (with correctness): {total}")
     print(f"missing/blank correctness rows       : {missing}")
     print(f"correct count                        : {correct_sum}")

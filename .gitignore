@@ -59,9 +59,7 @@ probe_rerun_info.txt
 !poster/qr_code.png
 performance_by_data_regime.pdf
 *.bak_*
-queue_noskill/
 preds/
-*.bak_noskill
 lodo_report.md
 vocab_stats_all.txt
 objabl_perseed.csv
@@ -76,14 +74,9 @@ probe_perseed.csv
 trunc_perseed.csv
 audit_aug21.txt
 appendix_tables.tex
-queue_n3000/
-queue_base2/
 source_scale_gain.pdf
 drip_*.log
-run_inventory.tsv
-run_inventory_quarantined.tsv
 inventory_stdout.txt
-sacct_all.txt
 wandb_*.csv
 wandb_dupes.txt
 *_inventory.tsv

@@ -4,10 +4,13 @@ import os
 """Two downstream tasks on ASSISTments using a (pretrained or scratch) EduBERT encoder.
 
   --task dropout      : student-level early-dropout prediction (binary).
-                        Label per student: dropped = (gap_to_last_activity > 30 days)
-                        AND (total interactions < dataset mean). Sequence -> mean-pooled
-                        encoder state -> binary head. Reports AUC + F1 (minority class)
-                        + positive-class rate (advisor asked to track this).
+                        Label per student, read from <processed_dir>/dropout_labels.json:
+                        bottom-quantile TOTAL interactions among students with at least
+                        --min_interactions (scripts/build_dropout_labels.py for
+                        ASSISTments 2017, scripts/build_dropout_labels_npz.py for any
+                        dataset). Input is the first --k_prefix interactions. Sequence ->
+                        mean-pooled encoder state -> binary head. Reports AUC + F1
+                        (minority class) + positive-class rate (advisor asked to track this).
 
   --task next_skill   : predict skill_{t+1} from history up to t (multiclass over K).
                         Encoder run CAUSALLY (no future peeking). Reports top-1 and
@@ -29,12 +32,10 @@ Usage:
     --processed_dir ../processed/assist2017 --init scratch \
     --epochs 30 --run_type scratch_nextskill --wandb
 
-NOTE on dropout labels: ASSISTments processed npz does NOT carry raw timestamps
-(only time_bin 1-5). The "30 days inactivity" rule needs wall-clock gaps, which are
-not in sequences.npz. We approximate dropout with a proxy that IS reconstructable
-from the npz (short total activity + trailing large time-gaps). If you want the exact
-30-day rule, we must re-derive per-student last-activity dates from the raw CSV during
-preprocessing and store a dropout label in the npz. This is flagged clearly at runtime.
+NOTE on dropout labels: an earlier version used a "30 days inactivity" rule. It was
+dropped because it is degenerate on ASSISTments 2017 (see scripts/build_dropout_labels.py:
+it flags 61% of students, since data collection simply ended). The label is now the
+cohort-relative bottom-quantile of total interactions described above.
 """
 
 
@@ -145,7 +146,7 @@ def collate(batch):
 
 
 # ---------------------------------------------------------------------------
-# Dropout label construction (proxy from npz; see module docstring caveat)
+# Dropout labels (loaded from dropout_labels.json; see module docstring)
 # ---------------------------------------------------------------------------
 def build_dropout_labels(processed_dir, max_seq_len):
     """Load the real dropout label file (built by build_dropout_labels.py)."""

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 import os
-"""Train a KT baseline (DKT or SAINT+) on a processed dataset; report test AUC.
+"""Train a KT baseline (DKT, AKT or SAINT+) on a processed dataset; report test AUC.
 
 Usage:
     python scripts/train_baseline.py \
@@ -91,7 +91,7 @@ def run_epoch(model, loader, device, model_name, optimizer=None,
                 logits_all = model(skill, correct)          # (B, L, K+1)
                 next_skill = skill[:, 1:]                    # (B, L-1)
                 step_logits = model.gather_next_step(logits_all[:, :-1], next_skill)
-            else:  # saint
+            else:  # saint and akt (same call signature)
                 key_pad = ~mask                              # (B, L) True=PAD
                 logits = model(skill, correct, time_bin, key_padding_mask=key_pad)
                 step_logits = logits[:, 1:]                  # predict t+1
@@ -147,7 +147,7 @@ def main() -> None:
     ap.add_argument("--max_seq_len", type=int, default=512)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--n_students", type=int, default=None,
-                    help="subsample TRAIN to first N students (seeded); None=all")
+                    help="subsample TRAIN to a seeded random N students; None=all")
     ap.add_argument("--run_type", default="baseline",
                     help="run-name suffix, e.g. baseline / pretrain / scratch")
     ap.add_argument("--ckpt_dir", default="../checkpoints")

@@ -10,7 +10,7 @@ Standard DKT formulation:
 
 Shapes (B=batch, L=seq len, K=num_skills, H=hidden):
   skill, correct : (B, L)
-  interaction id : (B, L)   = skill * 2 + correct, range [0, 2K)
+  interaction id : (B, L)   = skill * 2 + correct, range [0, 2(K+1)) incl. PAD skill 0
   lstm out       : (B, L, H)
   logits         : (B, L, K+1)  (index 0 = PAD skill, ignored)
 """

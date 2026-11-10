@@ -26,7 +26,6 @@ import random
 import re
 import statistics as st
 import sys
-from collections import defaultdict
 
 SEED_SUFFIX = re.compile(r"_seed[0-9]+$")
 

@@ -1,10 +1,10 @@
-# Task 4: transferability estimation via LogME (You et al. ICML 2020).
+# Task 4: transferability estimation via LogME (You et al. ICML 2021).
 # Loads a (frozen) pretrained EduBERT encoder, extracts features on a TARGET
 # dataset, computes LogME for predicting next-step correctness (KT). No fine-tuning.
 # Higher LogME = predicted better transfer. Correlate scores vs measured gains.
 #
 # Usage (run in sb env, on a GPU node or login is fine since it is light):
-#   PYTHONPATH=. python compute_logme.py --encoder_ckpt <enc.pt> \
+#   PYTHONPATH=. python scripts/compute_logme.py --encoder_ckpt <enc.pt> \
 #       --target_dir ../processed/<target> --max_students 3000 --seed 42
 # init=scratch (no ckpt) gives the scratch baseline LogME.
 import argparse, json

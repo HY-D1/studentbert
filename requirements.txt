@@ -1,4 +1,8 @@
-# Runtime dependencies (verified against actual imports in scripts/ and src/)
+# Runtime dependencies of the main pipeline (src/, the scripts that run in the sb env, analysis/).
+# Not listed here: the Task 4 NLP scripts (scripts/task4_*.py, analysis/nlp_option1_supplement.py)
+# need transformers and datasets and run in the separate t4 env; scripts/check_setup.py imports
+# transformers (listed in environment.yml only); poster/make_qr.py needs opencv-contrib-python and
+# poster/build_pptx.js needs Node with pptxgenjs.
 # GPU note: install torch as 2.5.1+cu121 on the cluster; cu130 wheels fall back to CPU.
 numpy
 pandas

@@ -439,7 +439,7 @@ def test_builder_duplicate_rules_and_joins():
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
         run_b = "edubert_assist2017_kt_assist_fromednet_n3000_seed42"
-        _write(tmp, f"kt_assist_fromednet_n3000_seed42_10000001.log",
+        _write(tmp, "kt_assist_fromednet_n3000_seed42_10000001.log",
                _kt_log(run_b, "pretrained", 0.6961, students=1366,
                        encoder="edubert_ednet_pretrain_full_encoder.pt", rid="pin1"))
         w6 = (_kt_log("edubert_assist2017_kt_assist_scratch_n3000_seed42", "scratch", 0.6690,

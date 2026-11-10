@@ -9,7 +9,9 @@ Outputs:
 
 Run on the cluster from the code dir:
   cd /projects/algl/dai.hany/studentbert/code
-  python collect_all_results.py --logdir . --out_md RESULTS.md --out_json results.json
+  python analysis/collect_all_results.py --logdir . --out_md RESULTS_generated.md --out_json results.json
+  (writing to RESULTS.md itself is refused while it holds the hand-added sections listed
+  in MANUAL below; write elsewhere and diff)
 
 Design:
   - Parses AUC / probe-acc / etc. from logs by known naming patterns.
@@ -26,8 +28,7 @@ Design:
 from __future__ import annotations
 import argparse
 import os
-import sys, json, re, glob, os
-from collections import defaultdict
+import sys, json, re, glob
 import statistics as st
 
 # ----------------------------------------------------------------------------

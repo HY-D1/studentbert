@@ -5,7 +5,7 @@
 #   break_even_n_curve.pdf/.png   -> 2-panel (top-1 | macro-OVR AUC) vs N, full width
 #   break_even_macro_single.*     -> single-panel macro-AUC, half width (clean option)
 #
-# Usage:  python make_lak_figure.py [--csv nextskill_results_agg.csv] [--dataset assist2017]
+# Usage:  python analysis/make_lak_figure.py [--csv nextskill_results_agg.csv] [--dataset assist2017]
 
 import argparse
 import csv
