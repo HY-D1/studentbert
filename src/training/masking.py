@@ -2,10 +2,10 @@
 
 Randomly select ~15% of REAL (non-PAD) positions per sequence. For each selected
 position, following BERT's 80/10/10 recipe:
-  80%: replace outcome with MASK id, and skill with a [MASK] skill (id 0 used as
-       a learnable "unknown"; here we keep skill but mask the outcome, which is
-       the KT-meaningful target — predicting whether the answer was correct).
-  10%: replace with a random outcome.
+  80%: replace outcome with MASK id, and skill with id 0. Id 0 is the skill
+       embedding's padding_idx, so the masked skill is a fixed zero vector (the
+       same as PAD), not a learnable [MASK] token. The time bin is NOT masked.
+  10%: replace with a random outcome and a random skill in [1, num_skills].
   10%: leave unchanged.
 Only the selected positions contribute to the loss (others are ignored via -100).
 

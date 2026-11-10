@@ -6,9 +6,10 @@
 #   4. correlate embedding coherence with probe decodability (ties both analyses)
 #
 # COHERENCE METRIC: skills that co-occur in student sequences should be neighbors
-# in embedding space IF the embedding captures skill structure. We measure:
-#   for each skill, its top-k embedding neighbors; coherence = fraction of those
-#   neighbors that are also top-k CO-OCCURRENCE neighbors (from the data).
+# in embedding space IF the embedding captures skill structure. We measure the
+# Spearman rank correlation, over skill pairs, between co-occurrence counts and
+# embedding cosine similarity (coherence_rankcorr: all pairs, and co-occurring
+# pairs only). This is vocabulary-size invariant. --k is accepted but unused.
 #   High coherence = embedding geometry reflects real skill co-occurrence structure.
 #
 # READ-ONLY on data; loads the encoder checkpoint's skill_emb weights.
@@ -19,7 +20,7 @@
 #                bridge2006:skill assist2009:skill algebra2006:skill \
 #     --processed_root ../processed --out embedding_analysis
 from __future__ import annotations
-import argparse, json, os
+import argparse, json
 from pathlib import Path
 import numpy as np
 

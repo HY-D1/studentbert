@@ -4,8 +4,8 @@
 # CPU only, runs in seconds on the login node.
 #
 # Usage:
-#   python skill_freq_report.py ../processed/assist2017
-#   python skill_freq_report.py ../processed/assist2017 --split test --out skill_freq_assist2017.md
+#   python analysis/skill_freq_report.py ../processed/assist2017
+#   python analysis/skill_freq_report.py ../processed/assist2017 --split test --out skill_freq_assist2017.md
 
 import argparse
 import json

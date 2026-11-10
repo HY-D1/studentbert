@@ -5,14 +5,14 @@ import os
 # FIX vs v1: v1 was circular. The encoder input includes skill_emb(skill) at each
 # position, so a linear probe trivially inverted it (scratch reached ~99.9%),
 # measuring nothing about pretraining. v2 removes the circularity by MASKING the
-# skill at the probed position (skill set to 0=PAD before encoding), so the probe
-# must infer the position's skill from CONTEXT (neighboring interactions, timing,
-# correctness). Now a random encoder cannot cheat, and the gap between sources
-# reflects learned skill-relational structure. This is the mechanistic evidence
-# for what each pretraining source captures.
+# skill at EVERY position (skill set to 0=PAD before encoding; see rep_masked), so
+# the probe must infer each position's skill from correctness and timing context
+# alone. Now a random encoder cannot cheat, and the gap between sources reflects
+# learned skill-relational structure. This is the mechanistic evidence for what
+# each pretraining source captures.
 #
-# Method: for each position t, zero out skill[t] (keep correct[t], time[t]),
-# encode the full (context-masked) sequence, take hidden[t], train a linear probe
+# Method: zero out skill at all positions (keep correct and time), encode the
+# whole sequence once, take hidden[t] at every real position, train a linear probe
 # to predict the TRUE skill[t]. Frozen encoder; only the probe learns.
 #
 # Usage:

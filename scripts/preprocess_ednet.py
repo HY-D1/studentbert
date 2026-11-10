@@ -28,7 +28,8 @@ Space           : O(N) ints in memory.
 
 Edge cases:
   - questions with empty/NaN tags -> skill 'UNK'
-  - user_answer not in a-d or missing -> row dropped
+  - user_answer, timestamp or question metadata missing -> row dropped (any non-missing
+    answer, a-d or not, is scored against correct_answer)
   - multi-tag questions -> first tag used (flagged; revisit for multi-KC handling)
   - students < min_interactions dropped
   - reading thousands of tiny CSVs is slow; we read only needed columns
@@ -110,7 +111,7 @@ def main() -> None:
         try:
             uid = int(uid_str)
         except ValueError:
-            uid = abs(hash(f.stem)) % (10**9)  # fallback stable-ish id
+            uid = abs(hash(f.stem)) % (10**9)  # fallback id; str hash varies per process (PYTHONHASHSEED)
 
         if f.stat().st_size == 0:
             continue

@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--boot_seed", type=int, default=0)
     ap.add_argument("--tol", type=float, default=5e-5)
     ap.add_argument("--device", default="cpu")
-    ap.add_argument("--out", required=True, help="prefix for _summary.tsv and _report.md")
+    ap.add_argument("--out", required=True, help="prefix for _summary.tsv, _report.md and _checks.json")
     a = ap.parse_args(argv)
 
     import torch
