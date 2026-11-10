@@ -4,7 +4,9 @@ from __future__ import annotations
 
 Every number comes from RESULTS.md (sections 0.1, 2.1, 11 and 11.1) or from the control summary that
 RESULTS.md 11.1 was rendered from (per-draw gains for the figure), and the script stops if the two
-disagree at 4 dp. Each table file starts with a provenance comment. Outputs:
+disagree at 4 dp. Each of the four RESULTS.md sections is checked against a pinned md5 (SECTIONS),
+so a section added elsewhere in RESULTS.md does not stop the script, while any change to the text it
+reads does. Each table file starts with a provenance comment. Outputs:
 
   tables/datasets.tex, tables/source_comparison.tex, tables/scale_ladder.tex,
   tables/update_matched.tex, tables/matched_scale.tex,
@@ -23,8 +25,13 @@ import sys
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
-PINNED = {"RESULTS.md": "e0837732eabff7f87d67201183280a91",
-          "budget_control_summary.tsv": "c1b14438e4d6a547af7952ebbc4b9fe4"}
+# (start heading, next heading, md5 of the text between them); identical to the text at 45b182b,
+# the commit the earlier whole-file pin was taken from
+SECTIONS = {"0": ("## 0", "## 1.", "cbca08fc14a98cb48cfce7787fce8356"),
+            "2.1": ("### 2.1", "### 2.2", "38b7d6c369daced45af1b841f744bac0"),
+            "11": ("## 11.", "### 11.1", "653fe9217873cd5723f24a6aac26f52e"),
+            "11.1": ("### 11.1", "## 12.", "ab948da478cf648b544f594e282e941c")}
+PINNED = {"budget_control_summary.tsv": "c1b14438e4d6a547af7952ebbc4b9fe4"}
 TRAIN = {"ASSISTments 2017": "1,366", "EdNet KT1": "353,597", "Junyi Academy": "49,153"}
 LADDER = (5000, 15000, 49153, 150000, 353597)
 TGT = ("assist2017", "junyi")
@@ -45,15 +52,19 @@ def cell(g: str, lo: str, hi: str) -> str:
     return f"\\makecell{{{tex(g)}\\\\{{\\scriptsize [{tex(lo)}, {tex(hi)}]}}}}"
 
 
-def section(text: str, head: str, nxt: str) -> str:
+def section(text: str, key: str) -> str:
+    head, nxt, md5 = SECTIONS[key]
     i = text.index(head)
     j = text.index(nxt, i + len(head))
+    got = hashlib.md5(text[i:j].encode()).hexdigest()
+    if got != md5:
+        sys.exit(f"ABORT: RESULTS.md {key} changed (md5 {got}, expected {md5}); nothing written")
     return text[i:j]
 
 
 def parse(results: str) -> dict:
     out: dict = {}
-    s0 = section(results, "## 0", "## 1.")
+    s0 = section(results, "0")
     out["datasets"] = {}
     for name in TRAIN:
         m = re.search(rf"^\| {re.escape(name)} \| ([\d,]+) \| ([\d,]+) \| ([\d,]+) \| ([\d.]+) \| "
@@ -64,7 +75,7 @@ def parse(results: str) -> dict:
     for v in TRAIN.values():
         if v not in results:
             sys.exit(f"ABORT: RESULTS.md never states the training split {v}")
-    s21 = section(results, "### 2.1", "### 2.2")
+    s21 = section(results, "2.1")
     cell = re.compile(rf"({NUM}) ±{NUM} \(({NUM}) \[({NUM}),({NUM})\] (\d/\d)\)")
     out["kt"] = {}
     for t in ("assist2017", "ednet", "junyi"):
@@ -76,14 +87,14 @@ def parse(results: str) -> dict:
             sys.exit(f"ABORT: RESULTS.md 2.1 row {t} has {len(cols)} condition columns")
         out["kt"][t] = {"scratch": m.group(1),
                         "cells": [cell.match(c).groups() if cell.match(c) else None for c in cols]}
-    s11 = section(results, "## 11.", "### 11.1")
+    s11 = section(results, "11")
     out["loss10"] = {}
     for n in LADDER:
         m = re.search(rf"^\| {n:,} \| ([\d.]+) / ([\d.]+) / ([\d.]+) \|", s11, re.M)
         if not m:
             sys.exit(f"ABORT: RESULTS.md 11 has no loss row for {n:,}")
         out["loss10"][n] = [float(x) for x in m.groups()]
-    s111 = section(results, "### 11.1", "## 12.")
+    s111 = section(results, "11.1")
     out["r111"] = {}
     row = re.compile(rf"^\| (assist2017|junyi) \| ([\d,]+) \| (\d+) \| ([\d,]+) \| ({NUM}) "
                      rf"\[({NUM}), ({NUM})\] \| (\d/\d) \| ([\d.]+) \| (.*) \|$", re.M)
@@ -296,18 +307,18 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--summary", required=True)
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
-    for p in (a.results, a.summary):
-        got = hashlib.md5(Path(p).read_bytes()).hexdigest()
-        if got != PINNED[Path(p).name]:
-            sys.exit(f"ABORT: {p} md5 {got}, expected {PINNED[Path(p).name]}")
-    R = parse(Path(a.results).read_text())
+    R = parse(Path(a.results).read_text())  # checks the four section pins
+    got = hashlib.md5(Path(a.summary).read_bytes()).hexdigest()
+    if got != PINNED[Path(a.summary).name]:
+        sys.exit(f"ABORT: {a.summary} md5 {got}, expected {PINNED[Path(a.summary).name]}")
+    results_md5 = hashlib.md5(Path(a.results).read_bytes()).hexdigest()
     with open(a.summary, newline="") as fh:
         per = check_summary(R, list(csv.DictReader(fh, delimiter="\t")))
     out = Path(a.out)
     (out / "tables").mkdir(parents=True, exist_ok=True)
     (out / "figures").mkdir(parents=True, exist_ok=True)
-    prov = (f"Inputs: RESULTS.md {PINNED['RESULTS.md']}, budget_control_summary.tsv "
-            f"{PINNED['budget_control_summary.tsv']}.")
+    prov = (f"Inputs: RESULTS.md {results_md5} (sections 0, 2.1, 11 and 11.1 pinned), "
+            f"budget_control_summary.tsv {PINNED['budget_control_summary.tsv']}.")
     tables(R, out / "tables", prov)
     figures(R, per, out / "figures")
     for p in sorted(out.rglob("*")):
