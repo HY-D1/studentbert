@@ -2222,6 +2222,49 @@ five smaller targets, 0.93 on Junyi Academy and 3.30 on EdNet, all on V100-SXM2;
 6 grid took 32.8 GPU-hours. Candidates cost about the same within a target, so the target's size
 sets the cost. With 20 epochs of similar length, one epoch is roughly a twentieth of a full
 fine-tune, an approximation until per-epoch times are recorded._
+### 12.23 Per-epoch trajectories and compute for every candidate (analysis/trajectory_table.py, commit 9302502, job 11634489)
+
+Task: Prof. Hazra (Nov 2026) asked to keep, for every check, each candidate's per-epoch ranking
+trajectory and compute cost. One table holds, per candidate per epoch, the validation score, the
+rank among the candidates of its ranking and the epoch and cumulative seconds: StudentBERT (7
+targets x 8 candidates x 6 seeds, epochs 1 to 20; cost the measured run time spread evenly over its
+epochs), the NLP short fine-tunes (three seed sets, epochs 1 to 3; cost measured per epoch) and
+Quick-Tune (Pineda Arango et al., ICLR 2024; epochs 1 to 50; cost the recorded training and
+evaluation time per epoch). The design was committed before the table was built.
+
+Quick-Tune rule A (Harry's choice, approved by Prof. Hazra): every Quick-Tune run uses its own
+random hyperparameters, and no configuration is shared across models on any task
+(analysis/qt_inspect.py), so each model on each task is represented by its first complete 50-epoch
+run in file order, a rule that uses no result. Limitation: the models are therefore not compared
+under identical hyperparameters, and a model can rank low because its run drew poor settings rather
+than because it transfers worse. This limitation is stated wherever Quick-Tune results are used.
+
+Files (md5): trajectory_design.md 9da80165f872ca8e572a0782afe474eb, trajectory_table.py
+5040a7fe5ea64f355ac875ed391cd88e, qt_inspect.py c811fac46ece2136aace4cff051c6ea8,
+trajectories_report.md 5b0d4c16558db76ddc6f32d0e35f2b52, trajectories.tsv
+e93329cbc69ae8a3af843c544d43793b, early_ft_epochs.tsv 602d8f8e997384835453edcc45e8e6da,
+executions.tsv 92a3e5250b50727f911fe6f09d4b225b, micro.zip ed189adccce30d8b7f4a6e52b8f0caae,
+mini.zip 0560bb028c2ea3c03cfb11165e9a6d87, extended.zip 7619c2a3c6d5e13b410037037bfe577a.
+
+Report as written by analysis/trajectory_table.py:
+
+
+Definitions in docs/trajectory_design.md. Rows per benchmark: nlp_early 1890, quicktune_extended 24250, quicktune_micro 33700, quicktune_mini 31900, studentbert 6720.
+
+- studentbert: 336 runs from early_ft_epochs.tsv (md5 602d8f8e997384835453edcc45e8e6da), cost from executions.tsv (md5 92a3e5250b50727f911fe6f09d4b225b)
+- nlp_early: 210 runs from /projects/algl/dai.hany/task4/early_ft
+- nlp_early: 210 runs from /projects/algl/dai.hany/task4/early_ft_fresh
+- nlp_early: 210 runs from /projects/algl/dai.hany/task4/early_ft_p3
+- quicktune_micro: rule A chose 674 runs on 30 tasks (models per task min 20, max 24; all 24 models on 4 tasks); runs shorter than 50 epochs not used: 2563; micro.zip md5 ed189adccce30d8b7f4a6e52b8f0caae
+- quicktune_mini: rule A chose 638 runs on 30 tasks (models per task min 12, max 24; all 24 models on 11 tasks); runs shorter than 50 epochs not used: 2035; mini.zip md5 0560bb028c2ea3c03cfb11165e9a6d87
+- quicktune_extended: rule A chose 485 runs on 26 tasks (models per task min 6, max 23; all 24 models on 0 tasks); runs shorter than 50 epochs not used: 2146; extended.zip md5 7619c2a3c6d5e13b410037037bfe577a
+
+Files: trajectories.tsv e93329cbc69ae8a3af843c544d43793b
+
+_Read: rule A keeps 20 to 24 models on every micro task, 12 to 24 on mini and 6 to 23 on extended,
+where many runs end before 50 epochs; all 24 models have a complete run on 4 micro and 11 mini tasks
+and on no extended task. Candidate sets therefore differ by task, and every Quick-Tune regret is
+judged within its task's own set._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
