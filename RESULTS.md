@@ -2369,6 +2369,119 @@ epoch 10 on 10 of 30 micro, 15 of 30 mini and 14 of 26 extended tasks, at a medi
 ranking, so regret there is zero by construction. H-score's choice does not yet exist on Quick-Tune,
 so these numbers describe how fast the eventual winner emerges, not when an H-score reversal becomes
 detectable._
+### 12.25 H-score on Quick-Tune micro (analysis/qt_reversal.py, commit c930810, job 11808894; post-hoc diagnostic analysis/qt_diagnostics.py, commit e748869, job 11809464)
+
+Task: Prof. Hazra (Nov 2026) asked whether H-score can be computed on the Quick-Tune tasks and
+whether their curves can show when a reversal becomes detectable. Design: docs/qt_hscore_design.md
+and docs/trajectory_amendment2.md, both committed before any feature or score existed. The 30
+Meta-Album micro tasks (40 images per class, 20 classes, 19 on DOG and PNU) were fetched from
+OpenML; frozen features of the 24 models were extracted on an H200 with each model's own
+preprocessing; H-score, shrunk H-score and LogME (the NLP estimator code) scored each task's rule A
+candidates on stratified halves at seeds 42, 1 and 2. The recommendation, fixed in advance, is the
+shrunk H-score's choice; plain H-score and LogME are secondary rows. Limitations: rule A (12.23;
+models are not compared under identical hyperparameters) and the image split (the estimators may see
+images on which Quick-Tune's curves were validated).
+
+Files (md5): qt_hscore_design.md 9131a8e9221faf387cb4ff3c9d87fcf1, trajectory_amendment2.md
+8859f77870d589845fc5d373a6cae773, qt_fetch_metaalbum.py 0850a7b55419bc5acd752956d136287f,
+qt_extract_features.py 49f0d1fcdba7442465f3a306fb2b3f2b, qt_score.py
+3ace18aa5aee44106002d00f7a78defb, qt_reversal.py 1877ad66cf8d54f28fddf358aa9c2791, qt_diagnostics.py
+8bb9857c7a93b2825c300085d902a585, trajectories.tsv e93329cbc69ae8a3af843c544d43793b,
+qt_reversal_report.md 5b6c386718ae4818c81be9eb4410bf48, qt_reversal.tsv
+9fc1b8f63f4978e6b9728edc2d02a1cf, qt_diagnostics_11809464.log 2507c1726127b85679ed7d9729214224,
+metaalbum_micro_report.json 1700e621ccce6d64692db92068378006, extract_log.jsonl
+50ea8a9ba8fd20713c25211fd30c6f8e, qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea.
+
+Pre-specified result, as written by analysis/qt_reversal.py (headings lowered two levels):
+
+
+Pre-specified in docs/qt_hscore_design.md and docs/trajectory_amendment2.md. Inputs: trajectories.tsv e93329cbc69ae8a3af843c544d43793b, qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e. Limitations: rule A (models not compared under identical hyperparameters) and the image split (the estimators may see images on which Quick-Tune's curves were validated).
+
+#### Estimators against the epoch-50 ranking (30 tasks x 3 seeds)
+
+| estimator | candidates scored | rankings | mean Spearman | top-1 tied with the best | mean regret (points) |
+|---|---|---|---|---|---|
+| hscore_shrunk | 2022/2022 | 90 | +0.11 | 5/90 | 56.54 |
+| hscore | 2022/2022 | 90 | +0.17 | 4/90 | 34.46 |
+| logme | 1146/2022 | 90 | +0.05 | 0/90 | 60.09 |
+
+Undefined scores (features interpolate the labels exactly), by estimator: logme 876. Where an estimator is undefined for some candidates, its ranking covers the rest.
+
+#### Warning rule on shrunk H-score's choice (90 recommendations, 85 overtaken)
+
+| budget (epochs) | compute per decision (GPU-h) | caught | false alarms | followed | regret of followed (points) |
+|---|---|---|---|---|---|
+| 0 (H-score alone) | 0 | 0/85 | 0/5 | 90/90 | 56.54 |
+| 1 | 0.13 | 82/85 | 5/5 | 3/90 | 25.62 |
+| 2 | 0.26 | 82/85 | 5/5 | 3/90 | 25.62 |
+| 3 | 0.38 | 82/85 | 5/5 | 3/90 | 25.62 |
+| 5 | 0.64 | 82/85 | 1/5 | 7/90 | 1.34 |
+| 10 | 1.28 | 81/85 | 1/5 | 8/90 | 1.83 |
+| 20 | 2.57 | 85/85 | 1/5 | 4/90 | 0.00 |
+| 30 | 3.90 | 82/85 | 1/5 | 7/90 | 1.34 |
+| 40 | 5.26 | 85/85 | 0/5 | 5/90 | 0.00 |
+| 50 | 6.62 | 85/85 | 0/5 | 5/90 | 0.00 |
+
+- overtaken (85): the decision settles by epoch 1 on 75, by 3 on 75, by 10 on 78, by 50 on 85; median settling epoch 1; compute at settling as a share of 50 epochs for all candidates: median 0.02.
+
+- not overtaken (5): the decision settles by epoch 1 on 0, by 3 on 0, by 10 on 4, by 50 on 5; median settling epoch 5; compute at settling as a share of 50 epochs for all candidates: median 0.10.
+
+Frozen-feature extraction for a task's candidates (all 800 or 760 images): mean 2.9 GPU-minutes on NVIDIA H200; the fine-tuning compute above is Quick-Tune's recorded time on its own, unrecorded hardware, so the two are reported side by side and not added.
+
+Files: qt_reversal.tsv 9fc1b8f63f4978e6b9728edc2d02a1cf
+
+Post-hoc diagnostic, added after the result above to explain it; it changes no rule and no result (output of analysis/qt_diagnostics.py, job 11809464):
+
+```
+Rule A runs: 674; ending near chance (top-1 <= 10 at epoch 50): 257
+Near-chance share and mean final top-1 by model (dimension):
+  xcit_nano_12_p8_384_dist (128): 23/30 near chance, mean final 16.3
+  edgenext_xx_small (168): 9/30 near chance, mean final 32.9
+  edgenext_x_small (192): 13/30 near chance, mean final 33.5
+  xcit_tiny_12_p8_384_dist (192): 16/30 near chance, mean final 22.2
+  xcit_tiny_24_p8_384_dist (192): 13/30 near chance, mean final 29.9
+  dla46x_c (256): 9/30 near chance, mean final 25.7
+  edgenext_small (304): 11/30 near chance, mean final 35.1
+  mobilevit_xxs (320): 13/30 near chance, mean final 22.6
+  deit3_small_patch16_384_in21ft1k (384): 16/30 near chance, mean final 27.5
+  mobilevit_xs (384): 11/30 near chance, mean final 21.6
+  mobilevitv2_075 (384): 13/30 near chance, mean final 24.3
+  volo_d1_384 (384): 3/30 near chance, mean final 46.9
+  xcit_small_12_p8_384_dist (384): 13/30 near chance, mean final 33.1
+  volo_d3_448 (512): 8/30 near chance, mean final 47.5
+  beit_base_patch16_384 (768): 18/30 near chance, mean final 21.7
+  convnext_small_384_in22ft1k (768): 4/30 near chance, mean final 55.8
+  volo_d4_448 (768): 4/26 near chance, mean final 51.1
+  volo_d5_448 (768): 1/23 near chance, mean final 56.3
+  volo_d5_512 (768): 1/5 near chance, mean final 43.1
+  beit_large_patch16_512 (1024): 16/20 near chance, mean final 7.8
+  swinv2_base_window12to24_192to384_22kft1k (1024): 7/30 near chance, mean final 52.7
+  tf_efficientnet_b4_ns (1792): 15/30 near chance, mean final 36.0
+  tf_efficientnet_b6_ns (2304): 14/30 near chance, mean final 25.4
+  tf_efficientnet_b7_ns (2560): 6/30 near chance, mean final 39.2
+Mean Spearman of final top-1 with feature dimension, per task: +0.12
+Mean regret of a random candidate: 50.88 points
+hscore_shrunk: picks [('tf_efficientnet_b6_ns', 27), ('beit_large_patch16_512', 25), ('tf_efficientnet_b7_ns', 16), ('swinv2_base_window12to24_192to384_22kft1k', 14), ('beit_base_patch16_384', 6), ('tf_efficientnet_b4_ns', 2)]; mean final of picks 27.7; picks near chance 39/90; mean Spearman of score with dimension +0.93
+hscore: picks [('volo_d3_448', 47), ('volo_d4_448', 15), ('volo_d5_448', 10), ('volo_d5_512', 5), ('convnext_small_384_in22ft1k', 3), ('volo_d1_384', 2)]; mean final of picks 49.7; picks near chance 15/90; mean Spearman of score with dimension +0.88
+logme: picks [('deit3_small_patch16_384_in21ft1k', 49), ('edgenext_small', 20), ('xcit_small_12_p8_384_dist', 13), ('xcit_tiny_24_p8_384_dist', 5), ('volo_d1_384', 3)]; mean final of picks 24.1; picks near chance 51/90; mean Spearman of score with dimension +0.44
+Mean best final top-1 per task: 84.2
+```
+
+_Read: under the pre-specified rule, shrunk H-score's choice is overtaken on 85 of 90
+recommendations, with a mean regret of 56.5 points, more than the 50.9 of a random candidate. The
+post-hoc diagnostic shows two causes. First, 257 of the 674 rule A runs (38%) end near chance (top-1
+at most 10 points at epoch 50), among them 16 of the 20 BEiT-large runs: under rule A a model's
+final accuracy mostly reflects whether its one sampled configuration worked, and it barely relates
+to feature dimension (mean Spearman +0.12). Second, with 400 images (380 on DOG and PNU) H-score
+largely tracks feature dimension (mean Spearman of score with dimension +0.93 for shrunk and +0.88
+for plain H-score): shrunk H-score picks EfficientNet-B6, BEiT-large, EfficientNet-B7 or SwinV2 on
+82 of 90 recommendations. Plain H-score picks a VOLO model on at least 79 of 90 and does better
+(mean regret 34.5); the pre-specified primary is not changed after the fact. LogME is undefined for
+876 of the 2,022 candidate scores, where the feature dimension is at least the number of images.
+Quick-Tune under rule A therefore cannot test whether an estimator's choice is overtaken after
+fine-tuning, and the warning and detection rows above are not interpreted. Another representation of
+each model, such as its best final accuracy over all its complete runs, would need its own
+pre-specified analysis._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
