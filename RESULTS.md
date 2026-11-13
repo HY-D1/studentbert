@@ -2482,6 +2482,88 @@ Quick-Tune under rule A therefore cannot test whether an estimator's choice is o
 fine-tuning, and the warning and detection rows above are not interpreted. Another representation of
 each model, such as its best final accuracy over all its complete runs, would need its own
 pre-specified analysis._
+### 12.26 Quick-Tune micro: model-level outcome and dimension control (analysis/qt_model_level.py, commit ef899da, job 11851877)
+
+Task: Prof. Hazra's reply to 12.25 (Nov 2026) asked for a model-level outcome that aggregates each
+model's complete runs, with best-run accuracy only as a sensitivity analysis, since the best single
+run rewards lucky hyperparameters and drifts toward selecting a model together with its tuning; and
+for a check of the conclusions after controlling for representation dimensionality.
+docs/trajectory_amendment3.md fixed both before the run. Outcome: each model's median (primary),
+mean or best final top-1 over all its complete 50-epoch runs on a task, for models with at least 3
+such runs. Scores: the 12.25 scores (raw), and the same estimators on each model's features
+projected on their top 128 principal components, computed from the scored images without labels
+(pca128). The recommendation is again the shrunk H-score's choice. This is a follow-up to 12.25, not
+a replacement; rule A is not used here, and the outcome instead averages over Quick-Tune's sampled
+hyperparameters. Remaining limitation: the estimators may see images on which Quick-Tune's curves
+were validated.
+
+Files (md5): trajectory_amendment3.md 68997af8cd801ebca198776b2626c181, qt_model_level.py
+498ccccb5d9ed6de7a71417d1a1c40b2, qt_score.py 3ace18aa5aee44106002d00f7a78defb, qt_reversal.py
+1877ad66cf8d54f28fddf358aa9c2791, qt_model_level_report.md dfdeb25cd579b43651df73b1e7239f0f,
+qt_model_level.tsv a83777a3aebb5a13c9a2659f5acf6223, qt_scores.jsonl
+b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e, micro.zip
+ed189adccce30d8b7f4a6e52b8f0caae.
+
+Report as written by analysis/qt_model_level.py (headings lowered two levels):
+
+
+Pre-specified in docs/trajectory_amendment3.md. Inputs: qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e. Model-task pairs with complete runs: 674; included (at least 3 complete runs): 614 on 30 tasks; excluded: 60. Complete runs per included pair: median 10, range 3 to 23.
+
+#### Outcome: median final top-1 over complete runs (primary)
+
+Random model: mean regret 43.76 points. Outcome against log-dimension: mean Spearman +0.22.
+
+| features | estimator | rankings | Spearman with outcome | partial, controlling log-dimension | score with log-dimension | top-1 tied with the best | mean regret (points) |
+|---|---|---|---|---|---|---|---|
+| raw | hscore_shrunk | 90 | +0.21 | +0.04 | +0.93 | 6/90 | 40.56 |
+| raw | hscore | 90 | +0.27 | +0.18 | +0.90 | 7/90 | 26.23 |
+| raw | logme | 90 | +0.12 | +0.10 | +0.44 | 6/90 | 45.57 |
+| pca128 | hscore_shrunk | 90 | +0.20 |  | +0.67 | 4/90 | 47.89 |
+| pca128 | hscore | 90 | +0.22 |  | +0.70 | 9/90 | 40.91 |
+| pca128 | logme | 90 | +0.20 |  | +0.66 | 7/90 | 36.21 |
+
+#### Outcome: mean final top-1 over complete runs
+
+Random model: mean regret 31.30 points. Outcome against log-dimension: mean Spearman +0.24.
+
+| features | estimator | rankings | Spearman with outcome | partial, controlling log-dimension | score with log-dimension | top-1 tied with the best | mean regret (points) |
+|---|---|---|---|---|---|---|---|
+| raw | hscore_shrunk | 90 | +0.27 | +0.16 | +0.93 | 6/90 | 28.02 |
+| raw | hscore | 90 | +0.32 | +0.24 | +0.90 | 7/90 | 18.88 |
+| raw | logme | 90 | +0.19 | +0.21 | +0.44 | 3/90 | 31.11 |
+| pca128 | hscore_shrunk | 90 | +0.29 |  | +0.67 | 4/90 | 31.74 |
+| pca128 | hscore | 90 | +0.29 |  | +0.70 | 14/90 | 26.95 |
+| pca128 | logme | 90 | +0.28 |  | +0.66 | 13/90 | 24.21 |
+
+#### Outcome: best final top-1 over complete runs
+
+Random model: mean regret 20.30 points. Outcome against log-dimension: mean Spearman +0.24.
+
+| features | estimator | rankings | Spearman with outcome | partial, controlling log-dimension | score with log-dimension | top-1 tied with the best | mean regret (points) |
+|---|---|---|---|---|---|---|---|
+| raw | hscore_shrunk | 90 | +0.34 | +0.32 | +0.93 | 22/90 | 14.42 |
+| raw | hscore | 90 | +0.31 | +0.24 | +0.90 | 13/90 | 13.52 |
+| raw | logme | 90 | +0.28 | +0.36 | +0.44 | 9/90 | 11.94 |
+| pca128 | hscore_shrunk | 90 | +0.41 |  | +0.67 | 32/90 | 11.00 |
+| pca128 | hscore | 90 | +0.40 |  | +0.70 | 26/90 | 11.67 |
+| pca128 | logme | 90 | +0.38 |  | +0.66 | 28/90 | 9.97 |
+
+Files: qt_model_level.tsv a83777a3aebb5a13c9a2659f5acf6223
+
+_Read: against a model's typical fine-tuned accuracy (the median over 614 model-task pairs with 3 to
+23 complete runs), every estimator agrees only weakly, with mean Spearman +0.12 to +0.27.
+Controlling for log feature dimension leaves almost nothing of the shrunk H-score's correlation
+(partial +0.04), and its choice does about as well as a random model (mean regret 40.56 against
+43.76 points): its apparent signal was mostly feature size. Plain H-score keeps a modest signal
+(partial +0.18) and a clearly lower regret (26.23). Projecting every model on 128 principal
+components does not remove the link to size, since the scores still correlate +0.66 to +0.70 with
+the original dimension, and the outcome itself rises slightly with dimension (+0.22); size and
+transferability cannot be fully separated here, and the partial correlation is the cleaner control.
+With best-run accuracy, the sensitivity outcome, all correlations are higher (+0.28 to +0.41) and
+regrets lower, as expected when lucky settings are rewarded. The conclusion of 12.25 therefore holds
+with a model-level outcome and with dimension controlled: on Quick-Tune micro, H-score predicts a
+model's typical fine-tuned accuracy only weakly, and its shrunk form hardly at all once feature size
+is accounted for._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
