@@ -2564,6 +2564,155 @@ regrets lower, as expected when lucky settings are rewarded. The conclusion of 1
 with a model-level outcome and with dimension controlled: on Quick-Tune micro, H-score predicts a
 model's typical fine-tuned accuracy only weakly, and its shrunk form hardly at all once feature size
 is accounted for._
+### 12.27 Regret against compute: static, early leader, override, abstention, halving (analysis/regret_compute.py, commit 935ce90, job 11919022)
+
+Task: Prof. Hazra (Nov 2026) asked, as the key experiment for the methods question, for a
+regret-versus-compute comparison of H-score (static selection), the early leader, our warning and
+override rule, and successive halving, under the same pre-specified criteria, with each method's
+place on the frontier. docs/regret_compute_design.md was committed before the script existed.
+H-score's, the early leader's and the rule's results were known before (12.13 to 12.26); successive
+halving, the common compute accounting and the frontier are new, and the script was test-run on the
+StudentBERT scores with stand-in costs while it was written. Decisions: 21 on StudentBERT (8
+candidates, six-seed test gold), 90 on NLP (7 encoders, published fine-tuned gold; every method
+stops at epoch 3, where the curves end) and 90 on Quick-Tune micro (models with at least 3 complete
+runs, median curves and the model-level median outcome of 12.26). Compute is GPU-hours per decision:
+StudentBERT's per-epoch costs are measured run times spread evenly over epochs and its scoring jobs'
+GPU is not recorded; NLP is V100-SXM2 time; Quick-Tune's fine-tuning time is its own on unrecorded
+hardware, so the static points' H200 scoring time is shown but counted as zero for the frontier. The
+frontier is the set of points that no other point beats on both mean compute and mean regret, among
+the methods that choose on every decision; abstention is reported beside it.
+
+Files (md5): regret_compute_design.md 4dc6393deea651bf59aa8144e1ce1608, regret_compute.py
+fd4288700ffd9af74fe92911371935ae, regret_compute_figure.py 1ef0df36f93e72b3a2c9f09627f4bb20,
+regret_compute_report.md fe8155d94f0d79572f9df5af382f7908, regret_compute.tsv
+d77242c6243450571be358a5661c5ca6, trajectories.tsv e93329cbc69ae8a3af843c544d43793b,
+reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7, nlp_head_pairs.tsv
+d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1,
+p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, qt_scores.jsonl
+b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e. The frontier
+figure, benchmark_final/regret_compute_frontier.pdf, is drawn from regret_compute.tsv by
+analysis/regret_compute_figure.py.
+
+Report as written by analysis/regret_compute.py (headings lowered two levels):
+
+
+Pre-specified in docs/regret_compute_design.md (H-score, early leader and rule results were known before; successive halving, the common compute accounting and the frontier are new; the script was test-run on the StudentBERT scores with stand-in costs while it was written, and no definition changed after that). StudentBERT reproduces RESULTS.md 12.17, 12.18 and 12.24. Inputs: trajectories.tsv e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7, tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa, tg1_task2_kt_algebra2006.jsonl d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl 5823dd2999f96921409b9cce5272d924, tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff, tg1_task2_kt_bridge2006.jsonl 38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl 59096f8a8941896c18ca60515ffdd9f2, tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0, nlp_head_pairs.tsv d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1, p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, task4_scores.jsonl 9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl 20c403eb43ade91bac987af41538299e, task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220, qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e.
+
+#### studentbert (test AUC)
+
+21 decisions, 8 candidates; compute is cluster GPU time (fine-tunes on V100-SXM2; the scoring jobs' GPU is not in their records).
+
+| method | setting | compute per decision (GPU-h) | chosen | mean regret [95% cluster CI] | zero regret | on the frontier |
+|---|---|---|---|---|---|---|
+| static H-score |  | 0.008 | 21/21 | 0.0012 [0.0002, 0.0023] | 11 | yes |
+| early leader | epoch 1 | 0.039 | 21/21 | 0.0031 [0.0007, 0.0070] | 8 |  |
+| override rule | epoch 1 | 0.047 | 21/21 | 0.0031 [0.0007, 0.0070] | 8 |  |
+| warning, abstain | epoch 1 | 0.047 | 17/21 | 0.0009 [0.0001, 0.0018] | 8 |  |
+| early leader | epoch 2 | 0.078 | 21/21 | 0.0010 [0.0002, 0.0025] | 13 |  |
+| override rule | epoch 2 | 0.086 | 21/21 | 0.0011 [0.0002, 0.0025] | 13 |  |
+| warning, abstain | epoch 2 | 0.086 | 12/21 | 0.0003 [0.0000, 0.0008] | 8 |  |
+| early leader | epoch 3 | 0.118 | 21/21 | 0.0006 [0.0000, 0.0016] | 18 | yes |
+| override rule | epoch 3 | 0.125 | 21/21 | 0.0006 [0.0001, 0.0016] | 17 |  |
+| warning, abstain | epoch 3 | 0.125 | 12/21 | 0.0009 [0.0000, 0.0024] | 10 |  |
+| early leader | epoch 5 | 0.196 | 21/21 | 0.0006 [0.0000, 0.0016] | 18 | yes |
+| override rule | epoch 5 | 0.204 | 21/21 | 0.0005 [0.0000, 0.0015] | 19 | yes |
+| warning, abstain | epoch 5 | 0.204 | 10/21 | 0.0010 [0.0000, 0.0026] | 9 |  |
+| early leader | epoch 10 | 0.392 | 21/21 | 0.0021 [0.0004, 0.0041] | 11 |  |
+| override rule | epoch 10 | 0.400 | 21/21 | 0.0017 [0.0003, 0.0034] | 13 |  |
+| warning, abstain | epoch 10 | 0.400 | 5/21 | 0.0007 [0.0000, 0.0017] | 3 |  |
+| early leader | epoch 20 | 0.784 | 21/21 | 0.0017 [0.0005, 0.0034] | 8 |  |
+| override rule | epoch 20 | 0.792 | 21/21 | 0.0017 [0.0004, 0.0034] | 7 |  |
+| warning, abstain | epoch 20 | 0.792 | 10/21 | 0.0009 [0.0000, 0.0019] | 5 |  |
+| successive halving | start 1 | 0.078 | 21/21 | 0.0007 [0.0002, 0.0013] | 13 | yes |
+| successive halving | start 2 | 0.157 | 21/21 | 0.0007 [0.0001, 0.0015] | 15 |  |
+| successive halving | start 5 | 0.394 | 21/21 | 0.0013 [0.0004, 0.0024] | 9 |  |
+| successive halving (factor 3) | start 1 | 0.068 | 21/21 | 0.0008 [0.0000, 0.0018] | 15 | yes |
+| successive halving (factor 3) | start 2 | 0.138 | 21/21 | 0.0014 [0.0002, 0.0034] | 11 |  |
+| successive halving (factor 3) | start 5 | 0.344 | 21/21 | 0.0009 [0.0004, 0.0014] | 11 |  |
+| full fine-tuning | best validation | 0.784 | 21/21 | 0.0003 [0.0000, 0.0006] | 15 | yes |
+
+#### nlp (points)
+
+90 decisions, 7 encoders; curves stop at epoch 3, so every method stops there; compute is V100-SXM2 time.
+
+| method | setting | compute per decision (GPU-h) | chosen | mean regret [95% cluster CI] | zero regret | on the frontier |
+|---|---|---|---|---|---|---|
+| static H-score |  | 0.029 | 90/90 | 2.59 [1.00, 3.93] | 32 | yes |
+| early leader | epoch 1 | 0.085 | 90/90 | 1.64 [0.46, 3.33] | 40 | yes |
+| override rule | epoch 1 | 0.115 | 90/90 | 2.16 [0.60, 4.05] | 34 |  |
+| warning, abstain | epoch 1 | 0.115 | 25/90 | 0.70 [0.00, 2.08] | 17 |  |
+| early leader | epoch 2 | 0.169 | 90/90 | 1.50 [0.43, 3.28] | 38 |  |
+| override rule | epoch 2 | 0.199 | 90/90 | 2.06 [0.47, 3.95] | 35 |  |
+| warning, abstain | epoch 2 | 0.199 | 20/90 | 0.90 [0.00, 3.45] | 16 |  |
+| early leader | epoch 3 | 0.253 | 90/90 | 0.97 [0.27, 2.03] | 48 | yes |
+| override rule | epoch 3 | 0.283 | 90/90 | 1.61 [0.39, 3.09] | 45 |  |
+| warning, abstain | epoch 3 | 0.283 | 24/90 | 0.50 [0.00, 1.56] | 17 |  |
+| successive halving | rungs 1,2,3 | 0.158 | 90/90 | 1.26 [0.43, 2.69] | 41 | yes |
+| successive halving (factor 3) | rungs 1,2,3 | 0.121 | 90/90 | 1.62 [0.42, 3.64] | 36 | yes |
+
+#### quicktune (top-1 points)
+
+90 decisions, models with at least 3 complete runs, median curves; fine-tuning compute is Quick-Tune's recorded time on its own hardware; the static methods' compute is H200 scoring time, shown in its column but treated as zero for the frontier, since it is not on the same axis.
+
+| method | setting | compute per decision (GPU-h) | chosen | mean regret [95% cluster CI] | zero regret | on the frontier |
+|---|---|---|---|---|---|---|
+| static H-score |  | 0.040 | 90/90 | 40.56 [30.41, 51.01] | 6 |  |
+| static plain H-score |  | 0.039 | 90/90 | 26.23 [19.82, 33.08] | 6 | yes |
+| early leader | epoch 1 | 0.094 | 90/90 | 33.58 [24.30, 43.13] | 12 |  |
+| override rule | epoch 1 | 0.094 | 90/90 | 32.44 [23.62, 41.64] | 12 |  |
+| warning, abstain | epoch 1 | 0.094 | 3/90 | 16.56 [16.56, 16.56] | 0 |  |
+| early leader | epoch 2 | 0.189 | 90/90 | 15.18 [9.28, 21.94] | 21 | yes |
+| override rule | epoch 2 | 0.189 | 90/90 | 15.18 [9.28, 21.94] | 21 | yes |
+| warning, abstain | epoch 2 | 0.189 | 0/90 | nan [nan, nan] | 0 |  |
+| early leader | epoch 3 | 0.283 | 90/90 | 13.20 [7.82, 19.70] | 27 | yes |
+| override rule | epoch 3 | 0.283 | 90/90 | 13.20 [7.82, 19.70] | 27 | yes |
+| warning, abstain | epoch 3 | 0.283 | 0/90 | nan [nan, nan] | 0 |  |
+| early leader | epoch 5 | 0.474 | 90/90 | 9.79 [5.01, 15.74] | 36 |  |
+| override rule | epoch 5 | 0.474 | 90/90 | 9.79 [5.01, 15.74] | 36 |  |
+| warning, abstain | epoch 5 | 0.474 | 3/90 | 0.00 [0.00, 0.00] | 3 |  |
+| early leader | epoch 10 | 0.953 | 90/90 | 1.06 [0.33, 1.97] | 72 | yes |
+| override rule | epoch 10 | 0.953 | 90/90 | 1.06 [0.33, 1.97] | 72 | yes |
+| warning, abstain | epoch 10 | 0.953 | 6/90 | 0.00 [0.00, 0.00] | 6 |  |
+| early leader | epoch 20 | 1.911 | 90/90 | 1.08 [0.24, 2.18] | 72 |  |
+| override rule | epoch 20 | 1.911 | 90/90 | 1.08 [0.24, 2.18] | 72 |  |
+| warning, abstain | epoch 20 | 1.911 | 6/90 | 0.00 [0.00, 0.00] | 6 |  |
+| early leader | epoch 30 | 2.901 | 90/90 | 0.25 [0.00, 0.62] | 81 | yes |
+| override rule | epoch 30 | 2.901 | 90/90 | 0.25 [0.00, 0.62] | 81 | yes |
+| warning, abstain | epoch 30 | 2.901 | 6/90 | 0.00 [0.00, 0.00] | 6 |  |
+| early leader | epoch 40 | 3.923 | 90/90 | 0.02 [0.00, 0.06] | 87 | yes |
+| override rule | epoch 40 | 3.923 | 90/90 | 0.02 [0.00, 0.06] | 87 | yes |
+| warning, abstain | epoch 40 | 3.923 | 6/90 | 0.00 [0.00, 0.00] | 6 |  |
+| early leader | epoch 50 | 4.946 | 90/90 | 0.00 [0.00, 0.00] | 90 | yes |
+| override rule | epoch 50 | 4.946 | 90/90 | 0.00 [0.00, 0.00] | 90 | yes |
+| warning, abstain | epoch 50 | 4.946 | 6/90 | 0.00 [0.00, 0.00] | 6 |  |
+| successive halving | start 1 | 0.417 | 90/90 | 9.30 [5.42, 13.56] | 36 | yes |
+| successive halving | start 2 | 0.932 | 90/90 | 2.51 [0.72, 4.72] | 69 | yes |
+| successive halving | start 3 | 1.459 | 90/90 | 2.67 [0.08, 7.31] | 78 |  |
+| successive halving (factor 3) | start 1 | 0.287 | 90/90 | 11.65 [6.68, 17.76] | 27 | yes |
+| successive halving (factor 3) | start 2 | 0.657 | 90/90 | 4.28 [2.13, 6.77] | 48 | yes |
+| successive halving (factor 3) | start 3 | 0.987 | 90/90 | 3.43 [0.26, 8.53] | 72 |  |
+
+Files: regret_compute.tsv d77242c6243450571be358a5661c5ca6
+
+_Read: static selection is always the cheapest point and never good enough once a little fine-tuning
+is allowed. A simple multi-fidelity method matches or beats the override rule on every benchmark. On
+StudentBERT, successive halving started at one epoch reaches 0.0007 AUC at 0.078 GPU-hours per
+decision, a tenth of fully fine-tuning every candidate (0.784 GPU-hours, 0.0003 when chosen by best
+validation), against 0.0012 for H-score alone; the early leader reaches 0.0006 at 3 epochs, and the
+override's best point, 0.0005 at 5 epochs, lies within the others' intervals. On NLP the override
+rule is never on the frontier: it keeps H-score's choice when the margin is not cleared, and its
+regret stays above the early leader's at every budget (1.61 against 0.97 points at 3 epochs); the
+frontier is H-score, the early leader at 1 and 3 epochs and successive halving. On Quick-Tune the
+override equals the early leader from 2 epochs on, because H-score's choice is always far behind,
+and the early leader and successive halving share the frontier (1.06 points at 10 epochs, 2.51 for
+halving at similar compute). What the rule adds is the warning: with abstention, the decisions it
+follows have the lowest regret (0.0003 AUC on 12 of 21 at 2 epochs on StudentBERT, 0.50 points on 24
+of 90 at 3 epochs on NLP), at partial coverage, and on Quick-Tune it follows almost none (0 to 6 of
+90; regret prints as nan where none is followed). On StudentBERT every method gets worse beyond
+about 5 epochs (the early leader 0.0021 at 10 epochs, halving 0.0013 when started at 5), the
+non-monotonicity of 12.24. StudentBERT is retrospective, NLP is truncated at 3 epochs, and
+Quick-Tune's outcome shares its curves with the methods' trajectories, so its regret at 50 epochs is
+zero by construction._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
