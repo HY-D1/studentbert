@@ -2713,6 +2713,160 @@ about 5 epochs (the early leader 0.0021 at 10 epochs, halving 0.0013 when starte
 non-monotonicity of 12.24. StudentBERT is retrospective, NLP is truncated at 3 epochs, and
 Quick-Tune's outcome shares its curves with the methods' trajectories, so its regret at 50 epochs is
 zero by construction._
+### 12.28 Selective trust in the static recommendation: coverage, compute and transfer (analysis/selective_trust.py, commit b90163f, job 11951748)
+
+Task: Prof. Hazra (Nov 2026), for Paper C: the promising part of the rule is the warning, or
+selective-trust, signal. She asked when the static (H-score) recommendation can be trusted, when to
+abstain or keep evaluating, how much compute that decision needs, and whether one common threshold
+transfers across domains or each domain needs its own budget, with the early leader and successive
+halving (12.27) as the multi-fidelity comparisons. docs/selective_trust_design.md (commit c8ca7dd)
+and its amendments 1 (882de48: area, ties, pooling, budget rule, intervals, references) and 2
+(992bd44: an equal-domain-weight sensitivity analysis of the transfer test) were committed before
+analysis/selective_trust.py (b90163f), which was not run on real data before this job; its tests use
+synthetic decisions. Evidence classes: the rule at t = 0 was known before (12.17, 12.20, 12.27) and
+is reproduced exactly, decision by decision and in every 12.27 warning row (the run stops
+otherwise); the threshold family, the normalized units, the area, the transfer test and its
+sensitivity analysis, the budget question and the reference points are pre-specified. Decisions and
+costs are those of 12.27, loaded by its code: 21 on StudentBERT, 90 on NLP (curves to epoch 3) and
+90 on Quick-Tune micro. Compute per decision is frozen scoring plus k epochs of every candidate;
+Quick-Tune's scoring stays off the fine-tuning axis, so its trust-all row shows 0.000 GPU-hours
+where 12.27's static row shows 0.040, and the share of full compute divides by fine-tuning alone, so
+StudentBERT's share at 20 epochs is 1.010.
+
+Files (md5): selective_trust_design.md f63bfdc6bc0df97a97fb2fc97ef0eddd,
+selective_trust_amendment_1.md de8a55b63b442dd2d1f28bb7bb2c1c9e, selective_trust_amendment_2.md
+e8c9ae36be77cfb3fd887b1a6f0a82f2, selective_trust.py 561f9d471f9df4686c35bf6f5c7129a0,
+test_selective_trust.py 38cbc5781baa722f080d80fe7610d98a, regret_compute.py
+fd4288700ffd9af74fe92911371935ae, selective_trust_report.md 6d8abb21cfb3fea5ea23b1c9bd3a7ee3,
+selective_trust.tsv afde26b12e7cf0a30472b35febc94e65, trajectories.tsv
+e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7,
+tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa, tg1_task2_kt_algebra2006.jsonl
+d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl 5823dd2999f96921409b9cce5272d924,
+tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff, tg1_task2_kt_bridge2006.jsonl
+38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl 59096f8a8941896c18ca60515ffdd9f2,
+tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0, nlp_head_pairs.tsv
+d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1,
+p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, task4_scores.jsonl
+9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl 20c403eb43ade91bac987af41538299e,
+task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220, qt_scores.jsonl
+b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e.
+selective_trust.tsv holds the full grid (domain, budget and threshold: coverage, selective regret
+raw and normalized, compute), 741 rows.
+
+Report as written by analysis/selective_trust.py (headings lowered two levels):
+
+
+Evidence classes: the rule at t = 0 (trust the static choice unless another candidate is strictly ahead) was known before (RESULTS.md 12.17, 12.20 and 12.27) and is reproduced here exactly, decision by decision and in every 12.27 "warning, abstain" row. The threshold family, the normalized units, the area, the leave-one-domain-out transfer and its equal-domain-weight sensitivity analysis, the budget question and the reference points are pre-specified in docs/selective_trust_design.md (commit c8ca7dd), amendment 1 (commit 882de48) and amendment 2, committed before this script. The script was not run on real data before this run (the inputs are on the cluster only); its tests use synthetic decisions. Static choice: H-score (shrunk H-score on Quick-Tune). Signal: the normalized lead L (the static choice's validation score minus the best other candidate's, over the spread of all candidates at epoch k; 0 when the spread is 0); trust when L >= t, t from -1.00 to 1.00 in steps of 0.05. Normalized regret: regret over the domain's mean regret of a random candidate. Targets: normalized selective regret at most 0.10, coverage at least 0.50. Intervals: 95% cluster bootstrap over targets or tasks, 10,000 resamples, random.Random(0).
+
+Inputs: trajectories.tsv e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7, tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa, tg1_task2_kt_algebra2006.jsonl d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl 5823dd2999f96921409b9cce5272d924, tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff, tg1_task2_kt_bridge2006.jsonl 38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl 59096f8a8941896c18ca60515ffdd9f2, tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0, nlp_head_pairs.tsv d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1, p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, task4_scores.jsonl 9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl 20c403eb43ade91bac987af41538299e, task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220, qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e. Design files: selective_trust_design.md f63bfdc6bc0df97a97fb2fc97ef0eddd, selective_trust_amendment_1.md de8a55b63b442dd2d1f28bb7bb2c1c9e, selective_trust_amendment_2.md e8c9ae36be77cfb3fd887b1a6f0a82f2. regret_compute.py fd4288700ffd9af74fe92911371935ae.
+
+#### studentbert (test AUC)
+
+21 decisions. Mean regret of a random candidate (the normalizer): 0.007540 test AUC. Fine-tuning every candidate fully: 0.784 GPU-h per decision.
+
+At t = 0 (the common fixed rule) at each budget, with the area under the normalized selective-regret curve over all thresholds and the multi-fidelity references of 12.27 at the nearest compute (method setting: mean regret at GPU-h).
+
+| budget | compute per decision (GPU-h) | share of full compute | trusted, coverage [95% CI] | selective regret [95% CI] | normalized [95% CI] | area (from coverage) | early leader | successive halving | successive halving (factor 3) |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 (trust all) | 0.008 | 0.010 | 21/21, 1.000 [1.000, 1.000] | 0.0012 [0.0002, 0.0023] | 0.164 [0.033, 0.301] | n/a | epoch 1: 0.0031 at 0.039 | start 1: 0.0007 at 0.078 | start 1: 0.0008 at 0.068 |
+| epoch 1 | 0.047 | 0.060 | 17/21, 0.810 [0.619, 0.952] | 0.0009 [0.0001, 0.0018] | 0.122 [0.012, 0.244] | 0.080 (from 0.048) | epoch 1: 0.0031 at 0.039 | start 1: 0.0007 at 0.078 | start 1: 0.0008 at 0.068 |
+| epoch 2 | 0.086 | 0.110 | 12/21, 0.571 [0.238, 0.857] | 0.0003 [0.0000, 0.0008] | 0.037 [0.000, 0.100] | 0.056 (from 0.048) | epoch 2: 0.0010 at 0.078 | start 1: 0.0007 at 0.078 | start 1: 0.0008 at 0.068 |
+| epoch 3 | 0.125 | 0.160 | 12/21, 0.571 [0.238, 0.857] | 0.0009 [0.0000, 0.0024] | 0.120 [0.000, 0.322] | 0.098 (from 0.048) | epoch 3: 0.0006 at 0.118 | start 2: 0.0007 at 0.157 | start 2: 0.0014 at 0.138 |
+| epoch 5 | 0.204 | 0.260 | 10/21, 0.476 [0.143, 0.857] | 0.0010 [0.0000, 0.0026] | 0.137 [0.000, 0.343] | 0.099 (from 0.048) | epoch 5: 0.0006 at 0.196 | start 2: 0.0007 at 0.157 | start 2: 0.0014 at 0.138 |
+| epoch 10 | 0.400 | 0.510 | 5/21, 0.238 [0.048, 0.476] | 0.0007 [0.0000, 0.0017] | 0.092 [0.000, 0.229] | 0.181 (from 0.048) | epoch 10: 0.0021 at 0.392 | start 5: 0.0013 at 0.394 | start 5: 0.0009 at 0.344 |
+| epoch 20 | 0.792 | 1.010 | 10/21, 0.476 [0.190, 0.762] | 0.0009 [0.0000, 0.0019] | 0.115 [0.006, 0.248] | 0.112 (from 0.048) | epoch 20: 0.0017 at 0.784 | start 5: 0.0013 at 0.394 | start 5: 0.0009 at 0.344 |
+
+#### nlp (points)
+
+90 decisions. Mean regret of a random candidate (the normalizer): 3.3633 points. NLP curves stop at epoch 3, so there is no full-compute share.
+
+At t = 0 (the common fixed rule) at each budget, with the area under the normalized selective-regret curve over all thresholds and the multi-fidelity references of 12.27 at the nearest compute (method setting: mean regret at GPU-h).
+
+| budget | compute per decision (GPU-h) | share of full compute | trusted, coverage [95% CI] | selective regret [95% CI] | normalized [95% CI] | area (from coverage) | early leader | successive halving | successive halving (factor 3) |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 (trust all) | 0.029 | n/a | 90/90, 1.000 [1.000, 1.000] | 2.59 [1.00, 3.93] | 0.770 [0.296, 1.170] | n/a | epoch 1: 1.64 at 0.085 | rungs 1,2,3: 1.26 at 0.158 | rungs 1,2,3: 1.62 at 0.121 |
+| epoch 1 | 0.115 | n/a | 25/90, 0.278 [0.078, 0.533] | 0.70 [0.00, 2.08] | 0.208 [0.000, 0.620] | 0.472 (from 0.011) | epoch 1: 1.64 at 0.085 | rungs 1,2,3: 1.26 at 0.158 | rungs 1,2,3: 1.62 at 0.121 |
+| epoch 2 | 0.199 | n/a | 20/90, 0.222 [0.089, 0.444] | 0.90 [0.00, 3.45] | 0.269 [0.000, 1.026] | 0.526 (from 0.011) | epoch 2: 1.50 at 0.169 | rungs 1,2,3: 1.26 at 0.158 | rungs 1,2,3: 1.62 at 0.121 |
+| epoch 3 | 0.283 | n/a | 24/90, 0.267 [0.067, 0.522] | 0.50 [0.00, 1.56] | 0.149 [0.000, 0.465] | 0.424 (from 0.022) | epoch 3: 0.97 at 0.253 | rungs 1,2,3: 1.26 at 0.158 | rungs 1,2,3: 1.62 at 0.121 |
+
+#### quicktune (top-1 points)
+
+90 decisions. Mean regret of a random candidate (the normalizer): 43.7596 top-1 points. Fine-tuning every candidate fully: 4.946 GPU-h per decision.
+
+At t = 0 (the common fixed rule) at each budget, with the area under the normalized selective-regret curve over all thresholds and the multi-fidelity references of 12.27 at the nearest compute (method setting: mean regret at GPU-h).
+
+| budget | compute per decision (GPU-h) | share of full compute | trusted, coverage [95% CI] | selective regret [95% CI] | normalized [95% CI] | area (from coverage) | early leader | successive halving | successive halving (factor 3) |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 (trust all) | 0.000 | 0.000 | 90/90, 1.000 [1.000, 1.000] | 40.56 [30.41, 51.01] | 0.927 [0.695, 1.166] | n/a | epoch 1: 33.58 at 0.094 | start 1: 9.30 at 0.417 | start 1: 11.65 at 0.287 |
+| epoch 1 | 0.094 | 0.019 | 3/90, 0.033 [0.000, 0.100] | 16.56 [16.56, 16.56] | 0.378 [0.378, 0.378] | 0.815 (from 0.033) | epoch 1: 33.58 at 0.094 | start 1: 9.30 at 0.417 | start 1: 11.65 at 0.287 |
+| epoch 2 | 0.189 | 0.038 | 0/90, 0.000 [0.000, 0.000] | n/a | n/a | 0.710 (from 0.033) | epoch 2: 15.18 at 0.189 | start 1: 9.30 at 0.417 | start 1: 11.65 at 0.287 |
+| epoch 3 | 0.283 | 0.057 | 0/90, 0.000 [0.000, 0.000] | n/a | n/a | 0.571 (from 0.033) | epoch 3: 13.20 at 0.283 | start 1: 9.30 at 0.417 | start 1: 11.65 at 0.287 |
+| epoch 5 | 0.474 | 0.096 | 3/90, 0.033 [0.000, 0.100] | 0.00 [0.00, 0.00] | 0.000 [0.000, 0.000] | 0.520 (from 0.033) | epoch 5: 9.79 at 0.474 | start 1: 9.30 at 0.417 | start 2: 4.28 at 0.657 |
+| epoch 10 | 0.953 | 0.193 | 6/90, 0.067 [0.000, 0.167] | 0.00 [0.00, 0.00] | 0.000 [0.000, 0.000] | 0.438 (from 0.033) | epoch 10: 1.06 at 0.953 | start 2: 2.51 at 0.932 | start 3: 3.43 at 0.987 |
+| epoch 20 | 1.911 | 0.386 | 6/90, 0.067 [0.000, 0.167] | 0.00 [0.00, 0.00] | 0.000 [0.000, 0.000] | 0.423 (from 0.067) | epoch 20: 1.08 at 1.911 | start 3: 2.67 at 1.459 | start 3: 3.43 at 0.987 |
+| epoch 30 | 2.901 | 0.587 | 6/90, 0.067 [0.000, 0.167] | 0.00 [0.00, 0.00] | 0.000 [0.000, 0.000] | 0.428 (from 0.033) | epoch 30: 0.25 at 2.901 | start 3: 2.67 at 1.459 | start 3: 3.43 at 0.987 |
+| epoch 40 | 3.923 | 0.793 | 6/90, 0.067 [0.000, 0.167] | 0.00 [0.00, 0.00] | 0.000 [0.000, 0.000] | 0.416 (from 0.033) | epoch 40: 0.02 at 3.923 | start 3: 2.67 at 1.459 | start 3: 3.43 at 0.987 |
+| epoch 50 | 4.946 | 1.000 | 6/90, 0.067 [0.000, 0.167] | 0.00 [0.00, 0.00] | 0.000 [0.000, 0.000] | 0.433 (from 0.033) | epoch 50: 0.00 at 4.946 | start 3: 2.67 at 1.459 | start 3: 3.43 at 0.987 |
+
+#### Leave-one-domain-out threshold transfer (k = 1, 2, 3)
+
+The threshold is chosen on the two other domains (the highest pooled coverage with pooled normalized selective regret at most 0.10; ties to the largest t of the band) and applied to the held-out domain, beside the held-out domain's own best threshold under the same target. Primary rule: the source domains pooled by decision (amendment 1). Sensitivity analysis (amendment 2): each source domain weighted equally, coverage above zero required in both. "none": no threshold qualifies.
+
+| budget | held out | rule | source threshold [band] | source coverage, normalized regret | held-out trusted, coverage [95% CI] | held-out normalized regret [95% CI] | at the band's smallest t: coverage, normalized regret | own best threshold [band] | own trusted, coverage [95% CI] | own normalized regret [95% CI] |
+|---|---|---|---|---|---|---|---|---|---|---|
+| epoch 1 | studentbert | primary (by decision) | 0.30 [0.30, 0.30] | 0.011, 0.000 | 6/21, 0.286 [0.095, 0.476] | 0.050 [0.000, 0.149] | 6/21, 0.286 [0.095, 0.476]; 0.050 [0.000, 0.149] | 0.20 [0.20, 0.20] | 9/21, 0.429 [0.190, 0.667] | 0.085 [0.012, 0.235] |
+| epoch 1 | studentbert | sensitivity analysis (equal domain weight) | none | n/a | n/a | n/a | n/a | 0.20 [0.20, 0.20] | 9/21, 0.429 [0.190, 0.667] | 0.085 [0.012, 0.235] |
+| epoch 1 | nlp | primary (by decision) | 0.20 [0.20, 0.20] | 0.081, 0.085 | 7/90, 0.078 [0.022, 0.133] | 0.352 [0.000, 0.639] | 7/90, 0.078 [0.022, 0.133]; 0.352 [0.000, 0.639] | 0.30 [0.30, 0.30] | 2/90, 0.022 [0.000, 0.067] | 0.000 [0.000, 0.000] |
+| epoch 1 | nlp | sensitivity analysis (equal domain weight) | none | n/a | n/a | n/a | n/a | 0.30 [0.30, 0.30] | 2/90, 0.022 [0.000, 0.067] | 0.000 [0.000, 0.000] |
+| epoch 1 | quicktune | primary (by decision) | 0.30 [0.30, 0.30] | 0.072, 0.037 | 0/90, 0.000 [0.000, 0.000] | n/a | 0/90, 0.000 [0.000, 0.000]; n/a | none | n/a | n/a |
+| epoch 1 | quicktune | sensitivity analysis (equal domain weight) | 0.30 [0.30, 0.30] | 0.154, 0.025 | 0/90, 0.000 [0.000, 0.000] | n/a | 0/90, 0.000 [0.000, 0.000]; n/a | none | n/a | n/a |
+| epoch 2 | studentbert | primary (by decision) | 0.30 [0.25, 0.30] | 0.017, 0.000 | 4/21, 0.190 [0.000, 0.476] | 0.017 [0.000, 0.070] | 5/21, 0.238 [0.000, 0.524]; 0.028 [0.000, 0.070] | -0.10 [-0.25, -0.10] | 17/21, 0.810 [0.524, 1.000] | 0.099 [0.012, 0.217] |
+| epoch 2 | studentbert | sensitivity analysis (equal domain weight) | none | n/a | n/a | n/a | n/a | -0.10 [-0.25, -0.10] | 17/21, 0.810 [0.524, 1.000] | 0.099 [0.012, 0.217] |
+| epoch 2 | nlp | primary (by decision) | -0.10 [-0.25, -0.10] | 0.153, 0.099 | 29/90, 0.322 [0.200, 0.522] | 0.473 [0.084, 1.215] | 46/90, 0.511 [0.356, 0.733]; 0.534 [0.165, 1.089] | 0.30 [0.25, 0.30] | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] |
+| epoch 2 | nlp | sensitivity analysis (equal domain weight) | none | n/a | n/a | n/a | n/a | 0.30 [0.25, 0.30] | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] |
+| epoch 2 | quicktune | primary (by decision) | 0.25 [0.25, 0.25] | 0.072, 0.017 | 0/90, 0.000 [0.000, 0.000] | n/a | 0/90, 0.000 [0.000, 0.000]; n/a | -0.40 [-0.45, -0.40] | 3/90, 0.033 [0.000, 0.100] | 0.057 [0.057, 0.057] |
+| epoch 2 | quicktune | sensitivity analysis (equal domain weight) | 0.25 [0.25, 0.25] | 0.136, 0.014 | 0/90, 0.000 [0.000, 0.000] | n/a | 0/90, 0.000 [0.000, 0.000]; n/a | -0.40 [-0.45, -0.40] | 3/90, 0.033 [0.000, 0.100] | 0.057 [0.057, 0.057] |
+| epoch 3 | studentbert | primary (by decision) | 0.10 [0.10, 0.10] | 0.094, 0.075 | 8/21, 0.381 [0.095, 0.714] | 0.171 [0.000, 0.685] | 8/21, 0.381 [0.095, 0.714]; 0.171 [0.000, 0.685] | 0.15 [0.15, 0.15] | 5/21, 0.238 [0.000, 0.571] | 0.000 [0.000, 0.000] |
+| epoch 3 | studentbert | sensitivity analysis (equal domain weight) | none | n/a | n/a | n/a | n/a | 0.15 [0.15, 0.15] | 5/21, 0.238 [0.000, 0.571] | 0.000 [0.000, 0.000] |
+| epoch 3 | nlp | primary (by decision) | 0.15 [0.15, 0.15] | 0.045, 0.000 | 13/90, 0.144 [0.044, 0.300] | 0.098 [0.000, 0.479] | 13/90, 0.144 [0.044, 0.300]; 0.098 [0.000, 0.479] | 0.10 [0.10, 0.10] | 17/90, 0.189 [0.044, 0.411] | 0.075 [0.000, 0.479] |
+| epoch 3 | nlp | sensitivity analysis (equal domain weight) | -0.35 [-0.35, -0.35] | 0.493, 0.076 | 54/90, 0.600 [0.378, 0.822] | 0.570 [0.227, 1.104] | 54/90, 0.600 [0.378, 0.822]; 0.570 [0.227, 1.104] | 0.10 [0.10, 0.10] | 17/90, 0.189 [0.044, 0.411] | 0.075 [0.000, 0.479] |
+| epoch 3 | quicktune | primary (by decision) | 0.15 [0.15, 0.15] | 0.162, 0.071 | 0/90, 0.000 [0.000, 0.000] | n/a | 0/90, 0.000 [0.000, 0.000]; n/a | -0.30 [-0.35, -0.30] | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] |
+| epoch 3 | quicktune | sensitivity analysis (equal domain weight) | 0.15 [0.15, 0.15] | 0.191, 0.049 | 0/90, 0.000 [0.000, 0.000] | n/a | 0/90, 0.000 [0.000, 0.000]; n/a | -0.30 [-0.35, -0.30] | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] |
+
+#### The domain-specific budget
+
+Per domain, the smallest budget (k = 0, trusting every decision, checked first) at which some threshold reaches normalized selective regret at most 0.10 with coverage at least 0.50, with the highest-coverage such threshold (ties to the largest t).
+
+| domain | smallest budget | threshold [band] | trusted, coverage [95% CI] | normalized selective regret [95% CI] | compute per decision (GPU-h) | share of full compute |
+|---|---|---|---|---|---|---|
+| studentbert | epoch 2 | -0.10 [-0.25, -0.10] | 17/21, 0.810 [0.524, 1.000] | 0.099 [0.012, 0.217] | 0.086 | 0.110 |
+| nlp | not reached | n/a | n/a | n/a | n/a | n/a |
+| quicktune | not reached | n/a | n/a | n/a | n/a | n/a |
+
+Limitations: StudentBERT is retrospective; NLP stops at epoch 3; Quick-Tune's outcome shares its curves with the signal, so its selective regret at 50 epochs is zero by construction; the t = 0 results were known before. Quick-Tune's frozen scoring (H200) is off the fine-tuning compute axis, as in 12.27.
+
+Files: selective_trust.tsv afde26b12e7cf0a30472b35febc94e65
+
+_Read: in these data no single threshold carries across domains, and only one domain reaches the
+targets within its budgets. At t = 0, StudentBERT trusts 17/21 decisions at 1 epoch (normalized
+selective regret 0.122) and 12/21 at 2 epochs (0.037), NLP trusts 20/90 to 25/90 (0.149 to 0.269),
+and Quick-Tune at most 6/90. Only StudentBERT meets the pre-specified targets (normalized selective
+regret at most 0.10 with coverage at least 0.50): at 2 epochs with t = -0.10 it trusts 17/21 at
+0.099 [0.012, 0.217], for 0.086 GPU-hours per decision, 0.110 of fully fine-tuning every candidate;
+the point sits at the target and its interval spans it. NLP, whose curves stop at 3 epochs, and
+Quick-Tune, up to 50, do not reach the targets. A threshold chosen on the two other domains misses
+on the held-out one: held-out Quick-Tune trusts 0/90 at every shared budget; held-out NLP has
+normalized selective regret 0.352 and 0.473 at 1 and 2 epochs and 0.098 on 13/90 at 3; held-out
+StudentBERT stays under the target at 1 and 2 epochs (0.050 and 0.017) but trusts fewer decisions
+than its own best threshold (6/21 against 9/21, 4/21 against 17/21), and has 0.171 at 3 epochs. The
+equal-domain-weight sensitivity analysis finds no qualifying threshold in 5 of the 9 cases; where it
+differs from the primary rule (NLP held out at 3 epochs, t = -0.35), the held-out regret is 0.570.
+At StudentBERT's operating point the multi-fidelity references choose on every decision at similar
+compute (the early leader 0.0010 AUC at 0.078 GPU-hours, successive halving 0.0007 at 0.078, against
+a normalizer of 0.007540), so at that compute selective trust is not shown to beat successive
+halving on regret; what it adds is knowing which decisions to evaluate further. Intervals are wide
+(7 StudentBERT targets, 5 NLP tasks). StudentBERT is retrospective, NLP stops at 3 epochs,
+Quick-Tune's outcome shares its curves with the signal, and the t = 0 results were known before._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 

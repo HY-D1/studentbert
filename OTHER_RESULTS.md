@@ -1,6 +1,6 @@
 # Other papers (Paper A, LAK, TLT): sections outside Papers B and C
 
-Generated from RESULTS.md (md5 99ed91735c97c5ead1002b774d9c7a0c) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
+Generated from RESULTS.md (md5 eeeb20becddcab752782e7f64e505fe5) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
 
 - 1: 6cbefe62839a6584fd0fe22184804b29
 - 1.1: dd4d8bd7185a656b88f805284d1d9ddf
