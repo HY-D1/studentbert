@@ -1,0 +1,682 @@
+# Other papers (Paper A, LAK, TLT): sections outside Papers B and C
+
+Generated from RESULTS.md (md5 99ed91735c97c5ead1002b774d9c7a0c) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
+
+- 1: 6cbefe62839a6584fd0fe22184804b29
+- 1.1: dd4d8bd7185a656b88f805284d1d9ddf
+- 2: 05cf52be1ee9aab2b1006a6260876f84
+- 2.1: 38b7d6c369daced45af1b841f744bac0
+- 2.2: e12e8813515cf63f01652f29bbd2b990
+- 3: 64b4ae6ddaf2e0334a1924f2f2ce1d0e
+- 3.1: 0d23881400ac88a01ae1f55478ed6e29
+- 3.2: a4b4934446f9a41124372a9def75bddf
+- 3.3: 332dd6891cc1bfcf8b8409c279dca46a
+- 4: e76ce0979236d8395af51dd2b866c257
+- 5: 03db38e6e5c1db3973fe88507f9e9b4b
+- 6: bb604112198cb8eadabbfd72225b66e1
+- 6.1: a8fbf9cea16d2edc5c32793dfa3d06ff
+- 6.2: 04b6bc4a2834a2260235b0d68777f16a
+- 7: 20ce5944a64fdfe5aeb7ec6dba176597
+- 8: 56661725a37010deb55067ad648532a5
+- 8.1: ec070cab990f87cf344397ea4640be75
+- 8.2: 217c539008c401da79848722179e2d33
+- 9: 001d7f796924c22c1e5ba69b2a7d06f9
+- 10: c826dccc0aaaa8068c37b25ca875ae96
+- 11: 653fe9217873cd5723f24a6aac26f52e
+- 11.1: ab948da478cf648b544f594e282e941c
+- 12.2: cfb8a894a27caed48851d69e0ab2ffca
+
+---
+
+## 1. Baseline table (7 datasets) 
+
+HAND-PATCHED 2026-09-05 by tools/patches/patch_results_base2.py. `collect_all_results.py` does NOT regenerate this section and WILL overwrite it. Update the collector before running it again, or re-apply this patch afterwards.
+
+Knowledge-tracing test AUC, mean over 6 seeds (42, 1, 2, 3, 4, 5), parsed from logs. Baselines come from the `base2_` campaign: one run per log, budget matched to the EduBERT row on that dataset (ASSIST2017 its full 1,366 training students, EdNet 20,000, Junyi 40,000, other four `--n_students 100000` which is their full split), 30 epochs, best checkpoint by validation. EduBERT-pretrained is in-domain for the original 3 and the EdNet-source full-objective encoder for the 4 newer sets. Final column is pretrained minus scratch paired by seed, 20,000-resample bootstrap CI, then seeds in the direction of the mean.
+
+| Dataset | DKT | AKT | SAINT+ | scratch | EduBERT-pt | pt - scratch (95% CI) |
+|---|---|---|---|---|---|---|
+| ASSIST2017 | **0.6974** | 0.6519 | 0.6290 | 0.6697 | 0.6927 | +0.0231 [+0.0220,+0.0239] 6/6 |
+| EdNet | 0.6799 | 0.6721 | **0.6860** | 0.6777 | 0.6846 | +0.0070 [+0.0066,+0.0075] 6/6 |
+| Junyi | 0.7586 | 0.7534 | **0.7985** | 0.7572 | 0.7581 | +0.0010 [+0.0008,+0.0012] 6/6 |
+| Algebra2005 | 0.7985 | 0.7756 | **0.8265** | 0.7806 | 0.7873 | +0.0067 [-0.0033,+0.0229] 2/6 |
+| Bridge2006 | 0.7946 | 0.7731 | **0.8534** | 0.7733 | 0.7752 | +0.0018 [+0.0003,+0.0034] 4/6 |
+| ASSIST2009 | **0.8762** | 0.8625 | 0.8406 | 0.8698 | 0.8699 | +0.0001 [-0.0011,+0.0016] 3/6 |
+| Algebra2006 | 0.8028 | 0.7741 | **0.8748** | 0.7867 | 0.7897 | +0.0029 [+0.0016,+0.0044] 6/6 |
+
+_Read: bold is the highest AUC in the row. SAINT+ is highest on 5 of 7, DKT on 2, EduBERT-pretrained on 0. Pretrained beats scratch on all 7 but only 5 of 7 intervals exclude zero: Algebra2005 (2/6 seeds, scratch pstdev 0.0144) and ASSIST2009 do not. AKT is lowest on 5 of 7, and SAINT+ is lowest on ASSIST2017 and ASSIST2009. CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): five cells recomputed from per-seed W&B values at full precision (EdNet AKT and gain, Junyi SAINT+, Bridge2006 DKT, ASSIST2009 DKT, Algebra2006 scratch), and the AKT count corrected from 6 to 5. Target budgets differ by row, so rows are comparable within themselves and not with each other. SUPERSEDES the earlier recorded table, in which DKT on ASSIST2017 read 0.690 against a measured 0.6974; that error flipped which model leads the row._
+
+**Agreement with the earlier 3-seed cross-check:** the 12 cells it covered (DKT/AKT/scratch on the 4 newer datasets) reproduce here to within 0.0009, so the two campaigns agree and `base2_` is preferred only because it is 6 seeds, budget matched, and one run per log.
+
+**SAINT+ leakage check, not assumed:** `src/models/saint_plus.py` lines 79-80 build the decoder response stream as START at position 0 and correct[t-1] at position t, with causal masks on encoder, decoder target and memory, so no position sees its own answer.
+
+**SAINT+ response-time caveat (read from `src/models/saint_plus.py`, 2026-09-30):** the leakage check above covers the answer only. The response-time bin is added to the encoder input unshifted (line 74) and the causal mask admits the diagonal, so the timing of the response being predicted is in scope for its own prediction. DKT and AKT do not read the time bin, and EduBERT predicts step t+1 from position t, so none of them sees the target step's timing. The size of the effect on the SAINT+ cells has not been measured.
+
+**Epoch budget per column (log check 2026-09-30, 6 completed logs per condition):** DKT, AKT and SAINT+ `base2_<model>_<ds>` 30 epochs on all 7. scratch and EduBERT-pt: assist2017 `kt_assist_{scratch,indomain}_n3000` 20 epochs at 1,366 train students (the 3,000 request exceeds the split); ednet and junyi `w7_ktfull_<ds>_{scratch,indomain}` 20 epochs; the 4 newer datasets `w8_scratch_<ds>` and `w8_{algabl,bridgeabl,a09abl,alg06abl}_full` 30 epochs. `w7_ktfull_ednet_scratch` seed 42 also has an empty log (job 8176342, 0 epochs) superseded by job 8176348. Superseded campaigns that feed no cell: `w6_akt_baseline` (AKT, assist2017, 100 epochs, seeds 42, 1 and 2, three runs in one log) and `dktclean` (DKT, assist2017, 20 epochs, one run, no --seed).
+
+### 1.1 SAINT+ per-seed KT test AUC, base2 campaign (logs + W&B full precision)
+
+Runs `base2_saint_<ds>_seed{42,1,2,3,4,5}`: 42 of 42 completed, one completed log per seed (43 logs found; the extra one is an attempt that ended before logging). Every run trained 30 epochs (30 epoch lines in each log; W&B config epochs=30, dropout 0.1, batch_size 64). Values are W&B `test/auc` matched by run id, never by name, rounded once to 4 dp; each agrees with its log banner within 5e-5. Mean and population SD from the unrounded values. Produced by `analysis/saint_base2_table.py` (exit 0, 2026-09-30).
+
+| Dataset | s42 | s1 | s2 | s3 | s4 | s5 | mean ±pstdev |
+|---|---|---|---|---|---|---|---|
+| assist2017 | 0.6286 | 0.6290 | 0.6275 | 0.6322 | 0.6274 | 0.6293 | 0.6290 ±0.0016 |
+| ednet | 0.6863 | 0.6867 | 0.6850 | 0.6857 | 0.6863 | 0.6859 | 0.6860 ±0.0005 |
+| junyi | 0.7985 | 0.7983 | 0.7994 | 0.7983 | 0.7983 | 0.7979 | 0.7985 ±0.0005 |
+| algebra2005 | 0.8420 | 0.8369 | 0.8391 | 0.8270 | 0.7800 | 0.8340 | 0.8265 ±0.0213 |
+| bridge2006 | 0.8521 | 0.8552 | 0.8531 | 0.8544 | 0.8547 | 0.8510 | 0.8534 ±0.0015 |
+| assist2009 | 0.8363 | 0.8423 | 0.8413 | 0.8416 | 0.8409 | 0.8411 | 0.8406 ±0.0019 |
+| algebra2006 | 0.8762 | 0.8741 | 0.8760 | 0.8748 | 0.8741 | 0.8734 | 0.8748 ±0.0010 |
+
+Model and training (`scripts/train_baseline.py` line 206, `src/models/saint_plus.py`): encoder-decoder transformer, 2 encoder and 2 decoder layers, d_model 256, 8 heads, d_ff 1,024, dropout 0.1, max_len 512; Adam lr 1e-3, batch 64, linear warm-up over the first 10% of steps then linear decay (`--warmup_frac` default 0.1, not overridden by `slurm/generators/gen_baselines_uniform.sh`, so it applies to DKT, AKT and SAINT+ alike); best checkpoint by validation AUC.
+
+_Read: every mean reproduces the SAINT+ column of section 1. Algebra2005 is the one high-variance cell (pstdev 0.0213): seed 4 at 0.7800 against 0.8270 to 0.8420 for the other five; excluding it gives 0.8358. Either value is above DKT on that row (0.7985). `slurm/run_saint_100.sbatch` (100 epochs, assist2017 only, run_type baseline) is a superseded campaign and feeds no cell._
+
+---
+## 2. Source comparison: scale > granularity  
+
+- **Central finding (parsed from logs, 6 seeds):** ranking cross-dataset sources by pretraining corpus size reproduces the observed transfer ordering on all 3 targets. Source sizes are TRAINING-SPLIT students, since pretraining reads the train split only: ASSIST 1,366, Junyi 49,153, EdNet 353,597. On the EdNet target, ASSIST (closest granularity, 102 skills vs 142) gives -0.0004 CI [-0.0016,+0.0009] 2/6, so it does not transfer at all, while Junyi (1,326 skills, far granularity) gives +0.0043 6/6. On the Junyi target ASSIST gives -0.0012 CI [-0.0020,-0.0001] 1/6, so there it costs accuracy. CAVEAT: for the ASSIST2017 target the N=3000 condition is its FULL training split, since 1,366 < 3000, so that column is not a reduced-data condition.
+- **Loss != transfer (parsed from pretrain logs):** best mlm_loss is EdNet 2.8784, Junyi 1.6294, ASSIST2017 1.1236, the exact inverse of the transfer ordering. CAVEAT: these losses are not directly comparable across datasets because the label spaces differ; chance-level skill loss ln(K+1) is 4.63 (ASSIST2017), 4.96 (EdNet), 7.19 (Junyi).
+- **Moderator:** sequence density (practice-per-skill) - see section 5.
+
+---
+### 2.1 Source comparison at N=3000, all 3 targets (KT test AUC, parsed from logs, 6 seeds)
+
+Runs `edubert_<target>_kt_<t>_{scratch|indomain|fromednet|fromjunyi|fromassist}_n3000_seed{42,1,2,3,4,5}`, mean ±pstdev, then the gain vs scratch paired by seed with a 20,000-resample bootstrap CI and the count of seeds with a positive gain. SUPERSEDES the earlier 3-seed table. CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): means, gains and intervals recomputed at full precision with the same bootstrap; four cells moved by 0.0001, and the count column holds positive seeds, as the two negative rows always did.
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 | 0.6697 ±0.0008 | 0.6927 ±0.0018 (+0.0231 [+0.0220,+0.0239] 6/6) | 0.6957 ±0.0021 (+0.0261 [+0.0251,+0.0274] 6/6) | 0.6910 ±0.0016 (+0.0214 [+0.0196,+0.0231] 6/6) | (=indomain) |
+| ednet | 0.6644 ±0.0014 | 0.6732 ±0.0007 (+0.0088 [+0.0076,+0.0099] 6/6) | (=indomain) | 0.6687 ±0.0010 (+0.0043 [+0.0032,+0.0053] 6/6) | 0.6640 ±0.0017 (-0.0004 [-0.0016,+0.0009] 2/6) |
+| junyi | 0.7352 ±0.0007 | 0.7394 ±0.0007 (+0.0042 [+0.0032,+0.0051] 6/6) | 0.7416 ±0.0004 (+0.0065 [+0.0057,+0.0072] 6/6) | (=indomain) | 0.7340 ±0.0009 (-0.0012 [-0.0020,-0.0001] 1/6) |
+
+Per-seed gains are in the inventory; recover them with `analysis/paired_bootstrap_pair.py --tsv run_inventory.tsv --metric test_auc --a <cond stem> --b <scratch stem>`.
+
+_Read: ranking cross-dataset sources by pretraining corpus size (training-split students: ASSIST 1,366, Junyi 49,153, EdNet 353,597) reproduces the observed ordering on all 3 targets. EdNet as a foreign source beats in-domain on both cross-domain targets with NON-OVERLAPPING intervals (assist2017 +0.0261 [+0.0251,+0.0274] vs +0.0231 [+0.0220,+0.0239]; junyi +0.0065 [+0.0057,+0.0072] vs +0.0042 [+0.0032,+0.0051]). On EdNet's own target in-domain leads (+0.0088). The granularity-closest source (ASSIST, 102 skills vs EdNet's 142) does NOT transfer on the EdNet target: -0.0004 with an interval spanning zero, 2/6 seeds, so write "fails to transfer", not "worse than scratch". On the Junyi target ASSIST is -0.0012 with an interval EXCLUDING zero, 1/6 seeds, so there it does cost accuracy. CAVEAT: for the assist2017 target, N=3000 is its FULL training split (1,366 < 3000), so that row is not a reduced-data condition._
+
+### 2.2 Source comparison at N=3000, next-skill macro-OVR AUC (parsed from logs, 6 seeds)
+
+Runs `edubert_<target>_ns_<t>_<cond>_n3000_seed{42,1,2,3,4,5}`, same budget and same sources as 2.1, second task. Same reporting format. CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): two interval ends recomputed at full precision.
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 (92 classes) | 0.9796 ±0.0002 | 0.9820 ±0.0002 (+0.0024 [+0.0021,+0.0026] 6/6) | 0.9815 ±0.0003 (+0.0019 [+0.0016,+0.0022] 6/6) | 0.9822 ±0.0002 (+0.0026 [+0.0023,+0.0028] 6/6) | - |
+| ednet (142 classes) | 0.8704 ±0.0007 | 0.8849 ±0.0007 (+0.0145 [+0.0143,+0.0147] 6/6) | - | 0.8752 ±0.0006 (+0.0047 [+0.0043,+0.0053] 6/6) | 0.8732 ±0.0005 (+0.0028 [+0.0024,+0.0034] 6/6) |
+| junyi (1326 classes) | 0.9883 ±0.0013 | 0.9912 ±0.0004 (+0.0029 [+0.0019,+0.0043] 6/6) | 0.9897 ±0.0002 (+0.0015 [+0.0004,+0.0028] 4/6) | - | 0.9900 ±0.0001 (+0.0018 [+0.0008,+0.0030] 6/6) |
+
+_Read: THE SCALE ORDERING OF 2.1 DOES NOT CARRY TO THIS TASK. It reproduces on the ednet target only (Junyi +0.0047 > ASSIST +0.0028). On assist2017 the smaller Junyi source beats the larger EdNet source (+0.0026 vs +0.0019), and on junyi the smallest source beats the largest (+0.0018 vs +0.0015, the latter 4/6 seeds). In-domain is also best on 2 of 3 targets here, so the foreign-beats-in-domain reversal of 2.1 does not reproduce either. Absolute values sit between 0.87 and 0.99, so read the ordering and not the magnitude. SCOPE both the scale claim and the foreign-beats-in-domain claim to KNOWLEDGE TRACING._
+
+## 3. Low-resource advantage & scale boundary  
+
+- **Scale boundary (parsed from logs, 6 seeds):** cross-dataset transfer gains are largest when the target is data-poor; at full target scale every cross-dataset gain falls to within noise of zero.
+- **Only survivor at full scale (parsed from logs):** in-domain EdNet KT at 20,000 target students, 0.6846 ±0.0004 against scratch 0.6777 ±0.0004, gain +0.0070 CI [+0.0066,+0.0075], 6/6 seeds, both n=6. CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): recomputed from per-seed W&B values at full precision (0.0069654); the 4 dp log values average to exactly 0.00695, which had been rounded to +0.0069.
+- **Takeaway:** cross-dataset pretraining is a low-resource tool. State the boundary plainly.
+
+### 3.1 Next-skill N-sweep, assist2017 target (parsed from logs)
+
+Source: `parse_nextskill_full.py` over `w5_nextskill_sweep_*.log` + `w5_nsauc_s*.log`. 144 raw run records dedup to 72 unique (cond, N, seed); nsauc runs preferred on overlap (EdNet 60 epochs at N<=50 for convergence fairness). 4 conditions x 6 N x 3 seeds (42, 1, 2), every cell n=3. macro_top1 not logged in this sweep: NOT FOUND (assist2017; macro_top1 exists only for the Junyi W7 run, section 8).
+
+**Test top-1 accuracy (mean ±std, n=3):**
+
+| Condition | N=25 | N=50 | N=100 | N=200 | N=500 | N=1000 |
+|---|---|---|---|---|---|---|
+| scratch | 0.6577 ±0.0186 | 0.7511 ±0.0034 | 0.7664 ±0.0006 | 0.7717 ±0.0006 | 0.7773 ±0.0008 | 0.7855 ±0.0001 |
+| indomain | 0.7498 ±0.0015 | 0.7651 ±0.0003 | 0.7727 ±0.0002 | 0.7784 ±0.0010 | 0.7887 ±0.0010 | 0.7975 ±0.0008 |
+| ednet | 0.6917 ±0.0455 | 0.7465 ±0.0138 | 0.7649 ±0.0057 | 0.7743 ±0.0030 | 0.7862 ±0.0017 | 0.7975 ±0.0016 |
+| junyi | 0.7435 ±0.0042 | 0.7627 ±0.0020 | 0.7729 ±0.0010 | 0.7794 ±0.0010 | 0.7910 ±0.0010 | 0.8000 ±0.0009 |
+
+**Test top-5 accuracy (mean ±std, n=3):**
+
+| Condition | N=25 | N=50 | N=100 | N=200 | N=500 | N=1000 |
+|---|---|---|---|---|---|---|
+| scratch | 0.7463 ±0.0134 | 0.8374 ±0.0015 | 0.8647 ±0.0011 | 0.8764 ±0.0004 | 0.8849 ±0.0015 | 0.8911 ±0.0008 |
+| indomain | 0.8505 ±0.0022 | 0.8706 ±0.0012 | 0.8790 ±0.0006 | 0.8852 ±0.0005 | 0.8911 ±0.0002 | 0.8958 ±0.0005 |
+| ednet | 0.7975 ±0.0317 | 0.8438 ±0.0087 | 0.8649 ±0.0051 | 0.8788 ±0.0021 | 0.8890 ±0.0016 | 0.8949 ±0.0000 |
+| junyi | 0.8369 ±0.0053 | 0.8635 ±0.0010 | 0.8751 ±0.0006 | 0.8836 ±0.0008 | 0.8909 ±0.0010 | 0.8961 ±0.0004 |
+
+**Test macro-OVR AUC (mean ±std, n=3):**
+
+| Condition | N=25 | N=50 | N=100 | N=200 | N=500 | N=1000 |
+|---|---|---|---|---|---|---|
+| scratch | 0.8547 ±0.0134 | 0.9327 ±0.0022 | 0.9562 ±0.0014 | 0.9670 ±0.0001 | 0.9734 ±0.0003 | 0.9773 ±0.0002 |
+| indomain | 0.9434 ±0.0020 | 0.9597 ±0.0006 | 0.9678 ±0.0006 | 0.9729 ±0.0003 | 0.9768 ±0.0002 | 0.9806 ±0.0001 |
+| ednet | 0.9003 ±0.0214 | 0.9408 ±0.0029 | 0.9571 ±0.0024 | 0.9691 ±0.0005 | 0.9761 ±0.0007 | 0.9800 ±0.0003 |
+| junyi | 0.9328 ±0.0049 | 0.9578 ±0.0013 | 0.9665 ±0.0003 | 0.9725 ±0.0004 | 0.9777 ±0.0003 | 0.9809 ±0.0003 |
+
+**Test weighted-OVR AUC (mean ±std, n=3):**
+
+| Condition | N=25 | N=50 | N=100 | N=200 | N=500 | N=1000 |
+|---|---|---|---|---|---|---|
+| scratch | 0.9170 ±0.0048 | 0.9586 ±0.0007 | 0.9686 ±0.0001 | 0.9729 ±0.0002 | 0.9766 ±0.0001 | 0.9793 ±0.0002 |
+| indomain | 0.9624 ±0.0012 | 0.9707 ±0.0001 | 0.9745 ±0.0002 | 0.9769 ±0.0002 | 0.9797 ±0.0001 | 0.9821 ±0.0001 |
+| ednet | 0.9417 ±0.0092 | 0.9615 ±0.0014 | 0.9697 ±0.0015 | 0.9747 ±0.0005 | 0.9789 ±0.0004 | 0.9818 ±0.0003 |
+| junyi | 0.9566 ±0.0023 | 0.9687 ±0.0004 | 0.9732 ±0.0004 | 0.9764 ±0.0001 | 0.9800 ±0.0000 | 0.9823 ±0.0001 |
+
+**Gap vs scratch (mean of per-seed means):**
+
+| Condition, metric | N=25 | N=50 | N=100 | N=200 | N=500 | N=1000 |
+|---|---|---|---|---|---|---|
+| indomain, top-1 | +0.0922 | +0.0140 | +0.0063 | +0.0067 | +0.0115 | +0.0120 |
+| ednet, top-1 | +0.0340 | -0.0046 | -0.0015 | +0.0027 | +0.0089 | +0.0120 |
+| junyi, top-1 | +0.0858 | +0.0116 | +0.0066 | +0.0077 | +0.0137 | +0.0145 |
+| indomain, macro AUC | +0.0887 | +0.0270 | +0.0116 | +0.0059 | +0.0035 | +0.0033 |
+| ednet, macro AUC | +0.0456 | +0.0081 | +0.0008 | +0.0022 | +0.0027 | +0.0027 |
+| junyi, macro AUC | +0.0781 | +0.0251 | +0.0103 | +0.0056 | +0.0043 | +0.0036 |
+
+Note: ednet at N=25 is high variance (top-1 std 0.0455). Full per-seed values: `nextskill_results_long.csv` / `nextskill_results_agg.csv` (gitignored, regenerable).
+
+---
+### 3.2 Paired-by-seed next-skill gaps, assist2017 target (top-1, recomputed from nextskill_results_long.csv)
+
+Same runs as 3.1, but each pretrained condition is differenced against scratch at the
+same N *within* a seed, since a seed fixes the target subsample (`first_n_students`
+draws per seed). Regenerate with `python3 analysis/paired_bootstrap_lak.py`.
+
+| N | condition | seeds | per-seed gaps | mean gap | 95% CI (paired boot) | +/n | sign-test p |
+|---|---|---|---|---|---|---|---|
+| 25 | ednet | 3 | -0.0058 +0.0225 +0.0852 | +0.0340 | [-0.0058, +0.0852] includes 0 | 2/3 | 0.500 |
+| 25 | indomain | 3 | +0.0765 +0.1195 +0.0804 | +0.0922 | [+0.0765, +0.1195] excludes 0 | 3/3 | 0.125 |
+| 25 | junyi | 3 | +0.0694 +0.1092 +0.0789 | +0.0858 | [+0.0694, +0.1092] excludes 0 | 3/3 | 0.125 |
+| 50 | ednet | 3 | -0.0091 -0.0170 +0.0122 | -0.0046 | [-0.0170, +0.0122] includes 0 | 1/3 | 0.875 |
+| 50 | indomain | 3 | +0.0102 +0.0178 +0.0139 | +0.0140 | [+0.0102, +0.0178] excludes 0 | 3/3 | 0.125 |
+| 50 | junyi | 3 | +0.0077 +0.0134 +0.0138 | +0.0116 | [+0.0077, +0.0138] excludes 0 | 3/3 | 0.125 |
+| 100 | ednet | 3 | -0.0046 -0.0064 +0.0064 | -0.0015 | [-0.0064, +0.0064] includes 0 | 1/3 | 0.875 |
+| 100 | indomain | 3 | +0.0067 +0.0058 +0.0064 | +0.0063 | [+0.0058, +0.0067] excludes 0 | 3/3 | 0.125 |
+| 100 | junyi | 3 | +0.0074 +0.0046 +0.0077 | +0.0066 | [+0.0046, +0.0077] excludes 0 | 3/3 | 0.125 |
+| 200 | ednet | 3 | +0.0003 +0.0013 +0.0063 | +0.0027 | [+0.0003, +0.0063] excludes 0 | 3/3 | 0.125 |
+| 200 | indomain | 3 | +0.0058 +0.0068 +0.0076 | +0.0067 | [+0.0058, +0.0076] excludes 0 | 3/3 | 0.125 |
+| 200 | junyi | 3 | +0.0079 +0.0072 +0.0081 | +0.0077 | [+0.0072, +0.0081] excludes 0 | 3/3 | 0.125 |
+| 500 | ednet | 3 | +0.0074 +0.0090 +0.0104 | +0.0089 | [+0.0074, +0.0104] excludes 0 | 3/3 | 0.125 |
+| 500 | indomain | 3 | +0.0104 +0.0140 +0.0100 | +0.0115 | [+0.0100, +0.0140] excludes 0 | 3/3 | 0.125 |
+| 500 | junyi | 3 | +0.0126 +0.0144 +0.0142 | +0.0137 | [+0.0126, +0.0144] excludes 0 | 3/3 | 0.125 |
+| 1000 | ednet | 3 | +0.0117 +0.0104 +0.0140 | +0.0120 | [+0.0104, +0.0140] excludes 0 | 3/3 | 0.125 |
+| 1000 | indomain | 3 | +0.0129 +0.0109 +0.0122 | +0.0120 | [+0.0109, +0.0129] excludes 0 | 3/3 | 0.125 |
+| 1000 | junyi | 3 | +0.0148 +0.0134 +0.0152 | +0.0145 | [+0.0134, +0.0152] excludes 0 | 3/3 | 0.125 |
+
+_Read: gaps are pretrained minus scratch at the same N, paired by seed. The bootstrap resamples the paired per-seed gaps._
+
+> CAVEAT, n=3 seeds per cell. Two consequences, both real:
+> 1. The exact one-sided sign test cannot go below 0.125 even when every seed agrees, so no cell here can reach p<0.05 by that test. Reaching p<0.05 needs at least 5 seeds.
+> 2. A bootstrap over 3 values resamples from only 10 distinct multisets, so the CI is coarse and anti-conservative. Treat it as indicative, not as a significance test.
+> The defensible claim at this seed count is the per-seed evidence itself: the gap direction and how many seeds agree. That is what the poster reports.
+
+_Read: in-domain and Junyi sources are positive on 3/3 seeds at every budget. The
+EdNet source is not: 2/3 seeds at N=25 with a per-seed spread of -0.0058 to +0.0852,
+and 1/3 seeds at both N=50 and N=100 where its mean gap is negative (-0.0046 and
+-0.0015). It only becomes consistently positive from N=200. So the largest source is
+not merely noisy at small N, it is the wrong default there; low-N guidance should name
+in-domain first, then Junyi. The gap is also not monotone in N: it collapses from
++0.092 at N=25 to +0.006 at N=100, then recovers to +0.012 to +0.015 by N=1000, with
+tight per-seed spread at the high end, so the recovery is not seed noise. At n=3 seeds
+these are per-seed evidence, not significance tests; see the caveat above._
+
+### 3.3 Macro-top-1 backfill, assist2017 target (parsed from the `_mt1_` reruns)
+
+`macro_top1` was never logged for the original sweep (section 9). These runs fill it
+at N=25 and N=1000: `edubert_assist2017_<cond>_mt1_n<N>_seed<S>`, 3 seeds, generated by
+`slurm/generators/gen_macrotop1_assist.sh`. Gains are paired by seed against scratch at
+the same N.
+
+| N | cond | top-1 | macro-top-1 | top-1 gain | macro-top-1 gain |
+|---|---|---|---|---|---|
+| 25 | scratch | 0.6595 ±0.0220 | 0.3392 ±0.0299 | - | - |
+| 25 | indomain | 0.7502 ±0.0011 | 0.5194 ±0.0040 | +0.0907 (3/3) | +0.1803 (3/3) |
+| 25 | ednet | 0.6922 ±0.0440 | 0.4256 ±0.0848 | +0.0327 (2/3) | +0.0864 (2/3) |
+| 25 | junyi | 0.7426 ±0.0044 | 0.5015 ±0.0145 | +0.0831 (3/3) | +0.1623 (3/3) |
+| 1000 | scratch | 0.7861 ±0.0007 | 0.6782 ±0.0018 | - | - |
+| 1000 | indomain | 0.7972 ±0.0010 | 0.6971 ±0.0045 | +0.0111 (3/3) | +0.0188 (3/3) |
+| 1000 | ednet | 0.7981 ±0.0010 | 0.6966 ±0.0085 | +0.0120 (3/3) | +0.0184 (3/3) |
+| 1000 | junyi | 0.7998 ±0.0002 | 0.7098 ±0.0052 | +0.0137 (3/3) | +0.0316 (3/3) |
+
+_Read: the pretraining gain is roughly twice as large under macro-top-1 as under plain
+top-1 (indomain at N=25 2.0x, ednet at N=25 2.6x, junyi at N=25 2.0x, indomain at N=1000 1.7x, ednet at N=1000 1.5x, junyi at N=1000 2.3x). Plain top-1 is per-interaction, so frequent skills and the `noskill`
+placeholder (10.1% of test interactions, section 10) dominate it; macro-top-1 averages
+per class. Scratch at N=25 reaches 0.6595 top-1
+but only 0.3392 macro-top-1, i.e. it
+largely fails on rare skills, and pretraining recovers much of that. The low-N advantage
+is therefore NOT a frequent-skill artifact; it is concentrated on the long tail.
+Re-running with identical seeds and data reproduces the section 3.1 top-1 to within 0.0101 on all 24 cells (median |delta| 0.0007); the pipeline is therefore reproducible to about the third decimal, not bit-exact. Every gain below is far larger than that drift._
+
+## 4. Objective reversal (headline)  
+
+Best pretraining objective is target-dependent. Per-dataset objective ablation (EdNet-source encoders: full / skill_only / correct_only -> target, EXCEPT the ednet row, whose encoders are Junyi-source: every w8_regime_ednet log loads edubert_junyi_pretrain_{full,junyi_skill_only,junyi_correct_only}_encoder.pt), from logs. CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): the ednet-row source, and means and pstdev recomputed from per-seed W&B values at full precision.
+
+| Target | full | skill_only | correct_only | pattern |
+|---|---|---|---|---|
+| assist2017 | 0.6896 ±0.0022 (n=6) | 0.6860 ±0.0021 (n=6) | 0.6619 ±0.0008 (n=6) | skill-driven (skill>=correct) |
+| ednet | 0.6599 ±0.0008 (n=6) | 0.6552 ±0.0010 (n=6) | 0.6620 ±0.0009 (n=6) | correctness-driven (correct>skill) |
+| junyi | 0.7228 ±0.0028 (n=6) | 0.7154 ±0.0022 (n=6) | 0.7276 ±0.0017 (n=6) | correctness-driven (correct>skill) |
+| algebra2005 | 0.7873 ±0.0038 (n=6) | 0.7871 ±0.0023 (n=6) | 0.7644 ±0.0057 (n=6) | skill-driven (skill>=correct) |
+| bridge2006 | 0.7752 ±0.0009 (n=6) | 0.7739 ±0.0012 (n=6) | 0.7633 ±0.0018 (n=6) | skill-driven (skill>=correct) |
+| assist2009 | 0.8699 ±0.0018 (n=6) | 0.8692 ±0.0016 (n=6) | 0.8662 ±0.0006 (n=6) | skill-driven (skill>=correct) |
+| algebra2006 | 0.7897 ±0.0011 (n=6) | 0.7897 ±0.0009 (n=6) | 0.7711 ±0.0044 (n=6) | skill-driven (skill>=correct) |
+
+**Recorded reversals (paired bootstrap):**
+- EdNet->ASSIST: skill 0.686 ~ full 0.690 >> correct 0.662; gap skill-correct large; 6/6 seeds, CI excludes 0 (recorded)
+- EdNet->Junyi: correct 0.728 > full 0.723 > skill 0.715; 6/6 seeds, CI excludes 0 (recorded)
+- Algebra2006 (seventh and last dataset added): skill-correct +0.0186 CI [+0.0148,+0.0227] 6/6 (analysis/paired_bootstrap_objective.py). NOT an advance-record claim: git shows the written prediction entered the repo at ca13880 on 2026-07-25 18:39:09, while the skill_only logs finished 18:22-18:25 the same evening, so no timestamped record separates specification from outcome. Report as an out-of-sample test: the dataset was prepared and evaluated after the ordering was fixed on the other six. Do NOT use the words prospective, predict-before-test, or advance-registration language.
+
+---
+## 5. What governs the regime: practice-per-skill 
+
+Practice-per-skill (pps = median seq length / n_skills) orders all 7 datasets:
+
+| Dataset | pps | regime |
+|---|---|---|
+| Junyi | 0.066 | correctness-driven |
+| EdNet | 0.211 | correctness-driven |
+| ASSIST2009 | 0.325 | skill-driven |
+| Algebra2006 | 2.414 | skill-driven |
+| Bridge2006 | 2.790 | skill-driven |
+| ASSIST2017 | 4.324 | skill-driven |
+| Algebra2005 | 5.330 | skill-driven |
+
+_practice-per-skill orders all 7: skill-driven >=0.325, correctness-driven <=0.211 (recorded)_
+
+**Causal truncation flip (recorded):** truncating ASSIST2017 sequence length while holding skill count (102) and #students (1708) FIXED flips the regime:
+- K=512 (UNTRUNCATED, pps 4.32): correct-skill -0.0265 CI [-0.0280,-0.0253] (0/6) -> ASSIST2017 at K=512 is the untruncated condition, because the median sequence is 441 < 512, so pps is 441/102 = 4.32 and NOT 512/102 = 5.02 (recorded)
+- K=10 (pps~0.10): correct-skill +0.0121 CI [+0.0033,+0.0212] (4/6; CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): the seed count read 6/6, but 4 of the 6 per-seed differences are positive at 4 dp and at full precision) -> ASSIST2017 truncated K=10/pps0.10: correctness-driven (correct-skill positive); regime FLIPPED holding skills+students fixed (recorded)
+- The from-scratch control now covers every K including 512 (0.6347, 0.6476, 0.6423, 0.6523, 0.6586, 0.6597, 0.6675 at K=10..512; the K=512 cell added 2026-08-11, jobs 9081378-9081383, 6 seeds, 1366 train students, 30 epochs, per-seed 0.6653/0.6684/0.6686/0.6680/0.6667/0.6683). It is not monotone. From K=320 to K=512 every condition gains the same additional interactions, but scratch gains only +0.0078 while full gains +0.0327 and skill_only +0.0331, and correct_only gains +0.0056, less than scratch; at K=512 correct_only (0.6655) falls BELOW scratch (0.6675). A generic data-quantity explanation is therefore ruled out, because the control experiences the same change and does not reproduce the pattern. The skill_only minus correct_only gap is negative at every tested K through 320 (pps 3.14) and positive only at K=512 (pps 4.32): the sign change is bracketed between pps 3.14 and 4.32, NOT near 1.5 (at K=160, pps 1.57, the gap is still -0.0046). Truncation retains each learner's most recent K interactions, so it lowers total interactions, time horizon and skill composition together; the control isolates density from data quantity but not from every co-varying property.
+
+**Truncation sweep (from logs, KT AUC means; CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): four cells recomputed at full precision):**
+
+| K | full | skill_only | correct_only | scratch |
+|---|---|---|---|---|
+| 10 | 0.6357 | 0.6362 | 0.6483 | 0.6347 |
+| 20 | 0.6410 | 0.6399 | 0.6427 | 0.6476 |
+| 40 | 0.6437 | 0.6415 | 0.6503 | 0.6423 |
+| 80 | 0.6497 | 0.6450 | 0.6509 | 0.6523 |
+| 160 | 0.6609 | 0.6559 | 0.6605 | 0.6586 |
+| 320 | 0.6614 | 0.6589 | 0.6599 | 0.6597 |
+| 512 | 0.6941 | 0.6920 | 0.6655 | 0.6675 |
+
+**Truncation provenance (log check 2026-09-30):** `w8_trunc_{full,skill_only,correct_only,scratch}_k{10,20,40,80,160,320,512}`, 28 cells, 6 logs each. The pretrained cells load `edubert_ednet_pretrain_full_encoder.pt`, `edubert_ednet_pretrain_ednet_skill_only_encoder.pt` and `edubert_ednet_pretrain_ednet_correct_only_encoder.pt` (EdNet source); every run trained 30 epochs on all 1,366 assist2017 train students (no --n_students).
+
+**Honest limit:** precise threshold fuzzy. The empty pps interval is 0.325-2.414 on raw median length and narrows to 0.325-1.041 under the 512-step model cap, which lowers Algebra2005 to 4.697, Bridge2006 to 1.041 and Algebra2006 to 1.058; the ordering and the regime split are identical under both definitions, so state which one any interval claim uses. LODO does not generalize (analysis/lodo_regime.py, reproducible, all 7 folds): n_students 6/7, n_interactions 6/7, n_skills 6/7, pps 5/7 under both definitions, correct_rate 3/7. Four features separate all 7 in-sample, so in-sample separation is uninformative; nothing reaches 7/7; the 2 folds holding out a correctness-driven dataset leave a single such example in training. NEGATIVE.
+
+---
+## 6. Probe mechanism (7 datasets)
+
+Masked-skill probe on the frozen representation (EdNet-full encoder vs scratch). Higher = skill more decodable. From logs:
+
+| Dataset | pretrained | scratch | gain |
+|---|---|---|---|
+| assist2017 | 0.1416 ±0.0011 (n=3) | 0.1366 ±0.0011 (n=3) | +0.0050 |
+| ednet | 0.1437 ±0.0000 (n=3) | 0.1294 ±0.0003 (n=3) | +0.0143 |
+| junyi | 0.0209 ±0.0002 (n=3) | 0.0165 ±0.0004 (n=3) | +0.0044 |
+| algebra2005 | 0.1729 ±0.0009 (n=3) | 0.1447 ±0.0027 (n=3) | +0.0282 |
+| bridge2006 | 0.1368 ±0.0017 (n=3) | 0.1054 ±0.0025 (n=3) | +0.0314 |
+| assist2009 | 0.1629 ±0.0015 (n=3) | 0.1240 ±0.0027 (n=3) | +0.0389 |
+| algebra2006 | 0.1081 ±0.0006 (n=3) | 0.0970 ±0.0011 (n=3) | +0.0111 |
+
+CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py): assist2017 pretrained 0.1417 -> 0.1416 (pstdev 0.0011) and its gain +0.0051 -> +0.0050, full precision; the same runs appear in the probe2 table below.
+
+_Pretrained beats scratch on all 7 (recorded gains +0.004 to +0.039, all positive). Mechanism: pretraining organizes the representation around skills._
+
+**Encoder scope (verified against w6_probe2 logs).** The 7-dataset table above holds the SOURCE FIXED (EdNet full-objective encoder vs scratch) so all 7 gains are comparable with no cross-dataset confound. The W6 probe did sweep MULTIPLE sources, on the original 3 targets only (probe_edubert_v2, 3 seeds, mean +/-std):
+
+| Probe target | in-domain | EdNet-source | Junyi-source | ASSIST-source | scratch |
+|---|---|---|---|---|---|
+| assist2017 | **0.1458 +/-0.0002** | 0.1416 +/-0.0011 | 0.1414 +/-0.0004 | (= in-domain) | 0.1366 +/-0.0011 |
+| ednet | **0.1437 +/-0.0000** | (= in-domain) | 0.1354 +/-0.0002 | 0.1337 +/-0.0005 | 0.1294 +/-0.0003 |
+| junyi | 0.0202 +/-0.0001 | **0.0209 +/-0.0002** | (= in-domain) | 0.0187 +/-0.0003 | 0.0165 +/-0.0004 |
+
+_Consistency: for the original 3 targets the probe7 "pretrained" cells above ARE these same runs (assist2017 probe7-full == probe2 EdNet-source 0.1416; ednet probe7-full == probe2 in-domain 0.1437; junyi probe7-full == probe2 EdNet-source 0.0209), verified identical seed-by-seed._
+
+_Per-target probe ordering tracks transfer ordering: Spearman rho ASSIST +0.5, EdNet +1.0, Junyi +1.0, mean +0.83. Report ORDINAL within-target, never pooled r (pooled r=0.26, attenuated by a target-baseline confound). On Junyi, EdNet-source beats in-domain in BOTH probe and transfer. In-domain full-objective encoders now exist for all 7 datasets, so extending the in-domain column to all 7 would be about 21 short probe jobs (NOT yet run)._
+
+_Parsing caveat: restrict probe greps to `w6_probe2*.log` and `w8_probe7*.log`. `w6_probe_*.log` (header `=== probe (skill-identity)`) holds the DEPRECATED v1 probe, which was circular (skill visible at the probed position, accuracies 0.96 to 0.9996; confirmed present in w6_probe_7988582.log and w6_probe_7988933.log); those values must never be reported._
+
+---
+### 6.1 LogME vs the domain probe (w7_logme_8263344.log, scripts/compute_logme.py)
+
+LogME on frozen encoders (full-objective + scratch), 3 targets, higher = better:
+
+| Target | scratch | indomain | fromednet | fromjunyi | fromassist |
+|---|---|---|---|---|---|
+| assist2017 | -0.669368 | -0.563884 | -0.565629 | -0.624513 | (=indomain) |
+| ednet | -0.650869 | -0.548155 | (=indomain) | -0.611066 | -0.569707 |
+| junyi | -0.574950 | -0.551480 | -0.439082 | (=indomain) | -0.506391 |
+
+Per-target Spearman rho against the same N=3000 KT gains (section 2.1), 3 pretrained sources per target:
+LogME [0.5, 0.5, 0.5] mean 0.50; probe [0.5, 1.0, 1.0] mean 0.83.
+
+_Read: identical 9 source-target pairs, identical gains. LogME does rank scratch last on all 3 targets (the coarse pretrain-vs-not signal is right) but mis-orders the pretrained sources on every target; the domain-specific masked-skill probe (section 6) tracks the source ordering better (0.83 vs 0.50)._
+
+### 6.2 Objective-conditioned probe, assist2017 and junyi (EdNet-source skill_only and correct_only encoders; runs `probe2_<ds>_obj_<obj>_seed*` and `tg_probe7_<ds>_<obj>_s*`)
+
+Every run loaded 79/82 tensors from `edubert_ednet_pretrain_ednet_{skill_only,correct_only}_encoder.pt`, so these are cross-dataset EdNet-source encoders, not in-domain ones (log check 2026-09-30). The two campaigns return identical 4 dp values. Values are 4 dp log banners; mean and population SD computed from them.
+
+| Target | objective | s42 | s1 | s2 | mean ±pstdev |
+|---|---|---|---|---|---|
+| assist2017 | skill_only | 0.1451 | 0.1464 | 0.1444 | 0.1453 ±0.0008 |
+| assist2017 | correct_only | 0.1114 | 0.1118 | 0.1133 | 0.1122 ±0.0008 |
+| junyi | skill_only | 0.0209 | 0.0210 | 0.0204 | 0.0208 ±0.0003 |
+| junyi | correct_only | 0.0137 | 0.0139 | 0.0136 | 0.0137 ±0.0001 |
+
+Comparators from section 6, same source: EdNet full-objective encoder 0.1416 ±0.0011 (assist2017) and 0.0209 ±0.0002 (junyi), re-read at full precision from `wandb_by_id.jsonl` on 2026-09-30 as 0.141640 ±0.001067 and 0.020918 ±0.000214; scratch 0.1366 ±0.0011 and 0.0165 ±0.0004.
+
+_Read: skill_only is above correct_only on both targets with no overlap across seeds, and correct_only is below scratch on both. The in-domain full-objective probes are the separate source-sweep cells above (assist2017 0.1458, junyi 0.0202)._
+
+## 7. Embedding geometry (honest negative) 
+
+- vocab-invariant coherence separated regimes raw, but matched-skill (top-100) control: confound persisted r=+0.87 AND separation broke (Algebra2006 skill rose above EdNet corr). REPORT AS NEGATIVE.
+- Tie-in: raw rho=-0.68 is a vocab-size artifact (both track n_skills); clean coherence-vs-probe-gain rho=-0.32 n.s. DROPPED.
+- **Report as:** we checked whether embedding geometry differs by regime; it did not survive a vocabulary-size control. Probe (section 6) carries the representational evidence.
+
+---
+## 8. Downstream tasks 
+
+- **Dropout (recomputed from per-seed logs, 20,000-resample paired bootstrap):** ASSIST2017 in-domain pretraining is WORSE than scratch at every clean K, not merely unhelpful. In-domain: -0.0376 [-0.0541,-0.0264] at K=5, -0.0456 [-0.0597,-0.0350] at K=10, -0.0390 [-0.0748,-0.0190] at K=20, -0.0373 [-0.0651,+0.0007] at K=50, 0/3 seeds positive at K=5/10/20 and 1/3 at K=50. Junyi is clean with in-domain best: +0.0371 [+0.0335,+0.0440] at K=5 and +0.0389 [+0.0326,+0.0428] at K=10, both 3/3. EdNet is mostly inconclusive at 8 seeds; only two of six cells clear (in-domain K=5 +0.0968 [+0.0295,+0.1637] 6/8; fromJunyi K=10 +0.0952 [+0.0569,+0.1315] 8/8). Clean K is dataset-dependent (ASSIST K<=50, EdNet/Junyi K<=10); use --window_censor for high K.
+- **Next-skill, assist2017 target:** full N-sweep now parsed from logs, see section 3.1 (4 conditions x N=25..1000 x 3 seeds, top-1/top-5/macro/weighted).
+- **Next-skill, Junyi target (parsed from logs, n=3):** frequency-saturated; plain top-1 flat (in-domain 0.4903 vs scratch 0.4933), macro-top1 in-domain +0.0070 (0.4925 vs 0.4855), top-5 in-domain +0.0561 (0.8500 vs 0.7939).
+
+### 8.1 ASSIST dropout K-sweep by condition (parsed from w6_dropoutK logs)
+
+Test AUC, mean +/-std, n=3 seeds (42, 1, 2). Run names `edubert_assist2017_{cond}_dropout_k{K}_seed{S}`.
+K<=50 = clean eval points. K=100/200 UNCENSORED = LEAKED (14% / 74% per the leak panel), listed only to document the leak signature; the honest high-K numbers are the W7 censored runs quoted below.
+
+| K | scratch | indomain | ednet | junyi | read |
+|---|---|---|---|---|---|
+| 5 | **0.7118 +/-0.0256** | 0.6742 +/-0.0158 | 0.6804 +/-0.0307 | 0.6991 +/-0.0122 | scratch best (+0.0127) |
+| 10 | **0.7210 +/-0.0055** | 0.6754 +/-0.0080 | 0.7144 +/-0.0106 | 0.7028 +/-0.0045 | scratch best (+0.0066) |
+| 20 | **0.7024 +/-0.0080** | 0.6634 +/-0.0175 | 0.6815 +/-0.0318 | 0.6747 +/-0.0175 | scratch best (+0.0209) |
+| 50 | 0.7654 +/-0.0053 | 0.7281 +/-0.0253 | 0.7508 +/-0.0330 | **0.7699 +/-0.0025** | tied (junyi +0.0045, within seed noise) |
+| 100 (LEAKED) | 0.7891 +/-0.0122 | 0.8068 +/-0.0026 | 0.7832 +/-0.0284 | 0.8033 +/-0.0061 | inflated, do not report |
+| 200 (LEAKED) | 0.8865 +/-0.0454 | 0.8971 +/-0.0121 | 0.9029 +/-0.0163 | 0.9085 +/-0.0143 | inflated, do not report |
+
+Source for K=5/10/20/50: w6_dropoutK_s42 (7987745), w6_dropoutK_s1 (7987751), w6_dropoutK_s2 (7987752). Per-seed AUC read from the W&B run summaries at 5 dp, not from the 4 dp log banners; means and standard deviations formed before rounding, ties rounded away from zero. K=100/200 rows are unchanged 4 dp values and are not reported anywhere. w5_dropout_k50 (7853281) covers K=50 only and is superseded; it is kept below as a reproduction check, not as a data source.
+
+Reproduction check, same command, same encoder checkpoints, same seed, unchanged dropout code path, all nodes gpu:v100-sxm2: 7853281 ran on d1002, 7987745 on d1019, 7987751 and 7987752 on d1017. Same-seed absolute differences across the 12 K=50 cells are min 0.0012, median 0.0134, max 0.0435. The 8 cells comparing d1002 with d1017 span 0.0035 to 0.0435, so node pairing does not predict the size. src/utils.py set_seed seeds random, numpy and torch and sets no determinism flags. KT n3000 runs duplicated the same way differ by at most 0.0024.
+
+_Read: in-domain pretraining is WORSE than scratch on ASSIST dropout at every clean K. In-domain intervals exclude zero at K=5/10/20 with 0/3 seeds positive; at K=50 seed42 reaches +0.0007, so that interval spans zero and 1/3 seeds are positive. From-junyi is +0.0045 at K=50 on 3/3 seeds, which is inside the reproduction spread recorded above, so no direction is read from it. Write "produces a worse student-level classifier than random initialization", not "does not help". W7 censored recovery (recorded): K=100 scratch 0.768 > ednet 0.765 > junyi 0.763 > indomain 0.759 (cohort 1315/1366); K=200 scratch 0.732, indomain 0.762, ednet 0.692, junyi 0.731 (cohort 1118, high variance, report with N caveat)._
+
+---
+### 8.2 EdNet dropout at n3000: corrected full 8-seed grid
+
+Runs `edubert_ednet_drop_ednet_{scratch|indomain|fromassist|fromjunyi}_k{5,10}_n3000_seed{1..7,42}`, test AUC. Extraction MUST be comma-anchored (`grep -A4 -F "=== dropout (NAME,"`): a bare-name grep collides seed4 with seed42 (prefix) and silently duplicates values; 7 seed4 cells below were corrected this way on July 30 2026. indomain k10 seed42 = 0.7261 recovered from the W&B run output.log (run completed and synced; the local log lost its tail) - W&B and local logs agree exactly on the junyi indomain k10 seed2/seed42 cross-checks (0.6240 / 0.6259). indomain k10 seed2 has no value and the cell stands at n=7. Every completed run of this condition logs exactly 165766 optimizer steps. Throughput is node-dependent by an order of magnitude: 59-92 steps/s on the fast nodes (d4052, h200, cascadelake; wall-clock 0.50-0.78 h) against 6.3 steps/s on a V100 node (c2207, v100-pcie, zen; 1 CPU allocated, GPU utilisation 2%, so the loader and not the GPU is the bottleneck), which needs 7.3 h. Against the 6 h walltime in the sbatch, a slow-node draw cannot finish: the original attempt reached 137073 steps (82.7%) at 5.98 h and died at the wall, and the July 30 2026 rerun (job 8839160) was on the same trajectory, 40.0% at 2.93 h projecting to 81.9% at the wall, and was cancelled. An earlier rerun that day (job 8838715) failed in 19 s at wandb.init after /home/dai.hany/.bashrc was lost, taking the WANDB_API_KEY with it. Completing this cell needs --time=08:00:00 and more than one CPU, not a plain resubmit; the seed42 value in this table came from a slow-node run that took 7.29 h. No claim depends on it either way.
+
+| cond | K | s1 | s2 | s3 | s4 | s5 | s6 | s7 | s42 | mean ±pstdev |
+|---|---|---|---|---|---|---|---|---|---|---|
+| scratch | 5 | 0.6623 | 0.5238 | 0.6342 | 0.4995 | 0.5000 | 0.5185 | 0.5196 | 0.7029 | 0.5701 ±0.0771 (n=8) |
+| scratch | 10 | 0.5124 | 0.7183 | 0.5180 | 0.5977 | 0.5264 | 0.6752 | 0.6348 | 0.5378 | 0.5901 ±0.0740 (n=8) |
+| indomain | 5 | 0.6949 | 0.6970 | 0.6118 | 0.5172 | 0.7156 | 0.7110 | 0.7047 | 0.6834 | 0.6669 ±0.0644 (n=8) |
+| indomain | 10 | 0.5802 | died | 0.6817 | 0.6852 | 0.7273 | 0.5861 | 0.5405 | 0.7261 | 0.6467 ±0.0706 (n=7) |
+| fromassist | 5 | 0.5164 | 0.6053 | 0.5000 | 0.5218 | 0.6753 | 0.5364 | 0.5130 | 0.5122 | 0.5475 ±0.0571 (n=8) |
+| fromassist | 10 | 0.5229 | 0.6912 | 0.5043 | 0.7367 | 0.6113 | 0.6456 | 0.6081 | 0.5463 | 0.6083 ±0.0764 (n=8) |
+| fromjunyi | 5 | 0.5077 | 0.7025 | 0.5128 | 0.6132 | 0.5371 | 0.5230 | 0.6797 | 0.6666 | 0.5928 ±0.0767 (n=8) |
+| fromjunyi | 10 | 0.6459 | 0.7214 | 0.6846 | 0.7311 | 0.5719 | 0.7302 | 0.7106 | 0.6867 | 0.6853 ±0.0506 (n=8) |
+
+CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py). Seven seed-condition pairs in this grid were executed twice and the copies disagree: scratch k5 s4 (0.4995 / 0.5285) and s5 (0.5000 / 0.5275); fromassist k5 s3 (0.5000 / 0.5139), s6 (0.5364 / 0.7159) and s7 (0.5130 / 0.4995); fromassist k10 s3 (0.5043 / 0.7152) and s6 (0.6456 / 0.5194). The table shows the first copy. Those seeds are now dropped from every comparison they enter instead of taking a copy; where one copy came from a job that later timed out (scratch and indomain k5 s42), the completed job's copy is kept, as in the table. The fromjunyi k10 and indomain k10 cells touch no disagreeing pair and are unchanged.
+
+Paired-by-seed effects vs scratch on this corrected grid, matching the recorded 8-seed paired-bootstrap results exactly (so the original analysis used correct extraction):
+- indomain k5: mean +0.0902 [+0.0153, +0.1601], 4/6 seeds positive, seeds 4 and 5 dropped (paired_bootstrap_pair.py, rng seed 42, W&B values). It read +0.0968 [+0.0295, +0.1637] 6/8 on the first copies.
+- fromjunyi k10: mean +0.0952 (8/8 positive) - recorded +0.095, CI [+0.057, +0.132].
+- indomain k10 (n=7 paired): mean +0.0750, per-seed range -0.094 to +0.201 - high variance, NO claim.
+- All other cells: high variance, no claims beyond the two effects above. EdNet dropout remains mostly inconclusive; report it that way.
+
+## 9. Honest negatives & caveats 
+
+- Embedding coherence does not separate regimes under a vocab control (section 7).
+- Coherence-vs-probe tie-in is a vocab-size artifact - dropped (section 7).
+- LODO cross-dataset prediction does not generalize at n=6 (overparameterized).
+- Regime threshold is fuzzy (empty pps gap 0.33-2.41, no dataset between assist2009 at 0.325 and algebra2006 at 2.414); pps ordering holds, exact boundary not localized.
+- Scale/pps observationally confounded at n=7; the causal claim rests on the single ASSIST2017 truncation manipulation.
+- EdNet dropout high-variance; ASSIST dropout pretraining doesn't help.
+- ednet-source next-skill at N=25 is high variance (top-1 std 0.0455); low-N claims anchor on indomain/junyi (section 3.1).
+- macro_top1 was absent from the original assist2017 sweep (added in W7, after it ran). It has since been backfilled at N=25 and N=1000 by targeted reruns (section 3.3) and remains absent at N=50, 100, 200 and 500. NOT recoverable offline either, per-example predictions were never saved and the fine-tuned _best.pt checkpoints were deleted after AUC collection, so obtaining it requires a targeted rerun (N=25 and N=1000, 4 conditions x 3 seeds = 24 short jobs). Mitigation: assist2017 has 102 skills vs Junyi 1326 and is far less frequency-saturated, and macro vs weighted OVR AUC give the identical ordering there (section 3.1), so the skew concern is already covered.
+
+---
+
+---
+## 10. Appendix: skill-frequency skew (ASSISTments 2017, test split)
+
+Regenerated by `analysis/skill_freq_report.py` (read-only, CPU, seconds). Full per-skill table: `skill_freq_assist2017.md` (gitignored, regenerable). This is the standing artifact for the previously recorded "92 of 102 skills, 17x skew" note, now confirmed exactly.
+
+| Statistic | Value |
+|---|---|
+| Students in test split | 172 |
+| Interactions in test split | 87,756 |
+| Skills in vocabulary (K) | 102 |
+| Skills PRESENT in test split | 92 |
+| Skills ABSENT from test split | 10 |
+| Skills with <50 instances | 10 |
+| Skills with <20 instances | 4 |
+| Skills with <10 instances | 1 |
+| Max instance count | 8,891 |
+| Median instance count (present) | 519.5 |
+| Max/median skew | 17.1x |
+
+Most frequent test skills: noskill 8,891; probability 7,230; pattern-finding 4,398; area 3,285; equation-solving 2,992. Rarest present: similar-triangles 8; circumference 16; surface-area-and-volume 18; multiplying-positive-negative-numbers 18; reduce-fraction 27.
+
+_Implication: macro-OVR AUC is reliable over the ~82 well-populated skills and noisy on the rare tail, which is why macro AND weighted OVR are both reported everywhere (section 3.1); the ordering being identical under both is the metric-robustness claim._
+
+_DATA CAVEAT (new, worth disclosing in any paper using this dataset): the single most frequent "skill" in the test split is the placeholder label `noskill`, at 8,891 of 87,756 interactions (10.1%). It is a real vocabulary entry (skill_idx 60), not a preprocessing bug, but it is an unlabeled bucket rather than a pedagogical skill. Next-skill metrics therefore include a large non-semantic class. Options if a reviewer asks: report next-skill with and without `noskill`, or state the share plainly. NOT yet re-run either way._
+## 11. Matched-scale source ablation: does corpus size cause transfer quality?
+
+Source identity held FIXED at EdNet KT1, only the number of pretraining
+students varied. This is the manipulation that separates source SIZE from
+source IDENTITY, which are perfectly confounded in section 2.1 (three sources,
+three sizes, three platforms).
+
+Encoders `edubert_ednet_pretrain_ednet_n{SIZE}{,d1,d2}_encoder.pt`, built by
+`slurm/generators/gen_source_scale.sh` with `scripts/pretrain_edubert.py
+--n_students SIZE --seed {42,1,2} --epochs 10 --batch_size 128 --lr 1e-3
+--warmup_frac 0.05`. THREE INDEPENDENT ENCODERS PER SIZE; the draw seed is the
+pretrain `--seed`, so each draw differs in both the sampled students and the
+initialization, and the spread across draws bounds total encoder-build variance
+at that size, not sampling variance alone.
+
+Transfer runs `edubert_<target>_kt_<t>_fromednet_n{SIZE}{,d1,d2}_src_n3000_seed{42,1,2,3,4,5}`,
+targets assist2017 and junyi only (the two where EdNet is foreign), KT only,
+N=3000 target budget, 6 seeds, all pinned to gpu:v100-sxm2. Scratch controls
+are REUSED from the n3000 grid (`kt_{assist,junyi}_scratch_n3000_seed*`), same
+budget, same seeds, same GPU model, so the pairing is valid and no scratch jobs
+were re-run. The 353,597 row is the pre-existing full-corpus encoder
+`edubert_ednet_pretrain_full_encoder.pt` and its existing n3000 transfer runs.
+
+| Source students | mlm loss (3 draws) | assist2017 gain | junyi gain | draw spread (assist) |
+|---|---|---|---|---|
+| 1,366 | 4.5344 / 5.2432 / 5.2274 / 4.8507 | UNSTABLE, see below | UNSTABLE | 0.0533 |
+| 5,000 | 4.0644 / 4.0596 / 4.0566 | -0.0018 | -0.0037 | 0.0013 |
+| 15,000 | 3.6959 / 3.6867 / 3.6952 | +0.0002 | -0.0023 | 0.0010 |
+| 49,153 | 3.1054 / 3.0965 / 3.1116 | +0.0177 | +0.0014 | 0.0018 |
+| 150,000 | 2.9565 / 2.9613 / 2.9585 | +0.0241 | +0.0043 | 0.0012 |
+| 353,597 | 2.8784 / 2.8872 / 2.8740 | +0.0259 | +0.0062 | 0.0017 |
+
+Gains are means over the three draws, each draw itself a 6-seed mean paired
+against the same scratch controls (assist2017 scratch 0.6697, junyi 0.7352).
+1,366 and 49,153 are the ASSISTments and Junyi TRAINING-SPLIT sizes, so those
+two rows are exact size matches to the other two sources in section 2.1.
+
+Per-draw gains at 150,000, assist2017: +0.0234 / +0.0245 / +0.0243.
+Per-draw gains at 150,000, junyi: +0.0043 / +0.0042 / +0.0044.
+Per-draw gains at 353,597, assist2017: +0.0261 / +0.0250 / +0.0267.
+Per-draw gains at 353,597, junyi: +0.0065 / +0.0062 / +0.0060.
+All eighteen 353,597 draw-by-target cells are positive on 6 of 6 seeds and
+every per-draw bootstrap interval excludes zero.
+
+THE 353,597 ROW WAS CORRECTED ON 2026-09-23 (tools/patches/patch_results_full_precision.py). The 2026-09-18 revision below entered the 150,000 draw-42 values (+0.0233 / +0.0043) in place of the 353,597 draw-42 values. Draw 42 at 353,597 is the pre-existing encoder and its n3000 transfer runs (section 2.1), +0.0261 / +0.0065 at full precision, so the row is +0.0259 / +0.0062 with draw spreads 0.0017 / 0.0004, and the pre-existing encoder is the middle draw on assist2017 and the strongest on junyi, not the weakest. The superseded 2026-09-18 note follows for provenance. THE 353,597 ROW WAS REVISED DOWNWARD ON 2026-09-18. It previously read +0.0260
+and +0.0064 from a single encoder, `edubert_ednet_pretrain_full_encoder.pt`
+(loss 2.8784, log `pretrain_ednet_7744629.log`, built 2026-06-20). Two further
+encoders were built under the section-11 recipe, `..._n353597d1` (loss 2.8872,
+job 10410464) and `..._n353597d2` (loss 2.8740, job 10410468), and their 24
+transfer runs collected (jobs 10418184 to 10418706, all COMPLETED). The
+pre-existing encoder is the WEAKEST of the three on both targets, so the
+single-draw figures were low rather than high. Quote +0.0250 and +0.0055.
+
+ONE PROPERTY OF THIS ROW DIFFERS FROM EVERY OTHER SIZE. At full corpus
+`--n_students 353597` selects the entire training split, so there is nothing to
+subsample and the three draws differ in the pretraining seed ONLY. At every
+smaller size a draw varies both the sampled students and the initialization.
+The 0.0017 and 0.0004 spreads here therefore bound initialization variance
+alone and are not directly comparable to the spreads in the table above. Worth
+noting that they are nonetheless the same order of magnitude, which suggests
+initialization variance rather than sampling variance dominates encoder fit
+across the whole ladder.
+
+THE 1,366 ROW IS A STABILITY BOUNDARY, NOT A MEASUREMENT. Four encoders at that
+size span 0.7088 in final mlm loss (4.5344 to 5.2432) against a chance value of
+ln(143) + ln(2) = 5.656, so they range from barely-trained to nearly-untrained.
+Downstream the fine-tune becomes bimodal: 24 runs were executed TWICE with an
+identical command, identical encoder and identical seed, and differ by up to
+0.0700 AUC, median 0.0198 to 0.0423 depending on the cell, with junyi values
+piling up at either ~0.6835 or ~0.732 and almost nothing between. For scale,
+the largest effect anywhere in this file is +0.0261. Report this row as a
+characterized failure mode with the duplicate-execution evidence attached;
+never as a point estimate.
+
+PROVENANCE NOTE ON THE 1,366 d42 ENCODER: it was built interactively (job
+10349907, node d1013, 2026-09-14 17:58:52 to 18:00:12) without `--wandb`, so it
+has no job log and no W&B run, and it is the only encoder in the ladder on
+unpinned hardware. Its loss of 4.5344 is recorded from the terminal session.
+
+DISCARDED RUNS: a first batch of 24 transfer runs at 150,000 (jobs 10362252 to
+10362281, submitted 12:07) loaded encoders that had not finished training; the
+pretraining script writes a checkpoint on every loss improvement, and jobs
+10361662 and 10361663 did not end until 13:17. Those logs are quarantined in
+`stale_n150000d/` and MUST NOT be aggregated. They produced a spurious draw
+spread of 0.0175 which disappeared to 0.0012 on the valid rerun. One run,
+`kt_junyi_fromednet_n150000d2_src_n3000_seed5`, executed twice in the valid
+batch (0.7388 and 0.7391); either is usable.
+
+_Read: holding source identity fixed and varying only student count reproduces
+the entire range of behaviour seen across the three real sources. Below ~15,000
+pretraining students EdNet-as-source does not help and on junyi actively hurts;
+above ~49,153 it helps on both targets; the sign flip sits between 15,000 and
+49,153 and replicates on both targets across three independently built encoders
+per size, with a draw spread never above 0.0018. Corpus SIZE is therefore doing
+the work, not corpus identity. Two further observations. (a) EdNet cut to
+Junyi's 49,153 students gives +0.0177 [+0.0162,+0.0194] on assist2017 against
+real Junyi's +0.0214 [+0.0196,+0.0231], so at matched size EdNet is if anything
+the weaker corpus per student and its full-scale advantage is entirely a size
+effect. (b) Within a fixed vocabulary the pretraining losses ARE comparable, so
+this is the first clean loss-versus-transfer test: loss falls smoothly and
+monotonically while transfer is a threshold, with 50.6% of the total loss
+improvement (4.5344 to 3.6959) buying a transfer change of -0.0001 to -0.0004.
+Loss tracks transfer ordinally (Spearman -0.83 on both targets) but not
+proportionally. (c) The curve keeps rising at the top, with diminishing returns (CORRECTED 2026-09-23 (tools/patches/patch_results_full_precision.py); it read "saturates" on the copied 353,597 value). Going from
+150,000 to the full 353,597 students, a 2.4-fold increase in corpus, buys
++0.0018 on assist2017 (+0.0241 to +0.0259) and +0.0019 on junyi (+0.0043 to
++0.0062), and every 353,597 draw exceeds every 150,000 draw on both targets
+(exact one-sided rank test p = 0.05, the floor at three draws per size). The step
+is smaller than the one below it (+0.0063 and +0.0029 from 49,153 to 150,000).
+The defensible statement is that transfer rises steeply from 5,000 to 49,153,
+continues to 150,000, and keeps rising more slowly to the full corpus; no plateau
+appears in the measured range. The target side (section 3) differs: there the
+benefit shrinks as target data grows._
+
+CORRECTION (2026-10-09, see 11.1). Two statements in the reading above do not hold once the number
+of optimizer updates is matched. "Corpus SIZE is therefore doing the work": at the 49,153 rung's
+3,850 updates, 15,000 learners transfer as well as 49,153, so the sign flip between 15,000 and
+49,153 is an update effect; a shortfall remains at 5,000. "(a) ... at matched size EdNet is if
+anything the weaker corpus per student": the Junyi encoder trained for 20 epochs (7,700 updates)
+against 10 for EdNet 49,153 (3,850), and at matched learners and updates the two tie. The interval
+[+0.0162,+0.0194] has no recorded method; by the method of 11.1 the 49,153 gain on assist2017 is
++0.0177 [+0.0172, +0.0185], draw spread 0.0018. Points (b) and (c) keep their numbers, but (b)'s
+losses are training losses at a fixed 10 epochs, so they also vary with the number of updates.
+
+DIGIT COLLISION: this Spearman -0.83 is a THIRD quantity at that magnitude,
+alongside the probe-vs-transfer rho +0.83 (section 6) and the scale/pps
+confound r -0.83 (section 5). Never mix them.
+### 11.1 Update-matched controls: number of updates against number of learners (2026-10-09; analysis/budget_control.py, slurm/generators/gen_budget_control.sh)
+
+Why. Every encoder in the table above trains for 10 epochs at batch 128, so the number of optimizer
+updates is ceil(learners / 128) x 10 and grows with the corpus, from 400 at 5,000 learners to 27,630
+at 353,597. The checkpoints record the source encoders' recipes (recipe_check_10871830.log): Junyi
+20 epochs, batch 128, lr 1e-3, warm-up 0.05 (best epoch 20, so 7,700 updates over 49,153 learners);
+EdNet full corpus and EdNet 49,153 (draw 42) 10 epochs, batch 128, warm-up 0.05 (best epoch 10);
+ASSISTments 2017 100 epochs, batch 64, warm-up 0.1 (best epoch 95). Each saved encoder is the one
+with the lowest training loss (scripts/pretrain_edubert.py), so the losses in the table above are
+training losses, not held-out losses.
+
+Design. Encoders edubert_ednet_pretrain_ednet_n{SIZE}e{EPOCHS}{,d1,d2}_encoder.pt with the
+section-11 recipe except the epoch count and the same draw seeds (42, 1, 2, so the same sampled
+learners): 49,153 x 20 epochs (7,700 updates, Junyi's), 15,000 x 33 (3,894) and 5,000 x 96 (3,840),
+the last two matched to the 49,153 rung's 3,850. Fine-tunes
+kt_<t>_fromednet_n{SIZE}e{EPOCHS}{,d1,d2}_bud_n3000_seed{1,2,3,4,5,42} on assist2017 and junyi,
+N=3000, 20 epochs, gpu:v100-sxm2: 108 runs, paired with the scratch controls above. Test AUC is the
+W&B full-precision value (wandb_budget_by_id.jsonl), each checked against its log's 4 dp value; the
+training losses come from the budget_pretrain_ednet_n{SIZE}e{EPOCHS}*_<job>.log files.
+
+Method, for this subsection and the per-size intervals of the 10-epoch ladder: a draw's gain is its
+6-seed mean of (run - scratch at that seed); a condition's gain is the mean over its draws; the 95%
+interval resamples the 6 seeds of the across-draw mean (20,000 resamples, random.Random(0),
+boot_mean_ci of analysis/build_transfer_benchmark.py); the draw spread (encoder-build variance) is
+reported beside it; differences pair the across-draw means by seed.
+
+Files (md5): budget_control_summary.tsv c1b14438e4d6a547af7952ebbc4b9fe4, budget_control_diffs.tsv
+722e1164514e934329a671a1f9ef06fd, budget_control_runs.tsv 27cb94677b1c1bc9f7adca203fb252c6,
+wandb_budget_by_id.jsonl b2166758dde5ec76272fb7e69155c5b1.
+
+| target | source learners | epochs | updates | gain [95% CI] | seeds + | draw spread | best training loss (d42 / d1 / d2) |
+|---|---|---|---|---|---|---|---|
+| assist2017 | 5,000 | 10 | 400 | -0.0018 [-0.0024, -0.0011] | 0/6 | 0.0013 | section 11 table |
+| assist2017 | 15,000 | 10 | 1,180 | +0.0002 [-0.0003, +0.0008] | 4/6 | 0.0010 | section 11 table |
+| assist2017 | 49,153 | 10 | 3,850 | +0.0177 [+0.0172, +0.0185] | 6/6 | 0.0018 | section 11 table |
+| assist2017 | 150,000 | 10 | 11,720 | +0.0241 [+0.0236, +0.0244] | 6/6 | 0.0012 | section 11 table |
+| assist2017 | 353,597 | 10 | 27,630 | +0.0259 [+0.0251, +0.0269] | 6/6 | 0.0017 | section 11 table |
+| assist2017 | 49,153 | 20 | 7,700 | +0.0216 [+0.0209, +0.0224] | 6/6 | 0.0005 | 2.9946 / 2.9960 / 2.9946 |
+| assist2017 | 15,000 | 33 | 3,894 | +0.0177 [+0.0175, +0.0179] | 6/6 | 0.0026 | 3.0984 / 3.0743 / 3.0798 |
+| assist2017 | 5,000 | 96 | 3,840 | +0.0148 [+0.0143, +0.0152] | 6/6 | 0.0035 | 2.9866 / 2.9907 / 3.0080 |
+| junyi | 5,000 | 10 | 400 | -0.0037 [-0.0045, -0.0028] | 0/6 | 0.0006 | section 11 table |
+| junyi | 15,000 | 10 | 1,180 | -0.0023 [-0.0030, -0.0016] | 0/6 | 0.0010 | section 11 table |
+| junyi | 49,153 | 10 | 3,850 | +0.0014 [+0.0007, +0.0021] | 6/6 | 0.0008 | section 11 table |
+| junyi | 150,000 | 10 | 11,720 | +0.0043 [+0.0033, +0.0052] | 6/6 | 0.0002 | section 11 table |
+| junyi | 353,597 | 10 | 27,630 | +0.0062 [+0.0055, +0.0070] | 6/6 | 0.0004 | section 11 table |
+| junyi | 49,153 | 20 | 7,700 | +0.0032 [+0.0024, +0.0040] | 6/6 | 0.0008 | 2.9946 / 2.9960 / 2.9946 |
+| junyi | 15,000 | 33 | 3,894 | +0.0008 [+0.0000, +0.0015] | 5/6 | 0.0002 | 3.0984 / 3.0743 / 3.0798 |
+| junyi | 5,000 | 96 | 3,840 | -0.0002 [-0.0010, +0.0004] | 4/6 | 0.0006 | 2.9866 / 2.9907 / 3.0080 |
+| assist2017 | 49,153 (Junyi encoder) | 20 | 7,700 | +0.0214 [+0.0197, +0.0232] | 6/6 | one encoder | not comparable (Junyi vocabulary) |
+
+| target | a minus b | difference [95% CI] | seeds + |
+|---|---|---|---|
+| assist2017 | matched 49153 20 minus ladder 49153 10 | +0.0039 [+0.0028, +0.0049] | 6/6 |
+| assist2017 | matched 15000 33 minus ladder 15000 10 | +0.0175 [+0.0170, +0.0181] | 6/6 |
+| assist2017 | matched 5000 96 minus ladder 5000 10 | +0.0165 [+0.0157, +0.0173] | 6/6 |
+| assist2017 | matched 15000 33 minus ladder 49153 10 | -0.0000 [-0.0007, +0.0006] | 3/6 |
+| assist2017 | matched 5000 96 minus ladder 49153 10 | -0.0030 [-0.0041, -0.0021] | 0/6 |
+| junyi | matched 49153 20 minus ladder 49153 10 | +0.0018 [+0.0013, +0.0023] | 6/6 |
+| junyi | matched 15000 33 minus ladder 15000 10 | +0.0031 [+0.0026, +0.0036] | 6/6 |
+| junyi | matched 5000 96 minus ladder 5000 10 | +0.0035 [+0.0028, +0.0042] | 6/6 |
+| junyi | matched 15000 33 minus ladder 49153 10 | -0.0005 [-0.0011, +0.0000] | 2/6 |
+| junyi | matched 5000 96 minus ladder 49153 10 | -0.0015 [-0.0022, -0.0009] | 0/6 |
+| assist2017 | junyi_source 49153 20 minus matched 49153 20 | -0.0002 [-0.0019, +0.0016] | 2/6 |
+| assist2017 | junyi_source 49153 20 minus ladder 49153 10 | +0.0037 [+0.0023, +0.0051] | 6/6 |
+
+_Read: with the number of updates matched to the 49,153 rung, 15,000 learners transfer as well as
+49,153 learners trained for 10 epochs: the difference is -0.0000 [-0.0007, +0.0006] on assist2017
+and -0.0005 [-0.0011, +0.0000] on junyi. At the same update count 5,000 learners fall short, -0.0030
+and -0.0015 with both intervals below zero. Doubling the updates at 49,153 learners adds +0.0039 and
++0.0018. At matched learners and updates the Junyi encoder and EdNet 49,153 tie on assist2017
+(-0.0002 [-0.0019, +0.0016]), while against the 10-epoch EdNet 49,153 Junyi leads by +0.0037. So the
+sign change between 15,000 and 49,153 in the ladder is an effect of the number of updates, and a
+data shortfall remains at 5,000 learners at this update count. Going from 150,000 to 353,597
+learners at 10 epochs adds +0.0018 on assist2017 and +0.0019 on junyi at full precision, and every
+353,597 draw exceeds every 150,000 draw on both targets; that step also multiplies the updates by
+2.4 (11,720 to 27,630), so it is not budget-matched either. Caveats: 96 epochs on 5,000 learners may
+overfit (only training loss is recorded); the matched-scale comparison has one target; the 5,000 x
+96 draw spread on assist2017 (0.0035) is the largest in this section._
+
+### 12.2 Recipe-matched objective comparison (each objective rebuilt 3 times under the full encoder's recipe, 10 epochs, batch 128, 5% warm-up; per-seed values averaged over the builds; 6 seeds; EdNet source)
+
+| target | full | skill_only | correct_only | scratch | skill minus correct | best (top-equivalent) |
+|---|---|---|---|---|---|---|
+| assist2017 | 0.6895 | 0.6863 | 0.6639 | 0.6648 | +0.0224 | full |
+| junyi | 0.7231 | 0.7159 | 0.7283 | 0.7121 | -0.0124 | correct_only |
+| algebra2005 | 0.7867 | 0.7876 | 0.7721 | 0.7806 | +0.0155 | skill_only, full, scratch |
+| bridge2006 | 0.7748 | 0.7731 | 0.7670 | 0.7733 | +0.0060 | full |
+| assist2009 | 0.8704 | 0.8695 | 0.8670 | 0.8698 | +0.0025 | full, scratch |
+| algebra2006 | 0.7892 | 0.7886 | 0.7785 | 0.7867 | +0.0102 | full, skill_only |
+
+Build against seed variance (draw by seed layout, 3 builds on shared fine-tune seeds, all 18
+objective-target pairs): the full objective shows no build effect on any target (every p above
+0.5); the single-signal objectives reach p < 0.05 in 3 of 12 pairs, about one expected by chance.
+Every build SD is at most 0.0012, against seed SDs of 0.0007 to 0.0045 (0.0161 for the noisy
+algebra2005 correct_only cell).
+
+_Read: skill minus correct keeps its sign on all six targets, so the objective reversal is not a
+product of the recipe mismatch in the original single-signal encoders, and correct_only stays below
+scratch on the four later datasets. Decision uncertainty in this benchmark comes mainly from
+fine-tune seeds, not encoder builds._
+
