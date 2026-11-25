@@ -13,7 +13,7 @@ from fractions import Fraction
 from pathlib import Path
 
 _HERE = Path(__file__).resolve().parent
-_CODE = {_HERE / "nlp_budget_extension.py": "23fec735621e8621ad11367fc7d88d2b",
+_CODE = {_HERE / "nlp_budget_extension.py": "39d08a0959e4f99f5c01510912b2b840",
          _HERE / "reversal_table.py": "6f56ff64bd2bc6b86637c4a8eb464b51"}
 for _p, _m in _CODE.items():
     if hashlib.md5(_p.read_bytes()).hexdigest() != _m:
@@ -339,8 +339,13 @@ def main(argv: list[str] | None = None) -> None:
         else:
             L += [f"Spread over the {a.qt_draws} draws of one run per model (2.5th and 97.5th "
                   f"percentiles of the mean floor): {stl.dec(Fraction(qspread[0]), nd)} to "
-                  f"{stl.dec(Fraction(qspread[1]), nd)}. Ties go to the model name. The drawn run "
-                  "is part of the median outcome, so this floor is optimistic.", ""]
+                  f"{stl.dec(Fraction(qspread[1]), nd)}. Ties go to the model name. Added after "
+                  "the first run (2026-11-25): every Quick-Tune run has its own random "
+                  "hyperparameters (docs/trajectory_design.md, rule A), so one run "
+                  "per model measures the variability of a hyperparameter draw, not of a seed; "
+                  "the methods read curves that are medians over the same runs that define the "
+                  "outcome, so this floor is not comparable with them and the readings below are "
+                  "not a seed-noise comparison.", ""]
         L += ["| method | setting | decisions followed | compute (GPU-h) | regret | floor on "
               "those decisions | excess over the floor [95% CI] | normalized excess [95% CI] | "
               "reading | difference from the static choice [95% CI] |",
@@ -367,7 +372,8 @@ def main(argv: list[str] | None = None) -> None:
         L.append("")
     L += ["Limitations: StudentBERT has 7 targets and NLP 5 tasks, so intervals are wide; the NLP "
           "floor includes the protocol difference to the published outcome; the Quick-Tune floor "
-          "is optimistic; the StudentBERT floor at the estimator seeds was known before (12.27).",
+          "measures hyperparameter-draw variability and is not comparable with the methods; the "
+          "StudentBERT floor at the estimator seeds was known before (12.27).",
           ""]
 
     out = Path(a.out)

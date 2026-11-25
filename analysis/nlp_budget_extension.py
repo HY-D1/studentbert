@@ -374,7 +374,7 @@ def main(argv: list[str] | None = None) -> None:
             lo, hi = Fraction(rr["ci_low"]) / norm, Fraction(rr["ci_high"]) / norm
             cells.append(f"{rr['param']}: {stl.dec(exact_norm_regret(nl, rr['choices'], norm), 3)}"
                          f" [{stl.dec(lo, 3)}, {stl.dec(hi, 3)}] at {rr['compute_gpu_h']:.3f}")
-        L.append(f"| {name.split(' (')[0]} | {b['label']} | {b['compute']:.3f} | "
+        L.append(f"| {name.rsplit(' (normalized', 1)[0]} | {b['label']} | {b['compute']:.3f} | "
                  f"{stl.dec(b['R'], 3)} | {' | '.join(cells)} |")
     L += ["", "Selective regret is over the trusted decisions only; the references are over all "
           f"{len(nl)} decisions.", ""]
@@ -416,9 +416,9 @@ def main(argv: list[str] | None = None) -> None:
                          f"{' | '.join(own_cells)} |")
     L += ["", "Limitations: five NLP tasks make the intervals wide; the outcome is the published "
           "fully fine-tuned performance, not epoch 10 of these 10,000-example runs; epochs 1 to 3 "
-          "can differ slightly from the recorded runs (GPU nondeterminism), so every budget comes "
-          "from the new runs; the NLP result up to epoch 3 was known before this extension was "
-          "designed.", ""]
+          "differ from the recorded runs in most runs, by up to the largest difference in the "
+          "table above (GPU nondeterminism), so every budget comes from the new runs; the NLP "
+          "result up to epoch 3 was known before this extension was designed.", ""]
 
     out = Path(a.out)
     tsv = out.with_name(out.name + ".tsv")
