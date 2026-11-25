@@ -1,6 +1,6 @@
 # Paper B: reliable transfer guidance (estimators, warning signal, fresh-seed validation)
 
-Generated from RESULTS.md (md5 eeeb20becddcab752782e7f64e505fe5) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
+Generated from RESULTS.md (md5 c0bac2881e8b65049df2620f9e547887) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
 
 - 12.3: a990d4030a606f0669466ec1b8ceb3c4
 - 12.4: 9c1bf912b795dbb1c64da6500d423ae1

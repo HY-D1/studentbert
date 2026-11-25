@@ -2867,6 +2867,335 @@ a normalizer of 0.007540), so at that compute selective trust is not shown to be
 halving on regret; what it adds is knowing which decisions to evaluate further. Intervals are wide
 (7 StudentBERT targets, 5 NLP tasks). StudentBERT is retrospective, NLP stops at 3 epochs,
 Quick-Tune's outcome shares its curves with the signal, and the t = 0 results were known before._
+### 12.29 NLP selective trust at 1, 2, 3, 5 and 10 epochs: coverage, regret and compute (analysis/nlp_budget_extension.py, commit 6f269bf, job 12136024)
+
+Task: Prof. Hazra (2026-11-20 and 11-23), for Paper C: extend the NLP early fine-tuning runs to 5
+and 10 epochs with the same models, tasks, seeds, decision rule, threshold and compute accounting,
+without new tuning, and report coverage, regret and compute at 1, 2, 3, 5 and 10 epochs, whether NLP
+ever reaches the selective-trust target, where the curve flattens or gets worse, the best budget
+against successive halving and the early leader at similar compute, and whether the useful budget is
+still domain-dependent. docs/nlp_budget_extension_design.md (commit 29652a2) fixed the runs, rules
+and read-outs before any run; the 630 runs (7 encoders x 5 tasks x 2 poolings x 9 seeds) were rerun
+from the pretrained encoders to 10 epochs with scripts/task4_early_ft.py unchanged
+(slurm/generators/gen_nlp_ft10_jobs.sh, commit 998efa3; 210 jobs, all COMPLETED, 76.02 GPU-hours on
+V100-SXM2), after a 5-run protocol check. analysis/nlp_budget_extension.py (commit 3b542c0) was not
+run on real data before its first run (job 12135671); a report label (the factor-3 row of item 4)
+and the limitation wording on epochs 1 to 3 were then corrected (commit 6f269bf) and the analysis
+rerun (job 12136024) with identical tables (the two table files have the same md5 in both runs).
+Evidence classes: the results up to epoch 3 were known before (12.27, 12.28); epochs 4 to 10, the
+budgets 5 and 10 and the read-outs are pre-specified and descriptive. Every NLP budget, including 1
+to 3, comes from the new runs, so 12.28 stays as recorded.
+
+Files (md5): nlp_budget_extension_design.md d82d64f47e3d23f35a94316446a0041b,
+nlp_budget_extension.py 39d08a0959e4f99f5c01510912b2b840, test_nlp_budget_extension.py
+94a8f7bbd4fab16aff25b83450b3ffc5, selective_trust.py 561f9d471f9df4686c35bf6f5c7129a0,
+regret_compute.py fd4288700ffd9af74fe92911371935ae, compare_ft_epochs.py
+16fbc8a6b27de3bec529729e1dec032e, gen_nlp_ft10_jobs.sh 8038b2ea85aa01443c800a6a891e604b,
+task4_early_ft.py 9c87a401c955fc90aca772e5c17cbf08, nlp_budget_extension_report.md
+6737d85651b7bedb453967c3674e1333, nlp_budget_extension.tsv adb591aa86fbaed5a606da575b2c288f,
+nlp_budget_extension_references.tsv 2e655e0112e3d896d70a75f36579b0e0, trajectories.tsv
+e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7,
+tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa, tg1_task2_kt_algebra2006.jsonl
+d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl 5823dd2999f96921409b9cce5272d924,
+tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff, tg1_task2_kt_bridge2006.jsonl
+38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl 59096f8a8941896c18ca60515ffdd9f2,
+tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0, nlp_head_pairs.tsv
+d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1,
+p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, task4_scores.jsonl
+9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl 20c403eb43ade91bac987af41538299e,
+task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220, qt_scores.jsonl
+b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e. The 630 new
+runs are pinned by the manifest md5 in the report; the tables hold the full threshold grid and the
+reference rows.
+
+Report as written by analysis/nlp_budget_extension.py (headings lowered two levels):
+
+
+Evidence classes: the runs, rules and read-outs are fixed in docs/nlp_budget_extension_design.md (commit 29652a2), committed before any run; the results up to epoch 3 were known before (RESULTS.md 12.27 and 12.28); epochs 4 to 10, the budgets 5 and 10, the flattening and worsening read-outs and the transfer test at 5 and 10 are new; all read-outs are descriptive. Every NLP budget comes from the new 10-epoch runs (one campaign). Rules as in RESULTS.md 12.28 (analysis/selective_trust.py, imported): trust when the normalized lead L >= t, t from -1.00 to 1.00 in steps of 0.05, t = 0 the common fixed rule, normalized regret over a random candidate's mean regret, targets 0.10 and 0.50, 95% cluster bootstrap over the 5 tasks (10,000 resamples, random.Random(0)). The script was not run on real data before this run; its tests use synthetic decisions.
+
+Inputs: trajectories.tsv e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7, tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa, tg1_task2_kt_algebra2006.jsonl d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl 5823dd2999f96921409b9cce5272d924, tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff, tg1_task2_kt_bridge2006.jsonl 38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl 59096f8a8941896c18ca60515ffdd9f2, tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0, nlp_head_pairs.tsv d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1, p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, task4_scores.jsonl 9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl 20c403eb43ade91bac987af41538299e, task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220, qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e. Design files: selective_trust_design.md f63bfdc6bc0df97a97fb2fc97ef0eddd, selective_trust_amendment_1.md de8a55b63b442dd2d1f28bb7bb2c1c9e, selective_trust_amendment_2.md e8c9ae36be77cfb3fd887b1a6f0a82f2, nlp_budget_extension_design.md d82d64f47e3d23f35a94316446a0041b. Code: selective_trust.py 561f9d471f9df4686c35bf6f5c7129a0, compare_ft_epochs.py 16fbc8a6b27de3bec529729e1dec032e, regret_compute.py fd4288700ffd9af74fe92911371935ae. New runs: 630 (manifest md5 b9301dfc082b1e045459546c26521f56).
+
+Checks passed: the recorded NLP, StudentBERT and Quick-Tune decisions reproduce every RESULTS.md 12.27 "warning, abstain" row; the reference rows reproduce the 12.27 early leader and successive-halving rows on the recorded runs; every new run has epochs 1 to 10 and the data and settings of its recorded run; the normalizer is unchanged.
+
+#### The new runs against the recorded 3-epoch runs
+
+| seed group | runs | epochs 1 to 3 identical | largest validation-accuracy difference | GPU-hours (10 epochs) |
+|---|---|---|---|---|
+| 42, 1, 2 | 210 | 44 | 0.4730 | 25.33 |
+| 3, 4, 5 | 210 | 40 | 0.4475 | 25.38 |
+| 6, 7, 8 | 210 | 42 | 0.2094 | 25.31 |
+
+t = 0 at 1, 2 and 3 epochs, new runs beside RESULTS.md 12.28 (trusted decisions, mean selective regret in points):
+
+| budget | new runs | RESULTS.md 12.28 |
+|---|---|---|
+| epoch 1 | 26, 1.27 | 25, 0.70 |
+| epoch 2 | 20, 0.73 | 20, 0.90 |
+| epoch 3 | 21, 0.47 | 24, 0.50 |
+
+#### 1. Per budget
+
+90 decisions. Mean regret of a random candidate (the normalizer): 3.3633 points. At t = 0, with the area under the normalized selective-regret curve over all thresholds, the highest-coverage threshold that meets normalized selective regret <= 0.10 at that budget, and the references at the nearest compute (method setting: mean regret in points at GPU-h).
+
+| budget | compute per decision (GPU-h) | trusted, coverage [95% CI] | selective regret [95% CI] | normalized [95% CI] | area (from coverage) | best threshold [band]: trusted, coverage [95% CI]; normalized [95% CI] | early leader | successive halving | successive halving (factor 3) |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 (trust all) | 0.029 | 90/90, 1.000 [1.000, 1.000] | 2.59 [1.00, 3.93] | 0.770 [0.296, 1.170] | n/a | n/a | epoch 1: 1.64 at 0.086 | rungs 1,2,3: 1.35 at 0.158 | rungs 1,2,3: 1.56 at 0.122 |
+| epoch 1 | 0.115 | 26/90, 0.289 [0.111, 0.522] | 1.27 [0.13, 3.80] | 0.377 [0.039, 1.129] | 0.514 (from 0.011) | 0.40 [0.35, 0.40]: 1/90, 0.011 [0.000, 0.033]; 0.000 [0.000, 0.000] | epoch 1: 1.64 at 0.086 | rungs 1,2,3: 1.35 at 0.158 | rungs 1,2,3: 1.56 at 0.122 |
+| epoch 2 | 0.199 | 20/90, 0.222 [0.056, 0.433] | 0.73 [0.00, 3.45] | 0.217 [0.000, 1.026] | 0.479 (from 0.044) | 0.15 [0.15, 0.15]: 7/90, 0.078 [0.000, 0.211]; 0.091 [0.000, 0.639] | epoch 2: 1.21 at 0.170 | start 1: 1.43 at 0.183 | start 1: 1.28 at 0.158 |
+| epoch 3 | 0.283 | 21/90, 0.233 [0.044, 0.467] | 0.47 [0.00, 1.48] | 0.139 [0.000, 0.439] | 0.394 (from 0.011) | 0.15 [0.10, 0.15]: 11/90, 0.122 [0.000, 0.322]; 0.075 [0.000, 0.412] | epoch 3: 1.00 at 0.254 | start 2: 1.34 at 0.363 | start 2: 1.32 at 0.315 |
+| epoch 5 | 0.452 | 21/90, 0.233 [0.100, 0.422] | 0.74 [0.00, 2.07] | 0.219 [0.000, 0.614] | 0.432 (from 0.033) | 0.10 [0.10, 0.10]: 14/90, 0.156 [0.011, 0.389]; 0.046 [0.000, 0.639] | epoch 5: 1.00 at 0.423 | start 3: 1.10 at 0.498 | start 3: 0.95 at 0.472 |
+| epoch 10 | 0.874 | 29/90, 0.322 [0.144, 0.556] | 0.75 [0.00, 1.81] | 0.223 [0.000, 0.540] | 0.410 (from 0.011) | 0.60 [0.45, 0.60]: 1/90, 0.011 [0.000, 0.033]; 0.000 [0.000, 0.000] | epoch 10: 1.02 at 0.845 | start 3: 1.10 at 0.498 | start 3: 0.95 at 0.472 |
+
+#### 2. The domain-specific budget for NLP (k = 0, 1, 2, 3, 5, 10)
+
+The smallest budget (k = 0, trusting every decision, checked first) at which some threshold reaches normalized selective regret at most 0.10 with coverage at least 0.50, with the highest-coverage such threshold (ties to the largest t).
+
+Not reached at any budget up to 10 epochs.
+
+#### 3. Does more budget help
+
+k* is the budget with the lowest mean normalized regret (ties to the lower compute). Flattening is the smallest budget k after which no larger budget lowers the mean normalized regret by more than 0.02. Worsening lists every budget larger than k* with a higher mean normalized regret, with a 95% paired cluster-bootstrap interval of R(k) minus R(k*) on the same resampled tasks. For successive halving the configurations are ordered by compute per decision. Coverage at t = 0: 0 (trust all) 90/90, epoch 1 26/90, epoch 2 20/90, epoch 3 21/90, epoch 5 21/90, epoch 10 29/90.
+
+- selective trust at t = 0 (normalized selective regret over the trusted decisions): lowest mean normalized regret (k*) at epoch 3, 0.139 at 0.283 GPU-h; flattening at epoch 3 (0.139); larger budgets with a higher mean normalized regret than k*:
+  - epoch 5: 0.219, difference 0.080 [-0.020, 0.410], 2 resamples without a trusted decision left out
+  - epoch 10: 0.223, difference 0.084 [-0.010, 0.349], 2 resamples without a trusted decision left out
+- early leader (normalized regret over all 90 decisions): lowest mean normalized regret (k*) at epoch 3, 0.296 at 0.254 GPU-h; flattening at epoch 3 (0.296); larger budgets with a higher mean normalized regret than k*:
+  - epoch 5: 0.297, difference 0.000 [-0.065, 0.058]
+  - epoch 10: 0.302, difference 0.006 [-0.067, 0.065]
+- successive halving (normalized regret over all 90 decisions): lowest mean normalized regret (k*) at start 3, 0.327 at 0.498 GPU-h; flattening at start 3 (0.327); no larger budget has a higher mean normalized regret than k*.
+- successive halving (factor 3) (normalized regret over all 90 decisions): lowest mean normalized regret (k*) at start 3, 0.282 at 0.472 GPU-h; flattening at start 3 (0.282); no larger budget has a higher mean normalized regret than k*.
+
+#### 4. The best budget against the references at similar compute
+
+| method | k* | compute (GPU-h) | normalized regret | early leader | successive halving | successive halving (factor 3) |
+|---|---|---|---|---|---|---|
+| selective trust at t = 0 | epoch 3 | 0.283 | 0.139 | epoch 3: 0.296 [0.097, 0.602] at 0.254 | start 2: 0.399 [0.104, 0.883] at 0.363 | start 2: 0.392 [0.130, 0.798] at 0.315 |
+| early leader | epoch 3 | 0.254 | 0.296 | epoch 3: 0.296 [0.097, 0.602] at 0.254 | start 1: 0.426 [0.116, 0.892] at 0.183 | start 2: 0.392 [0.130, 0.798] at 0.315 |
+| successive halving | start 3 | 0.498 | 0.327 | epoch 5: 0.297 [0.118, 0.548] at 0.423 | start 3: 0.327 [0.132, 0.608] at 0.498 | start 3: 0.282 [0.082, 0.587] at 0.472 |
+| successive halving (factor 3) | start 3 | 0.472 | 0.282 | epoch 5: 0.297 [0.118, 0.548] at 0.423 | start 3: 0.327 [0.132, 0.608] at 0.498 | start 3: 0.282 [0.082, 0.587] at 0.472 |
+
+Selective regret is over the trusted decisions only; the references are over all 90 decisions.
+
+#### 5. Secondary: leave-one-domain-out threshold transfer at k = 5 and 10
+
+As in RESULTS.md 12.28: the threshold is chosen on the two other domains and applied to the held-out one, beside its own best threshold. StudentBERT and Quick-Tune as in 12.28, NLP from the 10-epoch runs. "none": no threshold qualifies.
+
+| budget | held out | rule | source threshold [band] | source coverage, normalized regret | held-out trusted, coverage [95% CI] | held-out normalized regret [95% CI] | own best threshold [band] | own trusted, coverage [95% CI] | own normalized regret [95% CI] |
+|---|---|---|---|---|---|---|---|---|---|
+| epoch 5 | studentbert | primary (by decision) | 0.10 [0.10, 0.10] | 0.094, 0.038 | 8/21, 0.381 [0.095, 0.714] | 0.171 [0.000, 0.685] | 0.15 [0.15, 0.15] | 7/21, 0.333 [0.048, 0.667] | 0.000 [0.000, 0.000] |
+| epoch 5 | studentbert | sensitivity analysis (equal domain weight) | 0.05 [0.05, 0.05] | 0.122, 0.067 | 10/21, 0.476 [0.143, 0.857] | 0.137 [0.000, 0.343] | 0.15 [0.15, 0.15] | 7/21, 0.333 [0.048, 0.667] | 0.000 [0.000, 0.000] |
+| epoch 5 | nlp | primary (by decision) | 0.15 [0.15, 0.15] | 0.090, 0.000 | 12/90, 0.133 [0.011, 0.322] | 0.053 [0.000, 0.639] | 0.10 [0.10, 0.10] | 14/90, 0.156 [0.011, 0.389] | 0.046 [0.000, 0.639] |
+| epoch 5 | nlp | sensitivity analysis (equal domain weight) | -0.30 [-0.30, -0.30] | 0.493, 0.086 | 49/90, 0.544 [0.278, 0.811] | 0.442 [0.132, 0.982] | 0.10 [0.10, 0.10] | 14/90, 0.156 [0.011, 0.389] | 0.046 [0.000, 0.639] |
+| epoch 5 | quicktune | primary (by decision) | 0.10 [0.10, 0.10] | 0.198, 0.091 | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] | 0.35 [-0.30, 0.35] | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] |
+| epoch 5 | quicktune | sensitivity analysis (equal domain weight) | 0.15 [0.15, 0.15] | 0.233, 0.027 | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] | 0.35 [-0.30, 0.35] | 3/90, 0.033 [0.000, 0.100] | 0.000 [0.000, 0.000] |
+| epoch 10 | studentbert | primary (by decision) | 0.05 [0.05, 0.05] | 0.150, 0.094 | 4/21, 0.190 [0.048, 0.381] | 0.057 [0.000, 0.229] | 0.00 [0.00, 0.00] | 5/21, 0.238 [0.048, 0.476] | 0.092 [0.000, 0.229] |
+| epoch 10 | studentbert | sensitivity analysis (equal domain weight) | -0.10 [-0.10, -0.10] | 0.217, 0.098 | 10/21, 0.476 [0.190, 0.714] | 0.269 [0.075, 0.412] | 0.00 [0.00, 0.00] | 5/21, 0.238 [0.048, 0.476] | 0.092 [0.000, 0.229] |
+| epoch 10 | nlp | primary (by decision) | 0.00 [0.00, 0.00] | 0.099, 0.042 | 29/90, 0.322 [0.144, 0.556] | 0.223 [0.000, 0.540] | 0.60 [0.45, 0.60] | 1/90, 0.011 [0.000, 0.033] | 0.000 [0.000, 0.000] |
+| epoch 10 | nlp | sensitivity analysis (equal domain weight) | 0.00 [0.00, 0.00] | 0.152, 0.046 | 29/90, 0.322 [0.144, 0.556] | 0.223 [0.000, 0.540] | 0.60 [0.45, 0.60] | 1/90, 0.011 [0.000, 0.033] | 0.000 [0.000, 0.000] |
+| epoch 10 | quicktune | primary (by decision) | 0.60 [0.45, 0.60] | 0.009, 0.000 | 0/90, 0.000 [0.000, 0.000] | n/a | -0.30 [-0.30, -0.30] | 12/90, 0.133 [0.033, 0.267] | 0.050 [0.000, 0.107] |
+| epoch 10 | quicktune | sensitivity analysis (equal domain weight) | 0.05 [0.05, 0.05] | 0.212, 0.089 | 6/90, 0.067 [0.000, 0.167] | 0.000 [0.000, 0.000] | -0.30 [-0.30, -0.30] | 12/90, 0.133 [0.033, 0.267] | 0.050 [0.000, 0.107] |
+
+Limitations: five NLP tasks make the intervals wide; the outcome is the published fully fine-tuned performance, not epoch 10 of these 10,000-example runs; epochs 1 to 3 differ from the recorded runs in most runs, by up to the largest difference in the table above (GPU nondeterminism), so every budget comes from the new runs; the NLP result up to epoch 3 was known before this extension was designed.
+
+Files: nlp_budget_extension.tsv adb591aa86fbaed5a606da575b2c288f, nlp_budget_extension_references.tsv 2e655e0112e3d896d70a75f36579b0e0
+
+_Read: more early fine-tuning does not bring NLP to the selective-trust target. At t = 0 the trusted
+decisions are 26/90, 20/90, 21/90, 21/90 and 29/90 at 1, 2, 3, 5 and 10 epochs, with normalized
+selective regret 0.377, 0.217, 0.139, 0.219 and 0.223, for 0.115 to 0.874 GPU-hours per decision. No
+budget up to 10 epochs reaches normalized selective regret at most 0.10 with coverage at least 0.50;
+the highest coverage under the regret target is 14/90 (0.156) at 5 epochs. Selective trust and the
+early leader are lowest at 3 epochs (0.139 and 0.296) and flatten there; at 5 and 10 epochs
+selective trust is higher by 0.080 [-0.020, 0.410] and 0.084 [-0.010, 0.349], and the early leader
+by 0.000 and 0.006, intervals that span zero, so a worsening is not shown. Successive halving is
+lowest at its largest configuration (start 3: 0.327 at 0.498 GPU-hours; factor 3: 0.282 at 0.472).
+Near 0.25 to 0.28 GPU-hours, selective trust at 3 epochs has 0.139 over its 21 trusted decisions,
+the early leader at 3 epochs 0.296 over all 90, and successive halving 0.392 to 0.399; selective
+regret counts only the trusted decisions, so these are not like for like. With 12.28 (StudentBERT
+reaches the target at 2 epochs, Quick-Tune does not), NLP's answer stays not reached up to 10
+epochs; at 5 and 10 epochs a threshold chosen on the two other domains still misses on some held-out
+domains (held-out StudentBERT 0.171 at 5 epochs, held-out NLP 0.442 under equal domain weight at 5,
+held-out Quick-Tune 0/90 at 10). The reruns did not replay the recorded first epochs exactly (44, 40
+and 42 of 210 runs per seed group repeat epochs 1 to 3; the largest difference is 0.4730), and the t
+= 0 rows at 1 to 3 epochs moved with them (1.27 points at 1 epoch against 0.70 in 12.28). Five tasks
+make the intervals wide, and the outcome is the published fully fine-tuned performance._
+### 12.30 Noise floor per domain, and every method relative to it (analysis/noise_floor.py, commit 6f269bf, job 12136043)
+
+Task: Prof. Hazra (2026-11-24, before drafting Paper C): a noise-floor analysis per domain, to show
+whether the regret differences between methods are meaningfully above the variability from using one
+validation seed instead of the multi-seed final outcome, with methods reported relative to the floor
+and paired bootstrap uncertainty. The floor and read-outs follow a design written on 2026-11-24
+before analysis/noise_floor.py; at Harry's request the design is kept outside the repository, so no
+commit documents its date, and the analysis is described as designed before the run, not as
+pre-specified. The script (commit 4d49821) was not run on real data before its first run (job
+12135833); after the audit its Quick-Tune wording was corrected, as marked in the report, and it was
+rerun (commit 6f269bf, job 12136043) with the same table (noise_floor.tsv has the same md5 in both
+runs). Floor: the regret of choosing by one seed's (or one run's) complete fine-tuning, the best
+validation score over its epochs; StudentBERT and Quick-Tune decisions as in 12.27, NLP from the
+10-epoch campaign of 12.29. The StudentBERT floor at the estimator seeds is the 12.27 row full
+fine-tuning, best validation, known before. Descriptive.
+
+Files (md5): noise_floor.py fcc5c16b485fc061a04ff43599851224, test_noise_floor.py
+5c20425bfe2eb6cee8d399aaa6f66d4f, nlp_budget_extension.py 39d08a0959e4f99f5c01510912b2b840,
+reversal_table.py 6f56ff64bd2bc6b86637c4a8eb464b51, regret_compute.py
+fd4288700ffd9af74fe92911371935ae, noise_floor_report.md c0b276810b4dfd6c3fc7ca05e9c996fc,
+noise_floor.tsv 39a48176dd549371d5b56cd89a781834, executions.tsv 92a3e5250b50727f911fe6f09d4b225b,
+trajectories.tsv e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv
+8f57558d142869b3e34a35ad18d095f7, tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa,
+tg1_task2_kt_algebra2006.jsonl d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl
+5823dd2999f96921409b9cce5272d924, tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff,
+tg1_task2_kt_bridge2006.jsonl 38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl
+59096f8a8941896c18ca60515ffdd9f2, tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0,
+nlp_head_pairs.tsv d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv
+9123ad27c17496af7f5f51cdb1987bc1, p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c,
+task4_scores.jsonl 9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl
+20c403eb43ade91bac987af41538299e, task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220,
+qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl
+50ea8a9ba8fd20713c25211fd30c6f8e. The design file is outside the repository and is not pinned.
+
+Report as written by analysis/noise_floor.py (headings lowered two levels):
+
+
+Evidence classes: the floor and the read-outs follow a design written on 2026-11-24 before this script, kept outside the repository at Harry's request, so no commit documents its date; the read-outs are descriptive. The StudentBERT floor at the estimator seeds is the RESULTS.md 12.27 row "full fine-tuning, best validation", known before. NLP uses the 10-epoch campaign of analysis/nlp_budget_extension.py. Floor: the regret, against the domain's outcome, of choosing by one seed's (or one run's) complete fine-tuning, the best validation score over its epochs. Excess: the mean over the decisions a method follows of its regret minus the decision's floor, with a 95% paired cluster bootstrap (targets or tasks, 10,000 resamples, random.Random(0)). The script was not run on real data before this run; its tests use synthetic data.
+
+Inputs: trajectories.tsv e93329cbc69ae8a3af843c544d43793b, reversal_pairs.tsv 8f57558d142869b3e34a35ad18d095f7, tg1_task2_kt_algebra2005.jsonl 268ff75c4c59a23b2fa4d9bcc85b60aa, tg1_task2_kt_algebra2006.jsonl d0f758940ee42bfdd8275e00ff12fe49, tg1_task2_kt_assist2009.jsonl 5823dd2999f96921409b9cce5272d924, tg1_task2_kt_assist2017.jsonl f8a29e8c85e022e3306350ee159e31ff, tg1_task2_kt_bridge2006.jsonl 38235d16b5d18d72d97bb9d8b9a9a0e0, tg1_task2_kt_ednet.jsonl 59096f8a8941896c18ca60515ffdd9f2, tg1_task2_kt_junyi.jsonl bc1af53d5d042f25d57057952795dad0, nlp_head_pairs.tsv d023dd9346eb1020afa11d1dacbaf579, p2_head_pairs.tsv 9123ad27c17496af7f5f51cdb1987bc1, p3_head_pairs.tsv 9bad0afce43c426c8105473a6b8f918c, task4_scores.jsonl 9dfe5d930681ec04d79cb52c149bbc4e, task4_scores_fresh.jsonl 20c403eb43ade91bac987af41538299e, task4_scores_p3.jsonl 34ef47d06f1e7d155c585547a51f9220, qt_scores.jsonl b7f48f2f5c6ee9c45ce17201a6d2f9ea, extract_log.jsonl 50ea8a9ba8fd20713c25211fd30c6f8e, executions.tsv 92a3e5250b50727f911fe6f09d4b225b. Design files: selective_trust_design.md f63bfdc6bc0df97a97fb2fc97ef0eddd, selective_trust_amendment_1.md de8a55b63b442dd2d1f28bb7bb2c1c9e, selective_trust_amendment_2.md e8c9ae36be77cfb3fd887b1a6f0a82f2, nlp_budget_extension_design.md d82d64f47e3d23f35a94316446a0041b. Code: nlp_budget_extension.py 39d08a0959e4f99f5c01510912b2b840, reversal_table.py 6f56ff64bd2bc6b86637c4a8eb464b51, regret_compute.py fd4288700ffd9af74fe92911371935ae. NLP 10-epoch runs: 630 (manifest md5 b9301dfc082b1e045459546c26521f56).
+
+Checks passed: the recorded decisions of all three domains reproduce every RESULTS.md 12.27 "warning, abstain" row; every StudentBERT and Quick-Tune method row reproduces its 12.27 row; the NLP reference rows reproduce 12.27 on the recorded runs; the 10-epoch runs match their recorded runs in data and settings; the Quick-Tune run medians reproduce the 12.27 curves; the executions.tsv 6-seed means reproduce the StudentBERT gold.
+
+#### studentbert (test AUC)
+
+Primary floor: 0.0003 [0.0000, 0.0006] test AUC, normalized 0.033; zero regret on 15 of 21 decisions.
+
+Spread over the 6 fine-tuning seeds (each seed's pick, mean over the 7 targets; ties to the candidate name): seed 1 0.0004, seed 2 0.0009, seed 3 0.0001, seed 4 0.0001, seed 5 0.0004, seed 42 0.0003; range 0.0001 to 0.0009.
+
+Secondary, the seed oracle (the best test AUC of one seed against the 6-seed mean): seed 1 0.0002, seed 2 0.0002, seed 3 0.0000, seed 4 0.0001, seed 5 0.0000, seed 42 0.0001; mean 0.0001.
+
+| method | setting | decisions followed | compute (GPU-h) | regret | floor on those decisions | excess over the floor [95% CI] | normalized excess [95% CI] | reading | difference from the static choice [95% CI] |
+|---|---|---|---|---|---|---|---|---|---|
+| static H-score |  | 21/21 | 0.008 | 0.0012 | 0.0003 | 0.0010 [0.0000, 0.0020] | 0.131 [0.003, 0.269] | above the floor | n/a |
+| early leader | epoch 1 | 21/21 | 0.039 | 0.0031 | 0.0003 | 0.0029 [0.0004, 0.0068] | 0.383 [0.050, 0.908] | above the floor | 0.0019 [0.0000, 0.0049] |
+| override rule | epoch 1 | 21/21 | 0.047 | 0.0031 | 0.0003 | 0.0029 [0.0004, 0.0068] | 0.383 [0.050, 0.908] | above the floor | 0.0019 [0.0000, 0.0049] |
+| warning, abstain | epoch 1 | 17/21 | 0.047 | 0.0009 | 0.0003 | 0.0006 [-0.0000, 0.0016] | 0.084 [-0.002, 0.210] | not distinguishable from the floor | 0.0000 [0.0000, 0.0000] |
+| early leader | epoch 2 | 21/21 | 0.078 | 0.0010 | 0.0003 | 0.0008 [-0.0002, 0.0023] | 0.101 [-0.022, 0.309] | not distinguishable from the floor | -0.0002 [-0.0013, 0.0007] |
+| override rule | epoch 2 | 21/21 | 0.086 | 0.0011 | 0.0003 | 0.0008 [-0.0002, 0.0024] | 0.107 [-0.026, 0.315] | not distinguishable from the floor | -0.0002 [-0.0010, 0.0006] |
+| warning, abstain | epoch 2 | 12/21 | 0.086 | 0.0003 | 0.0003 | 0.0000 [-0.0001, 0.0001] | 0.001 [-0.013, 0.016] | not distinguishable from the floor | 0.0000 [0.0000, 0.0000] |
+| early leader | epoch 3 | 21/21 | 0.118 | 0.0006 | 0.0003 | 0.0004 [-0.0004, 0.0015] | 0.048 [-0.058, 0.200] | not distinguishable from the floor | -0.0006 [-0.0016, 0.0001] |
+| override rule | epoch 3 | 21/21 | 0.125 | 0.0006 | 0.0003 | 0.0004 [-0.0004, 0.0015] | 0.051 [-0.058, 0.204] | not distinguishable from the floor | -0.0006 [-0.0015, 0.0002] |
+| warning, abstain | epoch 3 | 12/21 | 0.125 | 0.0009 | 0.0001 | 0.0008 [-0.0001, 0.0024] | 0.110 [-0.015, 0.316] | not distinguishable from the floor | 0.0000 [0.0000, 0.0000] |
+| early leader | epoch 5 | 21/21 | 0.196 | 0.0006 | 0.0003 | 0.0003 [-0.0005, 0.0015] | 0.046 [-0.063, 0.198] | not distinguishable from the floor | -0.0006 [-0.0016, 0.0001] |
+| override rule | epoch 5 | 21/21 | 0.204 | 0.0005 | 0.0003 | 0.0003 [-0.0005, 0.0014] | 0.034 [-0.070, 0.189] | not distinguishable from the floor | -0.0007 [-0.0016, -0.0000] |
+| warning, abstain | epoch 5 | 10/21 | 0.204 | 0.0010 | 0.0000 | 0.0010 [-0.0002, 0.0026] | 0.132 [-0.026, 0.343] | not distinguishable from the floor | 0.0000 [0.0000, 0.0000] |
+| early leader | epoch 10 | 21/21 | 0.392 | 0.0021 | 0.0003 | 0.0019 [0.0000, 0.0039] | 0.249 [0.002, 0.522] | above the floor | 0.0009 [-0.0017, 0.0037] |
+| override rule | epoch 10 | 21/21 | 0.400 | 0.0017 | 0.0003 | 0.0014 [0.0000, 0.0032] | 0.187 [0.000, 0.427] | not distinguishable from the floor | 0.0004 [-0.0018, 0.0029] |
+| warning, abstain | epoch 10 | 5/21 | 0.400 | 0.0007 | 0.0007 | 0.0000 [0.0000, 0.0000] | 0.000 [0.000, 0.000] | not distinguishable from the floor | 0.0000 [0.0000, 0.0000] |
+| early leader | epoch 20 | 21/21 | 0.784 | 0.0017 | 0.0003 | 0.0015 [0.0003, 0.0032] | 0.197 [0.045, 0.427] | above the floor | 0.0005 [-0.0014, 0.0027] |
+| override rule | epoch 20 | 21/21 | 0.792 | 0.0017 | 0.0003 | 0.0014 [0.0002, 0.0032] | 0.188 [0.028, 0.422] | above the floor | 0.0004 [-0.0013, 0.0026] |
+| warning, abstain | epoch 20 | 10/21 | 0.792 | 0.0009 | 0.0004 | 0.0005 [0.0000, 0.0014] | 0.062 [0.000, 0.182] | not distinguishable from the floor | 0.0000 [0.0000, 0.0000] |
+| successive halving | start 1 | 21/21 | 0.078 | 0.0007 | 0.0003 | 0.0004 [-0.0002, 0.0011] | 0.058 [-0.022, 0.144] | not distinguishable from the floor | -0.0006 [-0.0011, -0.0001] |
+| successive halving | start 2 | 21/21 | 0.157 | 0.0007 | 0.0003 | 0.0005 [-0.0002, 0.0013] | 0.064 [-0.024, 0.167] | not distinguishable from the floor | -0.0005 [-0.0016, 0.0007] |
+| successive halving | start 5 | 21/21 | 0.394 | 0.0013 | 0.0003 | 0.0011 [0.0002, 0.0022] | 0.140 [0.032, 0.292] | above the floor | 0.0001 [-0.0016, 0.0018] |
+| successive halving (factor 3) | start 1 | 21/21 | 0.068 | 0.0008 | 0.0003 | 0.0006 [-0.0004, 0.0017] | 0.075 [-0.052, 0.228] | not distinguishable from the floor | -0.0004 [-0.0009, -0.0000] |
+| successive halving (factor 3) | start 2 | 21/21 | 0.138 | 0.0014 | 0.0003 | 0.0012 [-0.0001, 0.0032] | 0.153 [-0.018, 0.428] | not distinguishable from the floor | 0.0002 [-0.0012, 0.0016] |
+| successive halving (factor 3) | start 5 | 21/21 | 0.344 | 0.0009 | 0.0003 | 0.0006 [0.0001, 0.0013] | 0.086 [0.019, 0.166] | above the floor | -0.0003 [-0.0017, 0.0009] |
+| full fine-tuning | best validation | 21/21 | 0.784 | 0.0003 | 0.0003 | 0.0000 [0.0000, 0.0000] | 0.000 [0.000, 0.000] | not distinguishable from the floor | -0.0010 [-0.0020, -0.0000] |
+
+#### nlp (points)
+
+Primary floor: 0.93 [0.16, 1.97] points, normalized 0.278; zero regret on 54 of 90 decisions.
+
+Spread over the 9 estimator seeds (mean over 10 decisions each): seed 1 1.12, seed 2 1.22, seed 3 1.82, seed 4 0.72, seed 5 0.34, seed 6 0.33, seed 7 0.91, seed 8 0.93, seed 42 1.03; range 0.33 to 1.82. The NLP outcome is the published fully fine-tuned performance, so this floor includes the difference between these 10,000-example runs and the published protocol.
+
+Secondary, within the protocol (one seed's epoch-10 pick against the mean epoch-10 validation accuracy of the other 8 seeds, validation points, not subtracted from the methods): 1.33.
+
+| method | setting | decisions followed | compute (GPU-h) | regret | floor on those decisions | excess over the floor [95% CI] | normalized excess [95% CI] | reading | difference from the static choice [95% CI] |
+|---|---|---|---|---|---|---|---|---|---|
+| static H-score |  | 90/90 | 0.029 | 2.59 | 0.93 | 1.65 [0.16, 3.21] | 0.492 [0.047, 0.953] | above the floor | n/a |
+| early leader | epoch 1 | 90/90 | 0.086 | 1.64 | 0.93 | 0.71 [-0.04, 1.45] | 0.210 [-0.012, 0.431] | not distinguishable from the floor | -0.95 [-2.53, 0.47] |
+| override rule | epoch 1 | 90/90 | 0.115 | 2.02 | 0.93 | 1.09 [0.13, 2.17] | 0.324 [0.039, 0.646] | above the floor | -0.57 [-2.13, 0.59] |
+| warning, abstain | epoch 1 | 26/90 | 0.115 | 1.27 | 0.78 | 0.49 [-0.13, 2.18] | 0.145 [-0.037, 0.647] | not distinguishable from the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 2 | 90/90 | 0.170 | 1.21 | 0.93 | 0.28 [-0.15, 0.68] | 0.083 [-0.046, 0.202] | not distinguishable from the floor | -1.37 [-2.93, 0.16] |
+| override rule | epoch 2 | 90/90 | 0.199 | 2.13 | 0.93 | 1.19 [0.08, 2.59] | 0.354 [0.023, 0.770] | above the floor | -0.46 [-2.40, 1.52] |
+| warning, abstain | epoch 2 | 20/90 | 0.199 | 0.73 | 0.48 | 0.24 [-0.20, 2.56] | 0.073 [-0.061, 0.761] | not distinguishable from the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 3 | 90/90 | 0.254 | 1.00 | 0.93 | 0.06 [-0.13, 0.21] | 0.018 [-0.039, 0.062] | not distinguishable from the floor | -1.59 [-3.21, -0.17] |
+| override rule | epoch 3 | 90/90 | 0.283 | 1.59 | 0.93 | 0.66 [-0.02, 1.34] | 0.196 [-0.005, 0.398] | not distinguishable from the floor | -0.99 [-2.71, 0.38] |
+| warning, abstain | epoch 3 | 21/90 | 0.283 | 0.47 | 0.55 | -0.08 [-0.17, 0.00] | -0.025 [-0.052, 0.000] | not distinguishable from the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 5 | 90/90 | 0.423 | 1.00 | 0.93 | 0.06 [-0.19, 0.34] | 0.019 [-0.057, 0.102] | not distinguishable from the floor | -1.59 [-3.09, -0.26] |
+| override rule | epoch 5 | 90/90 | 0.452 | 1.42 | 0.93 | 0.48 [0.01, 1.17] | 0.143 [0.002, 0.348] | above the floor | -1.17 [-2.81, -0.02] |
+| warning, abstain | epoch 5 | 21/90 | 0.452 | 0.74 | 0.39 | 0.35 [-0.30, 1.53] | 0.103 [-0.090, 0.456] | not distinguishable from the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 10 | 90/90 | 0.845 | 1.02 | 0.93 | 0.08 [-0.15, 0.33] | 0.024 [-0.044, 0.098] | not distinguishable from the floor | -1.57 [-3.02, -0.21] |
+| override rule | epoch 10 | 90/90 | 0.874 | 1.62 | 0.93 | 0.68 [0.04, 1.41] | 0.203 [0.011, 0.419] | above the floor | -0.97 [-2.60, 0.31] |
+| warning, abstain | epoch 10 | 29/90 | 0.874 | 0.75 | 0.60 | 0.15 [-0.48, 1.03] | 0.044 [-0.143, 0.307] | not distinguishable from the floor | 0.00 [0.00, 0.00] |
+| successive halving | rungs 1,2,3 | 90/90 | 0.158 | 1.35 | 0.93 | 0.42 [-0.23, 1.10] | 0.124 [-0.069, 0.326] | not distinguishable from the floor | -1.24 [-2.96, 0.43] |
+| successive halving | start 1 | 90/90 | 0.183 | 1.43 | 0.93 | 0.50 [-0.19, 1.19] | 0.148 [-0.057, 0.353] | not distinguishable from the floor | -1.16 [-2.87, 0.36] |
+| successive halving | start 2 | 90/90 | 0.363 | 1.34 | 0.93 | 0.41 [-0.09, 1.05] | 0.121 [-0.027, 0.313] | not distinguishable from the floor | -1.25 [-3.07, 0.45] |
+| successive halving | start 3 | 90/90 | 0.498 | 1.10 | 0.93 | 0.16 [0.04, 0.29] | 0.049 [0.011, 0.087] | above the floor | -1.49 [-3.05, -0.05] |
+| successive halving (factor 3) | rungs 1,2,3 | 90/90 | 0.122 | 1.56 | 0.93 | 0.63 [-0.10, 1.49] | 0.187 [-0.031, 0.444] | not distinguishable from the floor | -1.03 [-2.84, 0.70] |
+| successive halving (factor 3) | start 1 | 90/90 | 0.158 | 1.28 | 0.93 | 0.35 [-0.15, 0.91] | 0.103 [-0.043, 0.269] | not distinguishable from the floor | -1.31 [-3.01, 0.29] |
+| successive halving (factor 3) | start 2 | 90/90 | 0.315 | 1.32 | 0.93 | 0.38 [-0.10, 0.87] | 0.114 [-0.030, 0.258] | not distinguishable from the floor | -1.27 [-2.97, 0.27] |
+| successive halving (factor 3) | start 3 | 90/90 | 0.472 | 0.95 | 0.93 | 0.02 [-0.31, 0.30] | 0.005 [-0.092, 0.091] | not distinguishable from the floor | -1.64 [-3.25, -0.26] |
+
+#### quicktune (top-1 points)
+
+Primary floor: 23.62 [19.58, 27.62] top-1 points, normalized 0.540; zero regret on 0 of 90 decisions.
+
+Spread over the 10000 draws of one run per model (2.5th and 97.5th percentiles of the mean floor): 15.02 to 32.73. Ties go to the model name. Added after the first run (2026-11-25): every Quick-Tune run has its own random hyperparameters (docs/trajectory_design.md, rule A), so one run per model measures the variability of a hyperparameter draw, not of a seed; the methods read curves that are medians over the same runs that define the outcome, so this floor is not comparable with them and the readings below are not a seed-noise comparison.
+
+| method | setting | decisions followed | compute (GPU-h) | regret | floor on those decisions | excess over the floor [95% CI] | normalized excess [95% CI] | reading | difference from the static choice [95% CI] |
+|---|---|---|---|---|---|---|---|---|---|
+| static H-score |  | 90/90 | 0.040 | 40.56 | 23.62 | 16.95 [8.59, 25.53] | 0.387 [0.196, 0.584] | above the floor | n/a |
+| early leader | epoch 1 | 90/90 | 0.094 | 33.58 | 23.62 | 9.96 [-0.27, 20.44] | 0.228 [-0.006, 0.467] | not distinguishable from the floor | -6.98 [-20.84, 7.47] |
+| override rule | epoch 1 | 90/90 | 0.094 | 32.44 | 23.62 | 8.83 [-1.15, 19.27] | 0.202 [-0.026, 0.440] | not distinguishable from the floor | -8.12 [-21.72, 6.17] |
+| warning, abstain | epoch 1 | 3/90 | 0.094 | 16.56 | 9.72 | 6.84 [6.84, 6.84] | 0.156 [0.156, 0.156] | above the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 2 | 90/90 | 0.189 | 15.18 | 23.62 | -8.44 [-14.96, -1.60] | -0.193 [-0.342, -0.036] | below the floor | -25.39 [-36.86, -14.01] |
+| override rule | epoch 2 | 90/90 | 0.189 | 15.18 | 23.62 | -8.44 [-14.96, -1.60] | -0.193 [-0.342, -0.036] | below the floor | -25.39 [-36.86, -14.01] |
+| warning, abstain | epoch 2 | 0 | 0.189 | n/a | n/a | n/a | n/a | n/a | n/a |
+| early leader | epoch 3 | 90/90 | 0.283 | 13.20 | 23.62 | -10.42 [-16.87, -3.49] | -0.238 [-0.386, -0.080] | below the floor | -27.37 [-39.26, -15.42] |
+| override rule | epoch 3 | 90/90 | 0.283 | 13.20 | 23.62 | -10.42 [-16.87, -3.49] | -0.238 [-0.386, -0.080] | below the floor | -27.37 [-39.26, -15.42] |
+| warning, abstain | epoch 3 | 0 | 0.283 | n/a | n/a | n/a | n/a | n/a | n/a |
+| early leader | epoch 5 | 90/90 | 0.474 | 9.79 | 23.62 | -13.83 [-19.90, -7.50] | -0.316 [-0.455, -0.171] | below the floor | -30.77 [-41.70, -19.85] |
+| override rule | epoch 5 | 90/90 | 0.474 | 9.79 | 23.62 | -13.83 [-19.90, -7.50] | -0.316 [-0.455, -0.171] | below the floor | -30.77 [-41.70, -19.85] |
+| warning, abstain | epoch 5 | 3/90 | 0.474 | 0.00 | 8.69 | -8.69 [-8.69, -8.69] | -0.199 [-0.199, -0.199] | below the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 10 | 90/90 | 0.953 | 1.06 | 23.62 | -22.55 [-26.96, -18.06] | -0.515 [-0.616, -0.413] | below the floor | -39.50 [-50.09, -29.24] |
+| override rule | epoch 10 | 90/90 | 0.953 | 1.06 | 23.62 | -22.55 [-26.96, -18.06] | -0.515 [-0.616, -0.413] | below the floor | -39.50 [-50.09, -29.24] |
+| warning, abstain | epoch 10 | 6/90 | 0.953 | 0.00 | 13.78 | -13.78 [-18.87, -8.69] | -0.315 [-0.431, -0.199] | below the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 20 | 90/90 | 1.911 | 1.08 | 23.62 | -22.53 [-26.83, -18.11] | -0.515 [-0.613, -0.414] | below the floor | -39.48 [-50.23, -29.06] |
+| override rule | epoch 20 | 90/90 | 1.911 | 1.08 | 23.62 | -22.53 [-26.83, -18.11] | -0.515 [-0.613, -0.414] | below the floor | -39.48 [-50.23, -29.06] |
+| warning, abstain | epoch 20 | 6/90 | 1.911 | 0.00 | 13.78 | -13.78 [-18.87, -8.69] | -0.315 [-0.431, -0.199] | below the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 30 | 90/90 | 2.901 | 0.25 | 23.62 | -23.37 [-27.27, -19.43] | -0.534 [-0.623, -0.444] | below the floor | -40.31 [-50.68, -30.18] |
+| override rule | epoch 30 | 90/90 | 2.901 | 0.25 | 23.62 | -23.37 [-27.27, -19.43] | -0.534 [-0.623, -0.444] | below the floor | -40.31 [-50.68, -30.18] |
+| warning, abstain | epoch 30 | 6/90 | 2.901 | 0.00 | 13.78 | -13.78 [-18.87, -8.69] | -0.315 [-0.431, -0.199] | below the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 40 | 90/90 | 3.923 | 0.02 | 23.62 | -23.59 [-27.60, -19.57] | -0.539 [-0.631, -0.447] | below the floor | -40.54 [-50.95, -30.39] |
+| override rule | epoch 40 | 90/90 | 3.923 | 0.02 | 23.62 | -23.59 [-27.60, -19.57] | -0.539 [-0.631, -0.447] | below the floor | -40.54 [-50.95, -30.39] |
+| warning, abstain | epoch 40 | 6/90 | 3.923 | 0.00 | 13.78 | -13.78 [-18.87, -8.69] | -0.315 [-0.431, -0.199] | below the floor | 0.00 [0.00, 0.00] |
+| early leader | epoch 50 | 90/90 | 4.946 | 0.00 | 23.62 | -23.62 [-27.62, -19.58] | -0.540 [-0.631, -0.447] | below the floor | -40.56 [-51.01, -30.41] |
+| override rule | epoch 50 | 90/90 | 4.946 | 0.00 | 23.62 | -23.62 [-27.62, -19.58] | -0.540 [-0.631, -0.447] | below the floor | -40.56 [-51.01, -30.41] |
+| warning, abstain | epoch 50 | 6/90 | 4.946 | 0.00 | 13.78 | -13.78 [-18.87, -8.69] | -0.315 [-0.431, -0.199] | below the floor | 0.00 [0.00, 0.00] |
+| successive halving | start 1 | 90/90 | 0.417 | 9.30 | 23.62 | -14.31 [-19.41, -9.15] | -0.327 [-0.444, -0.209] | below the floor | -31.26 [-42.64, -19.98] |
+| successive halving | start 2 | 90/90 | 0.932 | 2.51 | 23.62 | -21.11 [-25.91, -16.21] | -0.482 [-0.592, -0.371] | below the floor | -38.05 [-49.30, -26.93] |
+| successive halving | start 3 | 90/90 | 1.459 | 2.67 | 23.62 | -20.95 [-25.95, -15.55] | -0.479 [-0.593, -0.355] | below the floor | -37.90 [-48.09, -28.08] |
+| successive halving (factor 3) | start 1 | 90/90 | 0.287 | 11.65 | 23.62 | -11.96 [-17.68, -5.90] | -0.273 [-0.404, -0.135] | below the floor | -28.91 [-39.63, -18.20] |
+| successive halving (factor 3) | start 2 | 90/90 | 0.657 | 4.28 | 23.62 | -19.34 [-24.50, -14.11] | -0.442 [-0.560, -0.322] | below the floor | -36.29 [-47.14, -25.40] |
+| successive halving (factor 3) | start 3 | 90/90 | 0.987 | 3.43 | 23.62 | -20.19 [-25.46, -14.55] | -0.461 [-0.582, -0.332] | below the floor | -37.14 [-47.58, -26.83] |
+
+Limitations: StudentBERT has 7 targets and NLP 5 tasks, so intervals are wide; the NLP floor includes the protocol difference to the published outcome; the Quick-Tune floor measures hyperparameter-draw variability and is not comparable with the methods; the StudentBERT floor at the estimator seeds was known before (12.27).
+
+Files: noise_floor.tsv 39a48176dd549371d5b56cd89a781834
+
+_Read: on StudentBERT and NLP the static choice's regret is above the seed floor, and most
+multi-fidelity rows are not distinguishable from it. StudentBERT's floor is 0.0003 [0.0000, 0.0006]
+test AUC (15 of 21 decisions at zero; 0.0001 to 0.0009 over the 6 seeds; the seed oracle, which no
+selection rule can remove, 0.0001); the static H-score choice is above it by 0.0010 [0.0000,
+0.0020], the early leader at 2, 3 and 5 epochs and successive halving started at 1 or 2 epochs are
+not distinguishable from it, and the early leader at 1, 10 and 20 epochs is above it. NLP's floor is
+0.93 [0.16, 1.97] points (0.33 to 1.82 over the 9 seeds; 1.33 validation points within the
+protocol); the static choice is above it by 1.65 [0.16, 3.21], the early leader is not
+distinguishable from it at any budget (0.71 [-0.04, 1.45] at 1 epoch, 0.06 [-0.13, 0.21] at 3), the
+override rule is above it at 1, 2, 5 and 10 epochs, and successive halving is not distinguishable
+from it except at start 3 (0.16 [0.04, 0.29]). The static choice's excess over the floor (0.0010
+AUC, 1.65 points) is larger than the floor itself (0.0003, 0.93). On Quick-Tune the floor (23.62
+top-1 points) measures a hyperparameter draw, not a seed, and is not comparable with the methods,
+which read median curves over the same runs that define the outcome; the Quick-Tune rows are not a
+seed-noise comparison. StudentBERT has 7 targets and NLP 5 tasks, and the NLP floor includes the
+protocol difference to the published outcome._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 

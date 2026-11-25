@@ -1,6 +1,6 @@
 # Shared by Papers B and C: methods, datasets and the transfer benchmark
 
-Generated from RESULTS.md (md5 eeeb20becddcab752782e7f64e505fe5) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
+Generated from RESULTS.md (md5 c0bac2881e8b65049df2620f9e547887) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
 
 - head: 23174127c14fb3db99c019838a036369
 - 0: 010f46663f8c62aa75b4c3940d2e8f8a
