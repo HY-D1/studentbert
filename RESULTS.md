@@ -3196,6 +3196,132 @@ top-1 points) measures a hyperparameter draw, not a seed, and is not comparable 
 which read median curves over the same runs that define the outcome; the Quick-Tune rows are not a
 seed-noise comparison. StudentBERT has 7 targets and NLP 5 tasks, and the NLP floor includes the
 protocol difference to the published outcome._
+### 12.31 Corrections and added limitations for 12.24 to 12.30 (audit of 2026-11-25)
+
+Task: an audit of the record (Harry, 2026-11-25) checked the readings of 12.24 to 12.30 against
+their tables, design files, code and commit history, and found eight places where a reading says
+more than the evidence or leaves out a limitation. This section corrects them. It changes no number
+and runs no analysis (descriptive). The earlier sections stay as recorded, because the record is
+append-only and the split files list each section's md5; read each of them with the item below that
+names it. Every number below is printed in the section it cites, except the accuracy points of item
+1, which convert a printed fraction.
+
+Files (md5): scripts/task4_early_ft.py 9c87a401c955fc90aca772e5c17cbf08, tools/compare_ft_epochs.py
+16fbc8a6b27de3bec529729e1dec032e, docs/nlp_budget_extension_design.md
+d82d64f47e3d23f35a94316446a0041b, docs/qt_hscore_design.md 9131a8e9221faf387cb4ff3c9d87fcf1,
+docs/trajectory_amendment2.md 8859f77870d589845fc5d373a6cae773, docs/selective_trust_design.md
+f63bfdc6bc0df97a97fb2fc97ef0eddd, analysis/regret_compute.py fd4288700ffd9af74fe92911371935ae,
+analysis/noise_floor.py fcc5c16b485fc061a04ff43599851224, docs/regret_compute_design.md
+4dc6393deea651bf59aa8144e1ce1608.
+
+1. 12.29, the reruns. The table "The new runs against the recorded 3-epoch runs" gives the largest
+   validation-accuracy differences 0.4730, 0.4475 and 0.2094 without a unit, and the _Read_ repeats
+   0.4730. They are fractions of validation accuracy, that is 47.30, 44.75 and 20.94 accuracy points
+   (val_acc is correct / len(va), scripts/task4_early_ft.py line 174, checked to lie in [0, 1] at
+   line 61; the difference is abs(a["val_acc"] - b["val_acc"]), tools/compare_ft_epochs.py line 35).
+   The limitations name the cause "(GPU nondeterminism)". That is the cause the design expected
+   ("Epochs 1 to 3 may differ slightly from the recorded runs (GPU nondeterminism)",
+   docs/nlp_budget_extension_design.md), not a tested one: the check confirms only that each new run
+   has the data and settings of its recorded run, and differences of up to 47.30 points are not
+   slight. The decision of 12.29 to take every budget from the new runs is unaffected.
+
+2. 12.25, the design order. "Design: docs/qt_hscore_design.md and docs/trajectory_amendment2.md,
+   both committed before any feature or score existed" holds for the design, committed in 404c1f7
+   (2026-11-10 17:06) as fixed before extraction, together with the feature extraction script. It
+   does not hold for amendment 2, committed in c930810 (2026-11-10 20:38), which opens: "Follows
+   `docs/qt_hscore_design.md`, whose features now exist for all 30 micro tasks and 24 models (job
+   11805425; 720 files)." Amendment 2 was committed after the features existed and before any score:
+   it is committed with analysis/qt_score.py and analysis/qt_reversal.py before either runs on the
+   real features, as it states.
+
+3. 12.24, the early leader on StudentBERT. "after 3 to 5 epochs the early leader halves H-score's
+   regret (0.0006 against 0.0012)" and "A longer budget does not help: the early leader's regret
+   rises to 0.0021 after 10 epochs and 0.0017 after 20, worse than H-score alone" compare point
+   estimates. The paired differences from the static choice in 12.30 span zero at each of these
+   budgets: -0.0006 [-0.0016, 0.0001] at 3 and at 5 epochs, 0.0009 [-0.0017, 0.0037] at 10 and
+   0.0005 [-0.0014, 0.0027] at 20. Neither the halving nor the later worsening is shown.
+
+4. 12.28 and 12.29, the StudentBERT operating point. The budget and threshold at which "Only
+   StudentBERT meets the pre-specified targets" (2 epochs, t = -0.10: 17/21 at 0.099 [0.012, 0.217])
+   are chosen on the same 21 decisions on which they are scored (docs/selective_trust_design.md,
+   Reported, item 4: the smallest budget at which some threshold reaches the targets), so this point
+   is in-sample and optimistic. The design's out-of-sample test is the leave-one-domain-out transfer
+   (Reported, item 3): there a threshold chosen on the two other domains gives held-out StudentBERT
+   0.171 at 5 epochs (12.29). 12.28 adds that "the point sits at the target and its interval spans
+   it"; the phrase "StudentBERT reaches the target at 2 epochs" in 12.29 carries the same caveat.
+
+5. 12.27, the _Read_. (a) "On StudentBERT every method gets worse beyond about 5 epochs": in the
+   12.27 table the early leader (0.0006 at 5 epochs, 0.0021 at 10), the override rule (0.0005,
+   0.0017) and successive halving (0.0007 started at 2, 0.0013 started at 5) are higher later, but
+   warning, abstain is not (0.0010 at 5, 0.0007 at 10), nor is successive halving with factor 3
+   (0.0014 started at 2, 0.0009 started at 5); all of these are point estimates (item 3). (b)
+   "static selection is always the cheapest point and never good enough once a little fine-tuning is
+   allowed": by the paired differences from the static choice in 12.30, on NLP the early leader at
+   3, 5 and 10 epochs (-1.59 [-3.21, -0.17], -1.59 [-3.09, -0.26], -1.57 [-3.02, -0.21]), the
+   override rule at 5 epochs (-1.17 [-2.81, -0.02]) and successive halving started at 3 (-1.49
+   [-3.05, -0.05]; with factor 3, -1.64 [-3.25, -0.26]) have lower regret than static, and every
+   other NLP row, including all at 1 and 2 epochs, has an interval that includes zero. On
+   StudentBERT only successive halving started at 1 epoch is clearly lower (-0.0006 [-0.0011,
+   -0.0001]); three intervals end at a printed -0.0000 (successive halving with factor 3 started at
+   1, the override rule at 5 epochs, full fine-tuning), and every early-leader interval includes or
+   touches zero. On Quick-Tune the early leader and the override rule are lower from 2 epochs on but
+   not at 1 epoch (-6.98 [-20.84, 7.47] and -8.12 [-21.72, 6.17]), and there the methods read the
+   same runs that define the outcome (12.27, 12.30).
+
+6. Quick-Tune compute in 12.27 to 12.30. Each model's curve is the median over its complete runs (at
+   least 3; median 10 per included pair, 12.26), while its compute is the median of one run's time
+   per epoch (analysis/regret_compute.py lines 267 to 271). The Quick-Tune methods are therefore
+   charged for one run per model while their curves summarize several, which understates their
+   compute relative to the information they use. No number changes; this is a limitation of the
+   Quick-Tune fine-tuning compute in 12.27 to 12.30.
+
+7. 12.30, the StudentBERT floor. The floor chooses by one seed's best validation score
+   (analysis/noise_floor.py lines 80 to 81), and that seed's test AUC is one of the six averaged
+   into the gold (lines 122 to 123 check each decision's outcome against the 6-seed mean; 12.30
+   lists the same six seeds, 1, 2, 3, 4, 5 and 42, for the spread and for the seed oracle). The
+   choosing seed thus also enters the outcome, which biases the StudentBERT floor downward
+   (optimistic); the NLP floor is measured against the published outcome, which our runs do not
+   enter. Separately, "The static choice's excess over the floor (0.0010 AUC, 1.65 points) is larger
+   than the floor itself (0.0003, 0.93)" compares point estimates: the excess intervals [0.0000,
+   0.0020] and [0.16, 3.21] contain 0.0003 and 0.93.
+
+8. 12.27, the design order. "docs/regret_compute_design.md was committed before the script existed"
+   should read "before the script was committed": the design is commit ef198fe (2026-11-16 18:16:56)
+   and the script, 441 lines with 67 lines of tests, commit 935ce90 seven minutes later (18:24:04).
+   12.27 already states that "the script was test-run on the StudentBERT scores with stand-in costs
+   while it was written".
+
+_Read: no number in 12.24 to 12.30 changes. Items 3, 5 and 7 narrow three readings to what the
+intervals show: on StudentBERT no early-leader difference from the static choice excludes zero as
+printed, longer budgets are not shown to hurt, and the static choice's excess over the seed floor is
+not shown to exceed the floor. Item 4 marks StudentBERT's operating point as in-sample; items 6 and
+7 add two limitations (Quick-Tune compute is charged for one run, the StudentBERT floor is
+optimistic); items 1, 2 and 8 correct statements of fact. What stands: on NLP the early leader at 3,
+5 and 10 epochs, the override rule at 5 and successive halving at its largest setting have lower
+regret than the static choice with intervals that exclude zero, and on StudentBERT successive
+halving started at 1 epoch does._
+### 12.32 Correction to 12.20: what the label "(prospective)" covers (audit of 2026-11-25)
+
+Task: the audit of 12.31 also found that the tables of 12.20 label the seed set 42, 1, 2
+"(prospective)" in all of its rows, while only part of what they report was fixed before those
+seeds' fine-tunes existed. Descriptive; no number changes. The rule fixed in advance is the epoch-3
+rule: "follow H-score unless its pick is not the validation leader among the 7 encoders at epoch 3
+of the fine-tune with the estimator's seed; otherwise abstain", fixed on 2026-10-13 before any NLP
+early fine-tune existed (docs/option1_nlp_design.md, Methods compared, item 2; committed in 359b78d
+before any output of the full set was read, 12.15). The label holds for the epoch-3 flags on seeds
+42, 1, 2, which 12.20 counts with the replications' tie handling (17 of 20 overtaken recommendations
+recalled, against 18 of 20 under the original rule; 12.20, Ties). The same flag at epochs 1 and 2
+and the AUROC, AUPRC and matched-coverage read-outs, including those of the frozen margin (a
+reference row of the design, Methods compared, item 4), were not fixed in advance: 12.20 defined
+them after every warning result in 12.15 to 12.19 had been seen. For these the seed set 42, 1, 2 is
+post hoc like the other two, and so is the row that the _Read_ of 12.20 singles out ("The exception
+is the prospective set after two epochs").
+
+Files (md5): docs/option1_nlp_design.md 198ce6a6ecede9a26db35adf0cce6059.
+
+_Read: in 12.20, "(prospective)" names the seed set on which the epoch-3 rule was first tested; it
+describes that rule's flags at epoch 3, not the other budgets or the detector metrics. The 12.20
+task paragraph already states that the analysis was defined and run after the results._
 
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 

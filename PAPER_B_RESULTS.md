@@ -1,6 +1,6 @@
 # Paper B: reliable transfer guidance (estimators, warning signal, fresh-seed validation)
 
-Generated from RESULTS.md (md5 c0bac2881e8b65049df2620f9e547887) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
+Generated from RESULTS.md (md5 3700313c02db18d4488df1ae282c023e) by tools/split_results_by_paper.py. Do not edit: RESULTS.md stays the record, and every section below is copied from it unchanged. Sections, with the md5 of their text:
 
 - 12.3: a990d4030a606f0669466ec1b8ceb3c4
 - 12.4: 9c1bf912b795dbb1c64da6500d423ae1
@@ -21,6 +21,7 @@ Generated from RESULTS.md (md5 c0bac2881e8b65049df2620f9e547887) by tools/split_
 - 12.19: 0765011ab405c3a9a7dfd0eecd69f5fb
 - 12.20: 5aa1046402a2904e5165dc5fc800ebce
 - 12.21: 35befca5abd759e40fc16884fb8f2600
+- 12.32: c96a040d218aa5d5f4561139f9fcdabb
 - 13: d6160eb467f0df7fd498b04c329f4ca4
 - 13.1: d7da7737332501c1243c1c91d8ca69c0
 
@@ -1502,6 +1503,29 @@ rankings; mean regret 3.87 points against H-score's 2.70). Its rankings also cha
 seeds (stability 0.37 on StudentBERT and 0.63 on NLP). Bolya et al. report PARC at its best with a
 depth ensemble on a benchmark of diverse architectures; these numbers characterize the core method
 without that ensemble, as fixed in the design._
+### 12.32 Correction to 12.20: what the label "(prospective)" covers (audit of 2026-11-25)
+
+Task: the audit of 12.31 also found that the tables of 12.20 label the seed set 42, 1, 2
+"(prospective)" in all of its rows, while only part of what they report was fixed before those
+seeds' fine-tunes existed. Descriptive; no number changes. The rule fixed in advance is the epoch-3
+rule: "follow H-score unless its pick is not the validation leader among the 7 encoders at epoch 3
+of the fine-tune with the estimator's seed; otherwise abstain", fixed on 2026-10-13 before any NLP
+early fine-tune existed (docs/option1_nlp_design.md, Methods compared, item 2; committed in 359b78d
+before any output of the full set was read, 12.15). The label holds for the epoch-3 flags on seeds
+42, 1, 2, which 12.20 counts with the replications' tie handling (17 of 20 overtaken recommendations
+recalled, against 18 of 20 under the original rule; 12.20, Ties). The same flag at epochs 1 and 2
+and the AUROC, AUPRC and matched-coverage read-outs, including those of the frozen margin (a
+reference row of the design, Methods compared, item 4), were not fixed in advance: 12.20 defined
+them after every warning result in 12.15 to 12.19 had been seen. For these the seed set 42, 1, 2 is
+post hoc like the other two, and so is the row that the _Read_ of 12.20 singles out ("The exception
+is the prospective set after two epochs").
+
+Files (md5): docs/option1_nlp_design.md 198ce6a6ecede9a26db35adf0cce6059.
+
+_Read: in 12.20, "(prospective)" names the seed set on which the epoch-3 rule was first tested; it
+describes that rule's flags at epoch 3, not the other budgets or the detector metrics. The 12.20
+task paragraph already states that the analysis was defined and run after the results._
+
 ## 13. Cross-domain check: NLP encoder selection (Bassignana et al., EMNLP 2022; analysis/task4_evaluate.py, analysis/task4_ceiling.py; /projects/algl/dai.hany/task4/)
 
 Seven Hugging Face encoders (bert-base-uncased, roberta-base, distilbert-base-uncased,
