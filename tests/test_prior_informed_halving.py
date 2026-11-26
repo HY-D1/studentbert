@@ -78,9 +78,49 @@ def test_readouts() -> None:
     assert sr["static"] == 0 and sr["best"] is None
 
 
+def test_resamples_are_boot_ci_draws() -> None:
+    rng = random.Random(5)
+    ds = [random_decision(rng, "nlp", 3, 2, f"t{i % 4}/{i}") for i in range(11)]
+    vals = [rng.random() for _ in ds]
+    means = []
+    for cnt in pih.resamples(ds):
+        xs = [v for d, v in zip(ds, vals, strict=True) for _ in range(cnt[d.cluster])]
+        means.append(sum(xs) / len(xs))
+    means.sort()
+    lo, hi = rc.boot_ci(ds, vals)
+    assert abs(means[int(0.025 * rc.BOOT)] - lo) < 1e-12
+    assert abs(means[int(0.975 * rc.BOOT) - 1] - hi) < 1e-12
+
+
+def test_boot_matched() -> None:
+    ds = [decision("nlp", {"a": [0.5], "b": [0.4]}, {"a": 1.0, "b": 0.0}, {"a": 1.0, "b": 0.0},
+                   f"t{i}/1", f"t{i}") for i in range(2)]
+
+    def row(v: str, per: list, secs: list) -> dict:
+        return {"variant": v, "eta": 2, "param": f"p{v}", "per": [F(x) for x in per],
+                "per_s": secs, "exact": F(sum(per), len(per)), "compute_gpu_h": sum(secs) / 7200}
+    rows = [row("U", [2, 2], [3600.0, 3600.0]), row("I0", [1, 1], [1800.0, 1800.0]),
+            row("I1a", [3, 3], [0.0, 0.0]), row("I2", [0, 4], [0.0, 0.0])]
+    n = 200
+    bm = pih.boot_matched(ds, rows, n)
+    i0 = bm["pairs"][(2, "pU", "I0")]
+    assert i0 == {"save_ci": (0.5, 0.5), "share_ci": (0.5, 0.5), "no_match": 0}
+    i1 = bm["pairs"][(2, "pU", "I1a")]
+    assert i1["no_match"] == n and i1["save_ci"] is None, "never at or below U's regret"
+    both_t1 = sum(c == {"t1": 2} for c in pih.resamples(ds, n))
+    i2 = bm["pairs"][(2, "pU", "I2")]
+    assert 0 < both_t1 < n and i2["no_match"] == both_t1, "misses only when t1 is drawn twice"
+    assert i2["save_ci"] == (1.0, 1.0)
+    assert bm["pairs"][(2, "pU", "I3")]["no_match"] == n, "variant without configurations"
+    assert bm["static_ci"] is None and bm["static_no_match"] == n, "static regret is 0"
+    m, ci = pih.pair_diff(ds, rows[1], rows[0])
+    assert m == -1 and ci == (-1.0, -1.0)
+
+
 def main() -> None:
     tests = [test_halving_reproduces_regret_compute, test_variants_on_a_hand_example,
-             test_uninformed_average, test_readouts]
+             test_uninformed_average, test_readouts, test_resamples_are_boot_ci_draws,
+             test_boot_matched]
     failed = 0
     for t in tests:
         try:

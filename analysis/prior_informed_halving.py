@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import collections
 import csv
 import hashlib
 import math
@@ -131,7 +132,8 @@ def configs(ds: list[rc.Decision], orders: dict, floor: dict, norm: Fraction) ->
                              "ci": rc.boot_ci(ds, [float(r) for r in regs]),
                              "zero": sum(r == 0 for r in regs),
                              "excess": mean - sum((floor[d.key] for d in ds), Fraction(0))
-                             / len(ds), "excess_ci": rc.boot_ci(ds, diff), "per": regs})
+                             / len(ds), "excess_ci": rc.boot_ci(ds, diff), "per": regs,
+                             "per_s": [s for _, s in res]})
     return rows
 
 
@@ -164,6 +166,68 @@ def static_replaced(ds: list[rc.Decision], rows: list[dict]) -> dict | None:
     ok = [r for r in rows if r["variant"] == "U" and r["exact"] <= static]
     best = min(ok, key=lambda r: (r["compute_gpu_h"], r["exact"]), default=None)
     return {"static": static, "best": best}
+
+
+def resamples(ds: list[rc.Decision], n: int = rc.BOOT) -> list[collections.Counter]:
+    keys = sorted({d.cluster for d in ds})
+    rng = random.Random(0)
+    return [collections.Counter(rng.choice(keys) for _ in keys) for _ in range(n)]
+
+
+def pct(vals: list[float | None]) -> tuple[float, float] | None:
+    xs = sorted(v for v in vals if v is not None)
+    if not xs:
+        return None
+    return xs[int(0.025 * len(xs))], xs[max(int(0.975 * len(xs)) - 1, 0)]
+
+
+def boot_matched(ds: list[rc.Decision], rows: list[dict], n: int = rc.BOOT) -> dict:
+    idx = collections.defaultdict(list)
+    for i, d in enumerate(ds):
+        idx[d.cluster].append(i)
+    size = {k: len(v) for k, v in idx.items()}
+    reg = [{k: sum((r["per"][i] for i in v), Fraction(0)) for k, v in idx.items()} for r in rows]
+    comp = [{k: sum(r["per_s"][i] for i in v) for k, v in idx.items()} for r in rows]
+    stat = {k: sum((stl.regret(ds[i], ds[i].pick) for i in v), Fraction(0))
+            for k, v in idx.items()}
+    us = [j for j, r in enumerate(rows) if r["variant"] == "U"]
+    by_v = {v: [j for j, r in enumerate(rows) if r["variant"] == v] for v in INFORMED}
+    save = {(u, v): [] for u in us for v in INFORMED}
+    share = {(u, v): [] for u in us for v in INFORMED}
+    static = []
+    for cnt in resamples(ds, n):
+        m = sum(size[k] * c for k, c in cnt.items())
+        R = [sum((g[k] * c for k, c in cnt.items()), Fraction(0)) for g in reg]
+        C = [sum(g[k] * c for k, c in cnt.items()) / m / 3600 for g in comp]
+        for u in us:
+            for v, js in by_v.items():
+                ok = [j for j in js if R[j] <= R[u]]
+                if not ok:
+                    save[(u, v)].append(None)
+                    share[(u, v)].append(None)
+                    continue
+                b = min(ok, key=lambda j: (C[j], R[j]))
+                save[(u, v)].append(C[u] - C[b])
+                share[(u, v)].append((C[u] - C[b]) / C[u] if C[u] else None)
+        s = sum((stat[k] * c for k, c in cnt.items()), Fraction(0))
+        ok = [u for u in us if R[u] <= s]
+        static.append(C[min(ok, key=lambda j: (C[j], R[j]))] if ok else None)
+    out = {}
+    for (u, v), xs in save.items():
+        out[(rows[u]["eta"], rows[u]["param"], v)] = {
+            "save_ci": pct(xs), "share_ci": pct(share[(u, v)]),
+            "no_match": sum(x is None for x in xs)}
+    return {"pairs": out, "static_ci": pct(static),
+            "static_no_match": sum(x is None for x in static)}
+
+
+def pair_diff(ds: list[rc.Decision], best: dict, u: dict) -> tuple[Fraction, tuple]:
+    diff = [a - b for a, b in zip(best["per"], u["per"], strict=True)]
+    return sum(diff, Fraction(0)) / len(diff), rc.boot_ci(ds, [float(x) for x in diff])
+
+
+def ci_txt(ci: tuple | None, fmt: str) -> str:
+    return "n/a" if ci is None else f"[{ci[0]:{fmt}}, {ci[1]:{fmt}}]"
 
 
 def txt(x: Fraction, ci: tuple, nd: int) -> str:
@@ -215,7 +279,10 @@ def main(argv: list[str] | None = None) -> None:
     L = ["# Prior-informed successive halving: how much fine-tuning compute the score saves", "",
          "Evidence classes: the variants, rungs, accounting and read-outs follow a design written "
          "on 2026-11-24 before this script, kept outside the repository at Harry's request, so "
-         "no commit documents its date; the read-outs are descriptive. Successive halving at the "
+         "no commit documents its date; the intervals for compute saved at matched regret come "
+         "from its amendment 1, written on 2026-11-26 after Prof. Hazra asked for paired "
+         "intervals and before this script ran on real data, also kept outside the repository; "
+         "the read-outs are descriptive. Successive halving at the "
          "12.27 rungs (I0) was known before and is reproduced here decision by decision. U "
          "averages each decision over random candidate orders; the informed variants pay the "
          "frozen scoring time (off the axis on Quick-Tune, as in 12.27). Regret is against each "
@@ -262,33 +329,48 @@ def main(argv: list[str] | None = None) -> None:
             L.append(f"| {r['variant']} | {r['eta']} | {r['param']} | {r['compute_gpu_h']:.3f} | "
                      f"factor {u['eta']}, {u['param']} | {u['compute_gpu_h']:.3f} | "
                      f"{txt(m['diff'], m['ci'], nd)} |")
+        bm = boot_matched(ds, rows)
+        mr = matched_regret(rows)
         L += ["", "Compute saved at matched regret (for each U configuration, the cheapest "
               "configuration of each informed variant with mean regret at most U's; saving is "
-              "U's compute minus that configuration's):", "",
+              "U's compute minus that configuration's; intervals from amendment 1: the match is "
+              f"redone in each of the {rc.BOOT:,} resamples, percentiles over the resamples with "
+              "a match; the regret difference is the matched configuration minus U, paired over "
+              f"decisions; {len(mr)} pairs):", "",
               "| U configuration | U compute | U regret | variant | cheapest matching "
-              "configuration | its compute | saving (GPU-h) | share of U's compute |",
-              "|---|---|---|---|---|---|---|---|"]
-        for m in matched_regret(rows):
+              "configuration | its compute | saving (GPU-h) [95% CI] | share of U's compute "
+              "[95% CI] | resamples without a match | regret difference [95% CI] |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+        for m in mr:
             u, v, best = m["u"], m["variant"], m["best"]
+            b = bm["pairs"][(u["eta"], u["param"], v)]
             head = (f"| factor {u['eta']}, {u['param']} | {u['compute_gpu_h']:.3f} | "
                     f"{stl.dec(u['exact'], nd)} | {v} | ")
+            tail = f" | {b['no_match']} | "
             if best is None:
-                L.append(head + "none | n/a | n/a | n/a |")
+                L.append(head + f"none | n/a | n/a {ci_txt(b['save_ci'], '.3f')} | n/a "
+                         f"{ci_txt(b['share_ci'], '.3f')}" + tail + "n/a |")
                 continue
             save = u["compute_gpu_h"] - best["compute_gpu_h"]
             share = f"{save / u['compute_gpu_h']:.3f}" if u["compute_gpu_h"] else "n/a"
+            dm, dci = pair_diff(ds, best, u)
             L.append(head + f"factor {best['eta']}, {best['param']} | "
-                     f"{best['compute_gpu_h']:.3f} | {save:.3f} | {share} |")
+                     f"{best['compute_gpu_h']:.3f} | {save:.3f} {ci_txt(b['save_ci'], '.3f')} | "
+                     f"{share} {ci_txt(b['share_ci'], '.3f')}" + tail
+                     + f"{txt(dm, dci, nd)} |")
         sr = static_replaced(ds, rows)
+        sci = (f"95% CI of that compute with the match redone in each resample "
+               f"{ci_txt(bm['static_ci'], '.3f')}, no match in {bm['static_no_match']} of "
+               f"{rc.BOOT:,} resamples")
         if sr["best"] is None:
             L += ["", f"The static H-score choice ({stl.dec(sr['static'], nd)}): no U "
-                  "configuration reaches its mean regret.", ""]
+                  f"configuration reaches its mean regret ({sci}).", ""]
         else:
             bb = sr["best"]
             L += ["", f"The static H-score choice ({stl.dec(sr['static'], nd)}): the cheapest U "
                   f"configuration with mean regret at most this is factor {bb['eta']}, "
                   f"{bb['param']} at {bb['compute_gpu_h']:.3f} GPU-h per decision "
-                  f"({stl.dec(bb['exact'], nd)}).", ""]
+                  f"({stl.dec(bb['exact'], nd)}; {sci}).", ""]
     L += ["Limitations: offline replay of recorded curves; StudentBERT has 7 targets and NLP 5 "
           "tasks; on Quick-Tune the outcome comes from the same curves as the signal, its scoring "
           "is off the axis and its noise floor measures a hyperparameter draw, not a seed; "
