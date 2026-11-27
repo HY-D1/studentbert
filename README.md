@@ -45,7 +45,7 @@ studentbert/
 │                           #   RESULTS.md sections (kept for provenance)
 ├── configs/                # Paper B encoder recipes log, Task 4 published tables
 ├── docs/                   # design files committed before each pre-specified analysis
-├── poster/                 # poster build scripts; showcase_poster_2026-11-10.pdf
+├── poster/                 # showcase_poster_2026-11-10.pdf (student showcase poster)
 ├── tests/
 ├── RESULTS.md              # canonical consolidated results
 ├── PAPER_B_RESULTS.md, PAPER_C_RESULTS.md, SHARED_RESULTS.md, OTHER_RESULTS.md
