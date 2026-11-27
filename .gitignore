@@ -57,6 +57,7 @@ audit_report.txt
 paired_bootstrap_lak_out.md
 probe_rerun_info.txt
 !poster/qr_code.png
+!poster/showcase_poster_2026-11-10.pdf
 performance_by_data_regime.pdf
 *.bak_*
 preds/

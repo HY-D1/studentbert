@@ -45,10 +45,13 @@ studentbert/
 │                           #   RESULTS.md sections (kept for provenance)
 ├── configs/                # Paper B encoder recipes log, Task 4 published tables
 ├── docs/                   # design files committed before each pre-specified analysis
-├── poster/                 # poster build scripts
+├── poster/                 # poster build scripts; showcase_poster_2026-11-10.pdf
 ├── tests/
 ├── RESULTS.md              # canonical consolidated results
-└── EXPERIMENTS.md          # experiment index
+├── PAPER_B_RESULTS.md, PAPER_C_RESULTS.md, SHARED_RESULTS.md, OTHER_RESULTS.md
+│                           # verbatim copies of RESULTS.md sections by paper
+│                           #   (tools/split_results_by_paper.py)
+└── EXPERIMENTS.md          # experiment index (week 6 only)
 ```
 
 ## Setup
